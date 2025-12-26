@@ -1,0 +1,126 @@
+{
+  "typography": {
+    "font_family": {
+      "heading": "Outfit, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "weights": {
+      "heading": "600",
+      "body": "400",
+      "bold": "700"
+    },
+    "sizes": {
+      "h1": "text-4xl md:text-5xl tracking-tight",
+      "h2": "text-3xl tracking-tight",
+      "h3": "text-2xl font-semibold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-muted-foreground"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": "#F97316",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#F1F5F9",
+      "secondary_foreground": "#0F172A",
+      "accent": "#FFF7ED",
+      "accent_foreground": "#C2410C",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F8FAFC",
+      "muted_foreground": "#64748B",
+      "border": "#E2E8F0",
+      "input": "#E2E8F0",
+      "ring": "#F97316"
+    },
+    "dark_mode_palette": {
+      "primary": "#F97316",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#1E293B",
+      "secondary_foreground": "#F8FAFC",
+      "accent": "#431407",
+      "accent_foreground": "#FFEDD5",
+      "background": "#020617",
+      "foreground": "#F8FAFC",
+      "muted": "#0F172A",
+      "muted_foreground": "#94A3B8",
+      "border": "#1E293B",
+      "input": "#1E293B",
+      "ring": "#F97316"
+    },
+    "semantic": {
+      "success": "#22C55E",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "layout": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing": {
+      "section": "py-12 md:py-20",
+      "component": "p-6 md:p-8"
+    },
+    "grids": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-6",
+      "grading": "grid grid-cols-1 lg:grid-cols-12 gap-0 h-[calc(100vh-4rem)]"
+    },
+    "border_radius": {
+      "default": "0.5rem",
+      "button": "9999px",
+      "card": "0.75rem"
+    }
+  },
+  "components": {
+    "buttons": {
+      "default": "rounded-full font-medium transition-all active:scale-95",
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg shadow-orange-500/20",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+      "ghost": "hover:bg-accent hover:text-accent-foreground"
+    },
+    "cards": {
+      "default": "bg-card text-card-foreground rounded-xl border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-300",
+      "interactive": "cursor-pointer hover:border-primary/50 hover:ring-1 hover:ring-primary/50"
+    },
+    "inputs": {
+      "default": "rounded-lg border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_bg": "https://images.pexels.com/photos/7976210/pexels-photo-7976210.jpeg",
+      "teacher_grading": "https://images.pexels.com/photos/6684373/pexels-photo-6684373.jpeg",
+      "students_studying": "https://images.pexels.com/photos/8199557/pexels-photo-8199557.jpeg",
+      "login_illustration": "https://images.pexels.com/photos/28887854/pexels-photo-28887854.jpeg"
+    },
+    "icons": "lucide-react"
+  },
+  "libraries": {
+    "pdf_viewer": "react-pdf-viewer",
+    "charts": "recharts",
+    "animations": "framer-motion",
+    "notifications": "sonner",
+    "date_handling": "date-fns",
+    "forms": "react-hook-form + zod"
+  },
+  "instructions_to_main_agent": [
+    "1. SETUP: Install 'lucide-react', 'recharts', 'framer-motion', 'sonner', 'clsx', 'tailwind-merge'.",
+    "2. THEME: Update 'src/index.css' with the CSS variables provided in the 'colors' section. Ensure both :root and .dark classes are populated.",
+    "3. FONTS: Add 'Outfit' and 'Inter' from Google Fonts in 'public/index.html' or via import in 'index.css'.",
+    "4. LAYOUT: For the Grading Page, use a split-screen layout. Left side (60-70%) for PDF Viewer, Right side (30-40%) for Grading Panel. Use 'h-screen' minus header height to prevent scrolling the whole page.",
+    "5. DASHBOARD: Use the 'Bento Grid' strategy. Mix large summary cards with smaller stat cards. Use 'recharts' for the analytics.",
+    "6. COMPONENTS: Customize Shadcn components. Override default radius to '0.5rem' or '0.75rem'. Use 'rounded-full' for primary action buttons.",
+    "7. MOTION: Add subtle entrance animations using 'framer-motion' (e.g., fade-in-up for cards). Use 'AnimatePresence' for modal/dialog transitions.",
+    "8. ACCESSIBILITY: Ensure all text on Orange backgrounds is White. If using lighter orange, check contrast. Use 'data-testid' on all interactive elements.",
+    "9. PDF: Use a placeholder div or iframe if 'react-pdf-viewer' setup is too complex for the MVP, but structure the code to easily swap it in.",
+    "10. AUTH: Mock the Google OAuth flow visually if backend is not ready, but provide the UI for 'Sign in with Google'."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Avoid generic AI designs. Use the 'Orange' accent boldly but strategically (buttons, active states, key metrics).",
+    "Do not use gradients for the main background. Keep it clean White or very light Gray.",
+    "Use 'sonner' for all toast notifications.",
+    "Ensure the app is responsive, but prioritize Desktop experience for the Grading interface.",
+    "Use 'lucide-react' for icons. Do not use emojis in the UI."
+  ]
+}
