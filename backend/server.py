@@ -328,7 +328,7 @@ async def create_batch(batch: BatchCreate, user: User = Depends(get_current_user
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.batches.insert_one(new_batch)
-    del new_batch["_id"] if "_id" in new_batch else None
+    new_batch.pop("_id", None)
     return new_batch
 
 @api_router.delete("/batches/{batch_id}")
