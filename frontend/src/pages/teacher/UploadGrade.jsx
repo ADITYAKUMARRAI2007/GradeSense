@@ -255,20 +255,20 @@ export default function UploadGrade({ user }) {
   };
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center gap-2 mb-8">
+    <div className="flex items-center justify-center gap-1 lg:gap-2 mb-6 lg:mb-8 overflow-x-auto pb-2">
       {[1, 2, 3, 4, 5, 6].map((s) => (
-        <div key={s} className="flex items-center">
+        <div key={s} className="flex items-center flex-shrink-0">
           <div 
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+            className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-medium transition-all ${
               s < step ? "bg-green-500 text-white" :
               s === step ? "bg-primary text-white" :
               "bg-muted text-muted-foreground"
             }`}
           >
-            {s < step ? <CheckCircle className="w-5 h-5" /> : s}
+            {s < step ? <CheckCircle className="w-3 h-3 lg:w-5 lg:h-5" /> : s}
           </div>
           {s < 6 && (
-            <div className={`w-8 h-1 mx-1 ${s < step ? "bg-green-500" : "bg-muted"}`} />
+            <div className={`w-4 lg:w-8 h-0.5 lg:h-1 mx-0.5 lg:mx-1 ${s < step ? "bg-green-500" : "bg-muted"}`} />
           )}
         </div>
       ))}
@@ -277,7 +277,7 @@ export default function UploadGrade({ user }) {
 
   return (
     <Layout user={user}>
-      <div className="max-w-4xl mx-auto" data-testid="upload-grade-page">
+      <div className="max-w-4xl mx-auto px-0 lg:px-4" data-testid="upload-grade-page">
         {renderStepIndicator()}
 
         {/* Step 1: Exam Configuration */}
@@ -288,7 +288,7 @@ export default function UploadGrade({ user }) {
               <CardDescription>Set up the basic details for this exam</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                 <div className="space-y-2">
                   <Label>Batch/Class *</Label>
                   <Select 
@@ -350,7 +350,7 @@ export default function UploadGrade({ user }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                 <div className="space-y-2">
                   <Label>Exam Type *</Label>
                   <Select 
@@ -379,7 +379,7 @@ export default function UploadGrade({ user }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                 <div className="space-y-2">
                   <Label>Total Marks *</Label>
                   <Input 
@@ -493,7 +493,7 @@ export default function UploadGrade({ user }) {
               <CardDescription>Choose how strictly the AI should grade the papers</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                 {GRADING_MODES.map((mode) => (
                   <div 
                     key={mode.id}
