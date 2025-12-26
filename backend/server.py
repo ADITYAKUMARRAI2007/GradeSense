@@ -581,7 +581,7 @@ Return your response in this exact JSON format:
         for q in questions
     ])
     
-    # Create image contents - use ImageContent with image_base64 parameter
+    # Create image contents list - ImageContent inherits from FileContent
     all_images = []
     
     # Add model answer images
@@ -592,6 +592,7 @@ Return your response in this exact JSON format:
     for i, img in enumerate(images[:5]):  # Limit images
         all_images.append(ImageContent(image_base64=img))
     
+    # UserMessage takes file_contents parameter (not image_contents)
     user_message = UserMessage(
         text=f"""Grade this student's handwritten answer paper.
 
@@ -602,11 +603,9 @@ The first {min(len(model_answer_images), 3)} image(s) show the MODEL ANSWER (ref
 The remaining images show the STUDENT'S ANSWER PAPER.
 
 Please grade each question and provide constructive feedback.
-Return valid JSON only."""
+Return valid JSON only.""",
+        file_contents=all_images
     )
-    
-    # Add images to the message using the correct attribute
-    user_message.image_contents = all_images
     
     try:
         response = await chat.send_message(user_message)
