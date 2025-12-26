@@ -1,0 +1,183 @@
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { 
+  GraduationCap, 
+  LayoutDashboard, 
+  Upload, 
+  FileText, 
+  BarChart3, 
+  Lightbulb, 
+  Users, 
+  Settings,
+  LogOut,
+  ChevronLeft,
+  Bell,
+  MessageSquare
+} from "lucide-react";
+import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { cn } from "../lib/utils";
+import axios from "axios";
+import { API } from "../App";
+
+const teacherNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/teacher/dashboard" },
+  { icon: Upload, label: "Upload & Grade", path: "/teacher/upload" },
+  { icon: FileText, label: "Review Papers", path: "/teacher/review" },
+  { icon: BarChart3, label: "Class Reports", path: "/teacher/reports" },
+  { icon: Lightbulb, label: "Insights", path: "/teacher/insights" },
+  { icon: Users, label: "Manage Students", path: "/teacher/students" },
+  { icon: MessageSquare, label: "Re-evaluations", path: "/teacher/re-evaluations" },
+];
+
+const studentNavItems = [
+  { icon: LayoutDashboard, label: "My Dashboard", path: "/student/dashboard" },
+  { icon: FileText, label: "My Results", path: "/student/results" },
+  { icon: MessageSquare, label: "Request Re-evaluation", path: "/student/re-evaluation" },
+];
+
+export default function Layout({ children, user }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const navItems = user?.role === "student" ? studentNavItems : teacherNavItems;
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${API}/auth/logout`);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+    window.location.href = "/login";
+  };
+
+  return (
+    <div className="flex min-h-screen bg-muted/30">
+      {/* Sidebar */}
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 z-40 h-screen bg-white border-r border-border transition-all duration-300",
+          collapsed ? "w-[72px]" : "w-[260px]"
+        )}
+        data-testid="sidebar"
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-4 h-16 border-b">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
+            <GraduationCap className="w-6 h-6 text-white" />
+          </div>
+          {!collapsed && (
+            <span className="text-xl font-bold text-foreground">
+              Grade<span className="text-primary">Sense</span>
+            </span>
+          )}
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1 p-3 mt-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+                  isActive 
+                    ? "bg-primary text-white shadow-md shadow-orange-500/20" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="font-medium">{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom section */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t">
+          <Link
+            to="/settings"
+            data-testid="nav-settings"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+              location.pathname === "/settings" 
+                ? "bg-primary text-white" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Settings className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span className="font-medium">Settings</span>}
+          </Link>
+          
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="w-full justify-start gap-3 px-3 py-2.5 mt-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            data-testid="logout-btn"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span className="font-medium">Logout</span>}
+          </Button>
+        </div>
+
+        {/* Collapse button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-white border shadow-sm hover:bg-muted"
+          data-testid="collapse-sidebar-btn"
+        >
+          <ChevronLeft className={cn("w-4 h-4 transition-transform", collapsed && "rotate-180")} />
+        </Button>
+      </aside>
+
+      {/* Main content */}
+      <div className={cn("flex-1 transition-all duration-300", collapsed ? "ml-[72px]" : "ml-[260px]")}>
+        {/* Header */}
+        <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-white border-b">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">
+              {navItems.find(item => item.path === location.pathname)?.label || "GradeSense"}
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Notifications */}
+            <Button variant="ghost" size="icon" className="relative" data-testid="notifications-btn">
+              <Bell className="w-5 h-5" />
+              <span className="notification-badge">3</span>
+            </Button>
+
+            {/* User */}
+            <div className="flex items-center gap-3">
+              <Avatar className="w-9 h-9">
+                <AvatarImage src={user?.picture} alt={user?.name} />
+                <AvatarFallback className="bg-primary text-white">
+                  {user?.name?.charAt(0) || "U"}
+                </AvatarFallback>
+              </Avatar>
+              {!collapsed && (
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="p-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
