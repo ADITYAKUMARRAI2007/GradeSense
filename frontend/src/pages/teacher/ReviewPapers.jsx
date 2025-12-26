@@ -155,7 +155,7 @@ export default function ReviewPapers({ user }) {
                     <SelectValue placeholder="Filter by exam" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Exams</SelectItem>
+                    <SelectItem value="all">All Exams</SelectItem>
                     {exams.map(exam => (
                       <SelectItem key={exam.exam_id} value={exam.exam_id}>
                         {exam.exam_name}
