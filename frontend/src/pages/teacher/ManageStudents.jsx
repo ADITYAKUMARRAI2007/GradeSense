@@ -115,23 +115,24 @@ export default function ManageStudents({ user }) {
 
   return (
     <Layout user={user}>
-      <div className="space-y-6" data-testid="manage-students-page">
+      <div className="space-y-4 lg:space-y-6" data-testid="manage-students-page">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Manage Students</h1>
-            <p className="text-muted-foreground">Add, edit, and organize your students</p>
+            <h1 className="text-xl lg:text-2xl font-bold text-foreground">Manage Students</h1>
+            <p className="text-sm text-muted-foreground">Add, edit, and organize your students</p>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Button variant="outline" disabled>
-              <Upload className="w-4 h-4 mr-2" />
-              Bulk Import (CSV)
+          <div className="flex items-center gap-2 lg:gap-3">
+            <Button variant="outline" disabled className="text-xs lg:text-sm flex-1 lg:flex-none">
+              <Upload className="w-4 h-4 mr-1 lg:mr-2" />
+              <span className="hidden sm:inline">Bulk Import</span>
+              <span className="sm:hidden">Import</span>
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={openNewDialog} data-testid="add-student-btn">
-                  <Plus className="w-4 h-4 mr-2" />
+                <Button onClick={openNewDialog} data-testid="add-student-btn" className="text-xs lg:text-sm flex-1 lg:flex-none">
+                  <Plus className="w-4 h-4 mr-1 lg:mr-2" />
                   Add Student
                 </Button>
               </DialogTrigger>
@@ -206,20 +207,20 @@ export default function ManageStudents({ user }) {
 
         {/* Filters */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
+          <CardContent className="p-3 lg:p-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:gap-4">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search by name or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 text-sm"
                   data-testid="search-students-input"
                 />
               </div>
               <Select value={selectedBatch || "all"} onValueChange={(v) => setSelectedBatch(v === "all" ? "" : v)}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48 text-sm">
                   <SelectValue placeholder="All Batches" />
                 </SelectTrigger>
                 <SelectContent>
