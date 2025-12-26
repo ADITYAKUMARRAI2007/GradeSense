@@ -581,16 +581,16 @@ Return your response in this exact JSON format:
         for q in questions
     ])
     
-    # Create image contents
-    image_contents = []
+    # Create image contents - use ImageContent with image_base64 parameter
+    all_images = []
     
     # Add model answer images
     for i, img in enumerate(model_answer_images[:3]):  # Limit images
-        image_contents.append(ImageContent(image_base64=img))
+        all_images.append(ImageContent(image_base64=img))
     
     # Add student answer images
     for i, img in enumerate(images[:5]):  # Limit images
-        image_contents.append(ImageContent(image_base64=img))
+        all_images.append(ImageContent(image_base64=img))
     
     user_message = UserMessage(
         text=f"""Grade this student's handwritten answer paper.
@@ -598,13 +598,15 @@ Return your response in this exact JSON format:
 Questions to grade:
 {questions_text}
 
-The first set of images shows the MODEL ANSWER (reference).
-The following images show the STUDENT'S ANSWER PAPER.
+The first {min(len(model_answer_images), 3)} image(s) show the MODEL ANSWER (reference).
+The remaining images show the STUDENT'S ANSWER PAPER.
 
 Please grade each question and provide constructive feedback.
-Return valid JSON only.""",
-        image_contents=image_contents
+Return valid JSON only."""
     )
+    
+    # Add images to the message using the correct attribute
+    user_message.image_contents = all_images
     
     try:
         response = await chat.send_message(user_message)
