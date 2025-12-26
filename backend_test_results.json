@@ -1,0 +1,73 @@
+{
+  "timestamp": "2025-12-26T07:05:30.085729",
+  "total_tests": 13,
+  "passed_tests": 13,
+  "success_rate": 100.0,
+  "test_details": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Auth Me",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Batch",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Batches",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Subject",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Subjects",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Students",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Exams",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Analytics",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Class Report",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "AI Insights",
+      "success": true,
+      "details": ""
+    }
+  ]
+}
