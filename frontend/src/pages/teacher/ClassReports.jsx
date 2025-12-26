@@ -122,16 +122,16 @@ export default function ClassReports({ user }) {
 
   return (
     <Layout user={user}>
-      <div className="space-y-6" data-testid="class-reports-page">
+      <div className="space-y-4 lg:space-y-6" data-testid="class-reports-page">
         {/* Filters */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-4">
+          <CardContent className="p-3 lg:p-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 lg:gap-4">
               <Select 
                 value={filters.batch_id || "all"} 
                 onValueChange={(v) => setFilters(prev => ({ ...prev, batch_id: v === "all" ? "" : v }))}
               >
-                <SelectTrigger className="w-48" data-testid="batch-filter">
+                <SelectTrigger className="w-full sm:w-40 lg:w-48 text-sm" data-testid="batch-filter">
                   <SelectValue placeholder="All Batches" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,7 +148,7 @@ export default function ClassReports({ user }) {
                 value={filters.subject_id || "all"} 
                 onValueChange={(v) => setFilters(prev => ({ ...prev, subject_id: v === "all" ? "" : v }))}
               >
-                <SelectTrigger className="w-48" data-testid="subject-filter">
+                <SelectTrigger className="w-full sm:w-40 lg:w-48 text-sm" data-testid="subject-filter">
                   <SelectValue placeholder="All Subjects" />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,7 +165,7 @@ export default function ClassReports({ user }) {
                 value={filters.exam_id || "all"} 
                 onValueChange={(v) => setFilters(prev => ({ ...prev, exam_id: v === "all" ? "" : v }))}
               >
-                <SelectTrigger className="w-48" data-testid="exam-filter">
+                <SelectTrigger className="w-full sm:w-40 lg:w-48 text-sm" data-testid="exam-filter">
                   <SelectValue placeholder="All Exams" />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,10 +178,10 @@ export default function ClassReports({ user }) {
                 </SelectContent>
               </Select>
 
-              <div className="ml-auto">
-                <Button variant="outline" onClick={exportReport} data-testid="export-btn">
+              <div className="sm:ml-auto">
+                <Button variant="outline" onClick={exportReport} data-testid="export-btn" className="w-full sm:w-auto text-sm">
                   <Download className="w-4 h-4 mr-2" />
-                  Export Report
+                  Export
                 </Button>
               </div>
             </div>
@@ -189,72 +189,72 @@ export default function ClassReports({ user }) {
         </Card>
 
         {/* Overview Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
           <Card className="animate-fade-in">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-50">
-                  <Users className="w-5 h-5 text-blue-600" />
+            <CardContent className="p-3 lg:p-4">
+              <div className="flex items-center gap-2 lg:gap-3">
+                <div className="p-1.5 lg:p-2 rounded-lg bg-blue-50 flex-shrink-0">
+                  <Users className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{overview.total_students || 0}</p>
-                  <p className="text-sm text-muted-foreground">Total Students</p>
+                <div className="min-w-0">
+                  <p className="text-lg lg:text-2xl font-bold">{overview.total_students || 0}</p>
+                  <p className="text-xs lg:text-sm text-muted-foreground truncate">Total Students</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="animate-fade-in stagger-1">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-50">
-                  <TrendingUp className="w-5 h-5 text-orange-600" />
+            <CardContent className="p-3 lg:p-4">
+              <div className="flex items-center gap-2 lg:gap-3">
+                <div className="p-1.5 lg:p-2 rounded-lg bg-orange-50 flex-shrink-0">
+                  <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-orange-600" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{overview.avg_score || 0}%</p>
-                  <p className="text-sm text-muted-foreground">Class Average</p>
+                <div className="min-w-0">
+                  <p className="text-lg lg:text-2xl font-bold">{overview.avg_score || 0}%</p>
+                  <p className="text-xs lg:text-sm text-muted-foreground truncate">Class Average</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="animate-fade-in stagger-2">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-50">
-                  <Award className="w-5 h-5 text-green-600" />
+            <CardContent className="p-3 lg:p-4">
+              <div className="flex items-center gap-2 lg:gap-3">
+                <div className="p-1.5 lg:p-2 rounded-lg bg-green-50 flex-shrink-0">
+                  <Award className="w-4 h-4 lg:w-5 lg:h-5 text-green-600" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{overview.highest_score || 0}%</p>
-                  <p className="text-sm text-muted-foreground">Highest Score</p>
+                <div className="min-w-0">
+                  <p className="text-lg lg:text-2xl font-bold">{overview.highest_score || 0}%</p>
+                  <p className="text-xs lg:text-sm text-muted-foreground truncate">Highest Score</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="animate-fade-in stagger-3">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-50">
-                  <TrendingDown className="w-5 h-5 text-red-600" />
+            <CardContent className="p-3 lg:p-4">
+              <div className="flex items-center gap-2 lg:gap-3">
+                <div className="p-1.5 lg:p-2 rounded-lg bg-red-50 flex-shrink-0">
+                  <TrendingDown className="w-4 h-4 lg:w-5 lg:h-5 text-red-600" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{overview.lowest_score || 0}%</p>
-                  <p className="text-sm text-muted-foreground">Lowest Score</p>
+                <div className="min-w-0">
+                  <p className="text-lg lg:text-2xl font-bold">{overview.lowest_score || 0}%</p>
+                  <p className="text-xs lg:text-sm text-muted-foreground truncate">Lowest Score</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="animate-fade-in stagger-4">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-50">
-                  <FileSpreadsheet className="w-5 h-5 text-purple-600" />
+          <Card className="animate-fade-in stagger-4 col-span-2 lg:col-span-1">
+            <CardContent className="p-3 lg:p-4">
+              <div className="flex items-center gap-2 lg:gap-3">
+                <div className="p-1.5 lg:p-2 rounded-lg bg-purple-50 flex-shrink-0">
+                  <FileSpreadsheet className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{overview.pass_percentage || 0}%</p>
-                  <p className="text-sm text-muted-foreground">Pass Rate</p>
+                <div className="min-w-0">
+                  <p className="text-lg lg:text-2xl font-bold">{overview.pass_percentage || 0}%</p>
+                  <p className="text-xs lg:text-sm text-muted-foreground truncate">Pass Rate</p>
                 </div>
               </div>
             </CardContent>
@@ -262,24 +262,25 @@ export default function ClassReports({ user }) {
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* Score Distribution */}
           <Card className="animate-fade-in stagger-2">
-            <CardHeader>
-              <CardTitle>Score Distribution</CardTitle>
+            <CardHeader className="p-4 lg:p-6">
+              <CardTitle className="text-base lg:text-lg">Score Distribution</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-80">
+            <CardContent className="p-4 lg:p-6 pt-0">
+              <div className="h-60 lg:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={scoreDistribution}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                    <XAxis dataKey="range" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="range" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'white', 
                         border: '1px solid #E2E8F0',
-                        borderRadius: '8px'
+                        borderRadius: '8px',
+                        fontSize: '12px'
                       }} 
                     />
                     <Bar dataKey="count" fill="#F97316" radius={[4, 4, 0, 0]} />
@@ -291,21 +292,22 @@ export default function ClassReports({ user }) {
 
           {/* Question Analysis */}
           <Card className="animate-fade-in stagger-3">
-            <CardHeader>
-              <CardTitle>Question-wise Performance</CardTitle>
+            <CardHeader className="p-4 lg:p-6">
+              <CardTitle className="text-base lg:text-lg">Question-wise Performance</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-80">
+            <CardContent className="p-4 lg:p-6 pt-0">
+              <div className="h-60 lg:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={questionAnalysis} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12 }} />
-                    <YAxis dataKey="question" type="category" tick={{ fontSize: 12 }} width={60} tickFormatter={(v) => `Q${v}`} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                    <YAxis dataKey="question" type="category" tick={{ fontSize: 10 }} width={40} tickFormatter={(v) => `Q${v}`} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'white', 
                         border: '1px solid #E2E8F0',
-                        borderRadius: '8px'
+                        borderRadius: '8px',
+                        fontSize: '12px'
                       }}
                       formatter={(value) => [`${value}%`, 'Average']}
                     />
