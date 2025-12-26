@@ -12,10 +12,13 @@ import {
   LogOut,
   ChevronLeft,
   Bell,
-  MessageSquare
+  MessageSquare,
+  Menu,
+  X
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { cn } from "../lib/utils";
 import axios from "axios";
 import { API } from "../App";
@@ -38,6 +41,7 @@ const studentNavItems = [
 
 export default function Layout({ children, user }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -52,81 +56,92 @@ export default function Layout({ children, user }) {
     window.location.href = "/login";
   };
 
+  const NavContent = ({ isMobile = false }) => (
+    <>
+      {/* Logo */}
+      <div className={cn(
+        "flex items-center gap-3 h-16 border-b",
+        isMobile ? "px-4" : "px-4"
+      )}>
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
+          <GraduationCap className="w-6 h-6 text-white" />
+        </div>
+        {(isMobile || !collapsed) && (
+          <span className="text-xl font-bold text-foreground">
+            Grade<span className="text-primary">Sense</span>
+          </span>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex flex-col gap-1 p-3 mt-2 flex-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={() => isMobile && setMobileOpen(false)}
+              data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+                isActive 
+                  ? "bg-primary text-white shadow-md shadow-orange-500/20" 
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Icon className="w-5 h-5 flex-shrink-0" />
+              {(isMobile || !collapsed) && <span className="font-medium">{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom section */}
+      <div className="p-3 border-t mt-auto">
+        <Link
+          to="/settings"
+          onClick={() => isMobile && setMobileOpen(false)}
+          data-testid="nav-settings"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+            location.pathname === "/settings" 
+              ? "bg-primary text-white" 
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+        >
+          <Settings className="w-5 h-5 flex-shrink-0" />
+          {(isMobile || !collapsed) && <span className="font-medium">Settings</span>}
+        </Link>
+        
+        <Button
+          variant="ghost"
+          onClick={handleLogout}
+          className="w-full justify-start gap-3 px-3 py-2.5 mt-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          data-testid="logout-btn"
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {(isMobile || !collapsed) && <span className="font-medium">Logout</span>}
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex min-h-screen bg-muted/30">
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
       <aside 
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen bg-white border-r border-border transition-all duration-300",
+          "fixed left-0 top-0 z-40 h-screen bg-white border-r border-border transition-all duration-300 hidden lg:flex flex-col",
           collapsed ? "w-[72px]" : "w-[260px]"
         )}
         data-testid="sidebar"
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-4 h-16 border-b">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
-          {!collapsed && (
-            <span className="text-xl font-bold text-foreground">
-              Grade<span className="text-primary">Sense</span>
-            </span>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1 p-3 mt-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
-                  isActive 
-                    ? "bg-primary text-white shadow-md shadow-orange-500/20" 
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="font-medium">{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bottom section */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t">
-          <Link
-            to="/settings"
-            data-testid="nav-settings"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
-              location.pathname === "/settings" 
-                ? "bg-primary text-white" 
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <Settings className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span className="font-medium">Settings</span>}
-          </Link>
-          
-          <Button
-            variant="ghost"
-            onClick={handleLogout}
-            className="w-full justify-start gap-3 px-3 py-2.5 mt-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            data-testid="logout-btn"
-          >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span className="font-medium">Logout</span>}
-          </Button>
-        </div>
-
-        {/* Collapse button */}
+        <NavContent />
+        
+        {/* Collapse button - Desktop only */}
         <Button
           variant="ghost"
           size="icon"
@@ -138,17 +153,39 @@ export default function Layout({ children, user }) {
         </Button>
       </aside>
 
+      {/* Mobile Sidebar (Sheet) */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="p-0 w-[280px] flex flex-col">
+          <NavContent isMobile />
+        </SheetContent>
+      </Sheet>
+
       {/* Main content */}
-      <div className={cn("flex-1 transition-all duration-300", collapsed ? "ml-[72px]" : "ml-[260px]")}>
+      <div className={cn(
+        "flex-1 transition-all duration-300",
+        "lg:ml-[260px]",
+        collapsed && "lg:ml-[72px]"
+      )}>
         {/* Header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-white border-b">
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">
+        <header className="sticky top-0 z-30 flex items-center justify-between h-14 lg:h-16 px-4 lg:px-6 bg-white border-b">
+          <div className="flex items-center gap-3">
+            {/* Mobile menu button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setMobileOpen(true)}
+              data-testid="mobile-menu-btn"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            
+            <h1 className="text-base lg:text-lg font-semibold text-foreground truncate">
               {navItems.find(item => item.path === location.pathname)?.label || "GradeSense"}
             </h1>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 lg:gap-4">
             {/* Notifications */}
             <Button variant="ghost" size="icon" className="relative" data-testid="notifications-btn">
               <Bell className="w-5 h-5" />
@@ -156,25 +193,23 @@ export default function Layout({ children, user }) {
             </Button>
 
             {/* User */}
-            <div className="flex items-center gap-3">
-              <Avatar className="w-9 h-9">
+            <div className="flex items-center gap-2 lg:gap-3">
+              <Avatar className="w-8 h-8 lg:w-9 lg:h-9">
                 <AvatarImage src={user?.picture} alt={user?.name} />
-                <AvatarFallback className="bg-primary text-white">
+                <AvatarFallback className="bg-primary text-white text-sm">
                   {user?.name?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
-              {!collapsed && (
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                </div>
-              )}
+              <div className="hidden md:block">
+                <p className="text-sm font-medium">{user?.name}</p>
+                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {children}
         </main>
       </div>

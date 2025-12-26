@@ -73,14 +73,14 @@ export default function TeacherDashboard({ user }) {
 
   return (
     <Layout user={user}>
-      <div className="space-y-6" data-testid="teacher-dashboard">
+      <div className="space-y-4 lg:space-y-6" data-testid="teacher-dashboard">
         {/* Welcome Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
               Welcome back, {user?.name?.split(" ")[0]}!
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm lg:text-base text-muted-foreground mt-1">
               {new Date().toLocaleDateString('en-US', { 
                 weekday: 'long', 
                 year: 'numeric', 
@@ -91,7 +91,7 @@ export default function TeacherDashboard({ user }) {
           </div>
           <Button 
             onClick={() => navigate("/teacher/upload")}
-            className="rounded-full shadow-md hover:shadow-lg transition-all"
+            className="rounded-full shadow-md hover:shadow-lg transition-all w-full lg:w-auto"
             data-testid="upload-papers-btn"
           >
             Upload & Grade Papers
@@ -100,7 +100,7 @@ export default function TeacherDashboard({ user }) {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           {statCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -110,14 +110,14 @@ export default function TeacherDashboard({ user }) {
                 style={{ animationDelay: `${index * 0.1}s` }}
                 data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4 lg:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{stat.label}</p>
-                      <p className="text-3xl font-bold mt-1">{stat.value}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs lg:text-sm text-muted-foreground truncate">{stat.label}</p>
+                      <p className="text-xl lg:text-3xl font-bold mt-1">{stat.value}</p>
                     </div>
-                    <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                      <Icon className={`w-6 h-6 ${stat.color}`} />
+                    <div className={`p-2 lg:p-3 rounded-xl ${stat.bgColor} flex-shrink-0 ml-2`}>
+                      <Icon className={`w-4 h-4 lg:w-6 lg:h-6 ${stat.color}`} />
                     </div>
                   </div>
                 </CardContent>
@@ -127,31 +127,32 @@ export default function TeacherDashboard({ user }) {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Recent Activity */}
           <Card className="lg:col-span-2 animate-fade-in stagger-2" data-testid="recent-activity">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent Submissions</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between p-4 lg:p-6">
+              <CardTitle className="text-base lg:text-lg">Recent Submissions</CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => navigate("/teacher/review")}
+                className="text-xs lg:text-sm"
               >
                 View All
-                <ArrowRight className="w-4 h-4 ml-1" />
+                <ArrowRight className="w-3 h-3 lg:w-4 lg:h-4 ml-1" />
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 lg:p-6 pt-0 lg:pt-0">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+                    <div key={i} className="h-14 lg:h-16 bg-muted animate-pulse rounded-lg" />
                   ))}
                 </div>
               ) : recentSubmissions.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                  <p className="text-muted-foreground">No submissions yet</p>
+                <div className="text-center py-6 lg:py-8">
+                  <FileText className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="text-sm lg:text-base text-muted-foreground">No submissions yet</p>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -162,30 +163,38 @@ export default function TeacherDashboard({ user }) {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2 lg:space-y-3">
                   {recentSubmissions.map((submission, index) => (
                     <div 
                       key={submission.submission_id}
-                      className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      className="flex items-center justify-between p-3 lg:p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-sm font-medium text-primary">
+                      <div className="flex items-center gap-2 lg:gap-3 min-w-0">
+                        <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs lg:text-sm font-medium text-primary">
                             {submission.student_name?.charAt(0) || "?"}
                           </span>
                         </div>
-                        <div>
-                          <p className="font-medium">{submission.student_name}</p>
-                          <p className="text-sm text-muted-foreground">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm lg:text-base truncate">{submission.student_name}</p>
+                          <p className="text-xs lg:text-sm text-muted-foreground">
                             Score: {submission.total_score}
                           </p>
                         </div>
                       </div>
                       <Badge 
                         variant={submission.status === "teacher_reviewed" ? "default" : "secondary"}
-                        className={submission.status === "ai_graded" ? "bg-yellow-100 text-yellow-700" : ""}
+                        className={cn(
+                          "text-xs flex-shrink-0 ml-2",
+                          submission.status === "ai_graded" ? "bg-yellow-100 text-yellow-700" : ""
+                        )}
                       >
-                        {submission.status === "ai_graded" ? "Needs Review" : "Reviewed"}
+                        <span className="hidden sm:inline">
+                          {submission.status === "ai_graded" ? "Needs Review" : "Reviewed"}
+                        </span>
+                        <span className="sm:hidden">
+                          {submission.status === "ai_graded" ? "Review" : "Done"}
+                        </span>
                       </Badge>
                     </div>
                   ))}
@@ -195,24 +204,24 @@ export default function TeacherDashboard({ user }) {
           </Card>
 
           {/* Quick Actions & Alerts */}
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             {/* Pending Re-evaluations */}
             {stats.pending_reeval > 0 && (
               <Card className="border-yellow-200 bg-yellow-50/50 animate-fade-in stagger-3">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-yellow-900">
+                <CardContent className="p-3 lg:p-4">
+                  <div className="flex items-start gap-2 lg:gap-3">
+                    <AlertCircle className="w-4 h-4 lg:w-5 lg:h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-yellow-900 text-sm lg:text-base">
                         {stats.pending_reeval} Re-evaluation Request{stats.pending_reeval > 1 ? "s" : ""}
                       </p>
-                      <p className="text-sm text-yellow-700 mt-1">
+                      <p className="text-xs lg:text-sm text-yellow-700 mt-1">
                         Students have requested grade reviews
                       </p>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="mt-2 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+                        className="mt-2 border-yellow-300 text-yellow-700 hover:bg-yellow-100 text-xs lg:text-sm"
                         onClick={() => navigate("/teacher/re-evaluations")}
                       >
                         Review Requests
@@ -225,13 +234,13 @@ export default function TeacherDashboard({ user }) {
 
             {/* Quick Actions */}
             <Card className="animate-fade-in stagger-4" data-testid="quick-actions">
-              <CardHeader>
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
+              <CardHeader className="p-4 lg:p-6 pb-2 lg:pb-3">
+                <CardTitle className="text-base lg:text-lg">Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="p-4 lg:p-6 pt-0 space-y-2">
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start"
+                  className="w-full justify-start text-sm"
                   onClick={() => navigate("/teacher/upload")}
                 >
                   <FileText className="w-4 h-4 mr-2" />
@@ -239,7 +248,7 @@ export default function TeacherDashboard({ user }) {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start"
+                  className="w-full justify-start text-sm"
                   onClick={() => navigate("/teacher/students")}
                 >
                   <Users className="w-4 h-4 mr-2" />
@@ -247,7 +256,7 @@ export default function TeacherDashboard({ user }) {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start"
+                  className="w-full justify-start text-sm"
                   onClick={() => navigate("/teacher/reports")}
                 >
                   <TrendingUp className="w-4 h-4 mr-2" />
@@ -258,14 +267,14 @@ export default function TeacherDashboard({ user }) {
 
             {/* Summary */}
             <Card className="animate-fade-in stagger-5">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-50">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
+              <CardContent className="p-3 lg:p-4">
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <div className="p-2 rounded-lg bg-green-50 flex-shrink-0">
+                    <CheckCircle className="w-4 h-4 lg:w-5 lg:h-5 text-green-600" />
                   </div>
-                  <div>
-                    <p className="font-medium">{stats.total_students || 0} Students</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm lg:text-base">{stats.total_students || 0} Students</p>
+                    <p className="text-xs lg:text-sm text-muted-foreground">
                       Across {stats.total_batches || 0} batches
                     </p>
                   </div>
@@ -277,4 +286,8 @@ export default function TeacherDashboard({ user }) {
       </div>
     </Layout>
   );
+}
+
+function cn(...classes) {
+  return classes.filter(Boolean).join(' ');
 }
