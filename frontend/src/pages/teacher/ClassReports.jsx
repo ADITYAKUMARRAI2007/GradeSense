@@ -128,14 +128,14 @@ export default function ClassReports({ user }) {
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-4">
               <Select 
-                value={filters.batch_id} 
-                onValueChange={(v) => setFilters(prev => ({ ...prev, batch_id: v }))}
+                value={filters.batch_id || "all"} 
+                onValueChange={(v) => setFilters(prev => ({ ...prev, batch_id: v === "all" ? "" : v }))}
               >
                 <SelectTrigger className="w-48" data-testid="batch-filter">
                   <SelectValue placeholder="All Batches" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Batches</SelectItem>
+                  <SelectItem value="all">All Batches</SelectItem>
                   {batches.map(batch => (
                     <SelectItem key={batch.batch_id} value={batch.batch_id}>
                       {batch.name}
@@ -145,14 +145,14 @@ export default function ClassReports({ user }) {
               </Select>
 
               <Select 
-                value={filters.subject_id} 
-                onValueChange={(v) => setFilters(prev => ({ ...prev, subject_id: v }))}
+                value={filters.subject_id || "all"} 
+                onValueChange={(v) => setFilters(prev => ({ ...prev, subject_id: v === "all" ? "" : v }))}
               >
                 <SelectTrigger className="w-48" data-testid="subject-filter">
                   <SelectValue placeholder="All Subjects" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Subjects</SelectItem>
+                  <SelectItem value="all">All Subjects</SelectItem>
                   {subjects.map(subject => (
                     <SelectItem key={subject.subject_id} value={subject.subject_id}>
                       {subject.name}
@@ -162,14 +162,14 @@ export default function ClassReports({ user }) {
               </Select>
 
               <Select 
-                value={filters.exam_id} 
-                onValueChange={(v) => setFilters(prev => ({ ...prev, exam_id: v }))}
+                value={filters.exam_id || "all"} 
+                onValueChange={(v) => setFilters(prev => ({ ...prev, exam_id: v === "all" ? "" : v }))}
               >
                 <SelectTrigger className="w-48" data-testid="exam-filter">
                   <SelectValue placeholder="All Exams" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Exams</SelectItem>
+                  <SelectItem value="all">All Exams</SelectItem>
                   {exams.map(exam => (
                     <SelectItem key={exam.exam_id} value={exam.exam_id}>
                       {exam.exam_name}
