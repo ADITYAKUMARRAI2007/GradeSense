@@ -218,12 +218,12 @@ export default function ManageStudents({ user }) {
                   data-testid="search-students-input"
                 />
               </div>
-              <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+              <Select value={selectedBatch || "all"} onValueChange={(v) => setSelectedBatch(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="All Batches" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Batches</SelectItem>
+                  <SelectItem value="all">All Batches</SelectItem>
                   {batches.map(batch => (
                     <SelectItem key={batch.batch_id} value={batch.batch_id}>
                       {batch.name}

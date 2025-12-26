@@ -148,8 +148,8 @@ export default function ReviewPapers({ user }) {
                   />
                 </div>
                 <Select 
-                  value={filters.exam_id} 
-                  onValueChange={(v) => setFilters(prev => ({ ...prev, exam_id: v }))}
+                  value={filters.exam_id || "all"} 
+                  onValueChange={(v) => setFilters(prev => ({ ...prev, exam_id: v === "all" ? "" : v }))}
                 >
                   <SelectTrigger data-testid="exam-filter">
                     <SelectValue placeholder="Filter by exam" />

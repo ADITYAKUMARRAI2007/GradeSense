@@ -65,12 +65,12 @@ export default function ClassInsights({ user }) {
           </div>
           
           <div className="flex items-center gap-3">
-            <Select value={selectedExam} onValueChange={setSelectedExam}>
+            <Select value={selectedExam || "all"} onValueChange={(v) => setSelectedExam(v === "all" ? "" : v)}>
               <SelectTrigger className="w-64" data-testid="exam-select">
                 <SelectValue placeholder="All Exams" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Exams</SelectItem>
+                <SelectItem value="all">All Exams</SelectItem>
                 {exams.map(exam => (
                   <SelectItem key={exam.exam_id} value={exam.exam_id}>
                     {exam.exam_name}
