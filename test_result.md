@@ -180,6 +180,36 @@ backend:
           agent: "testing"
           comment: "✅ DETAILED STUDENT ANALYTICS WORKING: /api/students/{student_id} endpoint returns 200 status for teachers. API provides detailed student information with performance analytics, subject-wise performance, recent submissions, weak/strong areas, and personalized recommendations. Teacher authentication and student data access working correctly."
 
+  - task: "Duplicate Exam Name Prevention"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Duplicate exam name prevention implemented in exam creation endpoint (lines 708-714). Checks for existing exam names for the same teacher and returns 400 error with message 'An exam with this name already exists'"
+        - working: true
+          agent: "testing"
+          comment: "✅ DUPLICATE EXAM PREVENTION VERIFIED: Successfully tested duplicate exam name prevention. Created first exam 'Test Exam 1' (200 status), then attempted to create second exam with same name which correctly failed with 400 status and error message 'An exam with this name already exists'. Prevention mechanism working as expected."
+
+  - task: "Exam Deletion with Cascade"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Exam deletion endpoint implemented (lines 740-763). DELETE /api/exams/{exam_id} deletes exam and cascades to delete all associated submissions and re-evaluation requests. Returns 200 with 'Exam deleted successfully' message or 404 for non-existent exams"
+        - working: true
+          agent: "testing"
+          comment: "✅ EXAM DELETION WITH CASCADE VERIFIED: Successfully tested exam deletion functionality. DELETE /api/exams/{exam_id} returns 200 status with message 'Exam deleted successfully'. Verified exam is removed from exam list after deletion. Tested deletion of non-existent exam returns 404 as expected. CASCADE DELETION CONFIRMED: Created exam with 2 test submissions and 1 re-evaluation request, after exam deletion all related data (submissions and re-evaluations) were successfully removed from database. Cascade deletion working perfectly."
+
 frontend:
   - task: "Student Dashboard with Real Analytics"
     implemented: true
