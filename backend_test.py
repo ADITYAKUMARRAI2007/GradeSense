@@ -559,6 +559,139 @@ print('Test student created for analytics test');
             200
         )
 
+    def test_duplicate_exam_prevention(self):
+        """Test duplicate exam name prevention"""
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Skipping duplicate exam test - missing batch or subject")
+            return None
+            
+        # Create first exam with specific name
+        exam_name = "Test Exam 1"
+        exam_data = {
+            "batch_id": self.test_batch_id,
+            "subject_id": self.test_subject_id,
+            "exam_type": "Unit Test",
+            "exam_name": exam_name,
+            "total_marks": 100.0,
+            "exam_date": "2024-01-15",
+            "grading_mode": "balanced",
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 100.0,
+                    "rubric": "Test question"
+                }
+            ]
+        }
+        
+        # Create first exam (should succeed)
+        first_result = self.run_api_test(
+            "Create First Exam (Test Exam 1)",
+            "POST",
+            "exams",
+            200,
+            data=exam_data
+        )
+        
+        if first_result:
+            self.test_duplicate_exam_id = first_result.get('exam_id')
+            
+            # Try to create second exam with same name (should fail)
+            duplicate_result = self.run_api_test(
+                "Create Duplicate Exam (should fail)",
+                "POST", 
+                "exams",
+                400,  # Should fail with 400
+                data=exam_data
+            )
+            
+            # Verify error message contains "already exists"
+            if duplicate_result is None:
+                # Test the error message by making the request manually
+                url = f"{self.base_url}/exams"
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {self.session_token}'
+                }
+                
+                try:
+                    response = requests.post(url, json=exam_data, headers=headers, timeout=10)
+                    if response.status_code == 400:
+                        error_data = response.json()
+                        error_message = error_data.get('detail', '')
+                        if "already exists" in error_message.lower():
+                            self.log_test("Duplicate Exam Error Message Check", True, f"Correct error message: {error_message}")
+                        else:
+                            self.log_test("Duplicate Exam Error Message Check", False, f"Unexpected error message: {error_message}")
+                    else:
+                        self.log_test("Duplicate Exam Error Message Check", False, f"Expected 400, got {response.status_code}")
+                except Exception as e:
+                    self.log_test("Duplicate Exam Error Message Check", False, f"Request failed: {str(e)}")
+            
+            return first_result
+        
+        return None
+
+    def test_exam_deletion(self):
+        """Test exam deletion functionality"""
+        if not hasattr(self, 'test_duplicate_exam_id'):
+            print("⚠️  Skipping exam deletion test - no exam to delete")
+            return None
+            
+        exam_id = self.test_duplicate_exam_id
+        
+        # First verify exam exists
+        verify_result = self.run_api_test(
+            "Verify Exam Exists Before Deletion",
+            "GET",
+            "exams",
+            200
+        )
+        
+        if verify_result:
+            # Check if our exam is in the list
+            exam_found = any(exam.get('exam_id') == exam_id for exam in verify_result)
+            if exam_found:
+                print(f"✅ Exam {exam_id} found in exam list")
+            else:
+                print(f"⚠️  Exam {exam_id} not found in exam list")
+        
+        # Delete the exam
+        delete_result = self.run_api_test(
+            "Delete Exam",
+            "DELETE",
+            f"exams/{exam_id}",
+            200
+        )
+        
+        if delete_result:
+            # Verify exam is deleted by checking exam list
+            verify_deleted = self.run_api_test(
+                "Verify Exam Deleted",
+                "GET", 
+                "exams",
+                200
+            )
+            
+            if verify_deleted:
+                exam_still_exists = any(exam.get('exam_id') == exam_id for exam in verify_deleted)
+                if not exam_still_exists:
+                    self.log_test("Exam Deletion Verification", True, "Exam successfully removed from list")
+                else:
+                    self.log_test("Exam Deletion Verification", False, "Exam still exists in list after deletion")
+            
+            # Try to delete the same exam again (should return 404)
+            second_delete = self.run_api_test(
+                "Delete Non-existent Exam (should fail)",
+                "DELETE",
+                f"exams/{exam_id}",
+                404  # Should fail with 404
+            )
+            
+            return delete_result
+        
+        return None
+
     def cleanup_test_data(self):
         """Clean up test data from MongoDB"""
         print("\n🧹 Cleaning up test data...")
