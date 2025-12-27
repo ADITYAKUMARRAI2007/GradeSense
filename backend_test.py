@@ -784,6 +784,12 @@ print('Test data cleaned up');
         self.test_class_report()
         self.test_insights()
         
+        # Test new features: Duplicate Prevention & Deletion
+        print("\n🔒 Testing Duplicate Prevention & Deletion Features")
+        print("-" * 30)
+        self.test_duplicate_exam_prevention()
+        self.test_exam_deletion()
+        
         # Cleanup
         self.cleanup_test_data()
         
