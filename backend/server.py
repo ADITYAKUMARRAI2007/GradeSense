@@ -78,10 +78,17 @@ class Subject(BaseModel):
 class SubjectCreate(BaseModel):
     name: str
 
+# Sub-question support
+class SubQuestion(BaseModel):
+    sub_id: str  # e.g., "a", "b", "c"
+    max_marks: float
+    rubric: Optional[str] = None
+
 class ExamQuestion(BaseModel):
     question_number: int
     max_marks: float
     rubric: Optional[str] = None
+    sub_questions: List[SubQuestion] = []  # For questions like 1a, 1b, 1c
 
 class Exam(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -107,7 +114,13 @@ class ExamCreate(BaseModel):
     total_marks: float
     exam_date: str
     grading_mode: str
-    questions: List[ExamQuestion] = []
+    questions: List[dict] = []
+
+class SubQuestionScore(BaseModel):
+    sub_id: str
+    max_marks: float
+    obtained_marks: float
+    ai_feedback: str
 
 class QuestionScore(BaseModel):
     question_number: int
@@ -116,6 +129,7 @@ class QuestionScore(BaseModel):
     ai_feedback: str
     teacher_comment: Optional[str] = None
     is_reviewed: bool = False
+    sub_scores: List[SubQuestionScore] = []  # For sub-question scores
 
 class Submission(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -306,6 +320,14 @@ async def get_batches(user: User = Depends(get_current_user)):
             {"teacher_id": user.user_id},
             {"_id": 0}
         ).to_list(100)
+        
+        # Enrich with student count
+        for batch in batches:
+            student_count = await db.users.count_documents({
+                "batches": batch["batch_id"],
+                "role": "student"
+            })
+            batch["student_count"] = student_count
     else:
         batches = await db.batches.find(
             {"students": user.user_id},
@@ -313,11 +335,47 @@ async def get_batches(user: User = Depends(get_current_user)):
         ).to_list(100)
     return batches
 
+@api_router.get("/batches/{batch_id}")
+async def get_batch(batch_id: str, user: User = Depends(get_current_user)):
+    """Get batch details with students"""
+    batch = await db.batches.find_one(
+        {"batch_id": batch_id},
+        {"_id": 0}
+    )
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    # Get students in this batch
+    students = await db.users.find(
+        {"batches": batch_id, "role": "student"},
+        {"_id": 0, "user_id": 1, "name": 1, "email": 1, "student_id": 1}
+    ).to_list(500)
+    
+    batch["students_list"] = students
+    batch["student_count"] = len(students)
+    
+    # Get exams for this batch
+    exams = await db.exams.find(
+        {"batch_id": batch_id},
+        {"_id": 0, "exam_id": 1, "exam_name": 1, "status": 1}
+    ).to_list(100)
+    batch["exams"] = exams
+    
+    return batch
+
 @api_router.post("/batches")
 async def create_batch(batch: BatchCreate, user: User = Depends(get_current_user)):
     """Create a new batch"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create batches")
+    
+    # Check for duplicate name
+    existing = await db.batches.find_one({
+        "name": batch.name,
+        "teacher_id": user.user_id
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="A batch with this name already exists")
     
     batch_id = f"batch_{uuid.uuid4().hex[:8]}"
     new_batch = {
@@ -331,9 +389,48 @@ async def create_batch(batch: BatchCreate, user: User = Depends(get_current_user
     new_batch.pop("_id", None)
     return new_batch
 
+@api_router.put("/batches/{batch_id}")
+async def update_batch(batch_id: str, batch: BatchCreate, user: User = Depends(get_current_user)):
+    """Update batch name"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can update batches")
+    
+    # Check for duplicate name (excluding current batch)
+    existing = await db.batches.find_one({
+        "name": batch.name,
+        "teacher_id": user.user_id,
+        "batch_id": {"$ne": batch_id}
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="A batch with this name already exists")
+    
+    result = await db.batches.update_one(
+        {"batch_id": batch_id, "teacher_id": user.user_id},
+        {"$set": {"name": batch.name}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return {"message": "Batch updated"}
+
 @api_router.delete("/batches/{batch_id}")
 async def delete_batch(batch_id: str, user: User = Depends(get_current_user)):
-    """Delete a batch"""
+    """Delete a batch (only if empty)"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can delete batches")
+    
+    # Check if batch has students
+    student_count = await db.users.count_documents({
+        "batches": batch_id,
+        "role": "student"
+    })
+    if student_count > 0:
+        raise HTTPException(status_code=400, detail=f"Cannot delete batch with {student_count} students. Remove students first.")
+    
+    # Check if batch has exams
+    exam_count = await db.exams.count_documents({"batch_id": batch_id})
+    if exam_count > 0:
+        raise HTTPException(status_code=400, detail=f"Cannot delete batch with {exam_count} exams. Delete exams first.")
+    
     result = await db.batches.delete_one({
         "batch_id": batch_id,
         "teacher_id": user.user_id
@@ -347,10 +444,22 @@ async def delete_batch(batch_id: str, user: User = Depends(get_current_user)):
 @api_router.get("/subjects")
 async def get_subjects(user: User = Depends(get_current_user)):
     """Get all subjects"""
-    subjects = await db.subjects.find(
-        {"teacher_id": user.user_id},
-        {"_id": 0}
-    ).to_list(100)
+    if user.role == "teacher":
+        subjects = await db.subjects.find(
+            {"teacher_id": user.user_id},
+            {"_id": 0}
+        ).to_list(100)
+    else:
+        # Students see subjects from their batches
+        exams = await db.exams.find(
+            {"batch_id": {"$in": user.batches}},
+            {"subject_id": 1, "_id": 0}
+        ).to_list(100)
+        subject_ids = list(set(e["subject_id"] for e in exams))
+        subjects = await db.subjects.find(
+            {"subject_id": {"$in": subject_ids}},
+            {"_id": 0}
+        ).to_list(100)
     return subjects
 
 @api_router.post("/subjects")
@@ -358,6 +467,14 @@ async def create_subject(subject: SubjectCreate, user: User = Depends(get_curren
     """Create a new subject"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create subjects")
+    
+    # Check for duplicate
+    existing = await db.subjects.find_one({
+        "name": subject.name,
+        "teacher_id": user.user_id
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Subject already exists")
     
     subject_id = f"subj_{uuid.uuid4().hex[:8]}"
     new_subject = {
@@ -383,6 +500,96 @@ async def get_students(batch_id: Optional[str] = None, user: User = Depends(get_
     
     students = await db.users.find(query, {"_id": 0}).to_list(500)
     return students
+
+@api_router.get("/students/{student_user_id}")
+async def get_student_detail(student_user_id: str, user: User = Depends(get_current_user)):
+    """Get detailed student information with performance analytics"""
+    student = await db.users.find_one(
+        {"user_id": student_user_id},
+        {"_id": 0}
+    )
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Get all submissions for this student
+    submissions = await db.submissions.find(
+        {"student_id": student_user_id},
+        {"_id": 0, "file_data": 0, "file_images": 0}
+    ).to_list(100)
+    
+    # Calculate overall stats
+    if submissions:
+        percentages = [s.get("percentage", 0) for s in submissions]
+        avg_percentage = sum(percentages) / len(percentages)
+        highest = max(percentages)
+        lowest = min(percentages)
+        
+        # Trend calculation (last 5 vs previous 5)
+        sorted_subs = sorted(submissions, key=lambda x: x.get("created_at", ""))
+        if len(sorted_subs) >= 2:
+            recent = sorted_subs[-min(5, len(sorted_subs)):]
+            recent_avg = sum(s.get("percentage", 0) for s in recent) / len(recent)
+            if len(sorted_subs) > 5:
+                older = sorted_subs[-min(10, len(sorted_subs)):-5]
+                older_avg = sum(s.get("percentage", 0) for s in older) / len(older) if older else recent_avg
+                trend = recent_avg - older_avg
+            else:
+                trend = 0
+        else:
+            trend = 0
+    else:
+        avg_percentage = 0
+        highest = 0
+        lowest = 0
+        trend = 0
+    
+    # Subject-wise performance
+    subject_performance = {}
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "subject_id": 1})
+        if exam:
+            subj = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+            subj_name = subj.get("name", "Unknown") if subj else "Unknown"
+            if subj_name not in subject_performance:
+                subject_performance[subj_name] = {"scores": [], "total_exams": 0}
+            subject_performance[subj_name]["scores"].append(sub.get("percentage", 0))
+            subject_performance[subj_name]["total_exams"] += 1
+    
+    for subj_name, data in subject_performance.items():
+        data["average"] = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
+        data["highest"] = max(data["scores"]) if data["scores"] else 0
+        data["lowest"] = min(data["scores"]) if data["scores"] else 0
+    
+    # Question-wise analysis (weak areas)
+    weak_areas = []
+    strong_areas = []
+    for sub in submissions[-5:]:  # Last 5 exams
+        for qs in sub.get("question_scores", []):
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+            if pct < 50:
+                weak_areas.append(f"Q{qs['question_number']}: {pct:.0f}%")
+            elif pct >= 80:
+                strong_areas.append(f"Q{qs['question_number']}: {pct:.0f}%")
+    
+    return {
+        "student": student,
+        "stats": {
+            "total_exams": len(submissions),
+            "avg_percentage": round(avg_percentage, 1),
+            "highest_score": highest,
+            "lowest_score": lowest,
+            "trend": round(trend, 1)
+        },
+        "subject_performance": subject_performance,
+        "recent_submissions": submissions[-10:],
+        "weak_areas": weak_areas[:5],
+        "strong_areas": strong_areas[:5],
+        "recommendations": [
+            "Focus on improving weak areas identified above",
+            "Maintain consistency in strong subjects",
+            "Practice more numerical problems" if any("Math" in s for s in subject_performance.keys()) else "Review conceptual topics"
+        ]
+    }
 
 @api_router.post("/students")
 async def create_student(student: UserCreate, user: User = Depends(get_current_user)):
@@ -460,6 +667,7 @@ async def delete_student(student_user_id: str, user: User = Depends(get_current_
 async def get_exams(
     batch_id: Optional[str] = None,
     subject_id: Optional[str] = None,
+    status: Optional[str] = None,
     user: User = Depends(get_current_user)
 ):
     """Get all exams"""
@@ -473,6 +681,8 @@ async def get_exams(
         query["batch_id"] = batch_id
     if subject_id:
         query["subject_id"] = subject_id
+    if status:
+        query["status"] = status
     
     exams = await db.exams.find(query, {"_id": 0}).to_list(100)
     
@@ -482,6 +692,10 @@ async def get_exams(
         subject = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
         exam["batch_name"] = batch["name"] if batch else "Unknown"
         exam["subject_name"] = subject["name"] if subject else "Unknown"
+        
+        # Get submission count
+        sub_count = await db.submissions.count_documents({"exam_id": exam["exam_id"]})
+        exam["submission_count"] = sub_count
     
     return exams
 
@@ -501,7 +715,7 @@ async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
         "total_marks": exam.total_marks,
         "exam_date": exam.exam_date,
         "grading_mode": exam.grading_mode,
-        "questions": [q.model_dump() for q in exam.questions],
+        "questions": exam.questions,
         "teacher_id": user.user_id,
         "status": "draft",
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -548,15 +762,23 @@ async def grade_with_ai(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
+    # Grading mode instructions
+    mode_instructions = {
+        "strict": "Grade STRICTLY. Require exact match with model answer. Give minimal partial credit. Deduct marks for any deviation from expected answer.",
+        "balanced": "Grade FAIRLY. Consider both accuracy and conceptual understanding. Give reasonable partial credit for partially correct answers.",
+        "conceptual": "Grade for UNDERSTANDING. Focus on whether the student understands the concept, even if wording differs from model answer. Be generous with partial credit.",
+        "lenient": "Grade LENIENTLY. Reward any reasonable attempt. Give generous partial credit. Focus on what the student got right rather than wrong."
+    }
+    
+    grading_instruction = mode_instructions.get(grading_mode, mode_instructions["balanced"])
+    
     chat = LlmChat(
         api_key=api_key,
         session_id=f"grading_{uuid.uuid4().hex[:8]}",
         system_message=f"""You are an expert exam grader for handwritten answer papers.
-Grading Mode: {grading_mode}
-- Strict: Exact match required, minimal partial credit
-- Balanced: Fair evaluation considering accuracy and understanding
-- Conceptual: Focus on understanding over exact wording
-- Lenient: Generous partial credit for attempts
+
+GRADING MODE: {grading_mode.upper()}
+{grading_instruction}
 
 You will receive the model answer and student answer as images.
 Grade each question and provide detailed feedback.
@@ -567,32 +789,46 @@ Return your response in this exact JSON format:
     {{
       "question_number": 1,
       "obtained_marks": 8.5,
-      "ai_feedback": "Detailed feedback here explaining the grade"
+      "ai_feedback": "Detailed feedback explaining the grade",
+      "sub_scores": [
+        {{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Feedback for part a"}},
+        {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b"}}
+      ]
     }}
   ]
 }}
+
+If a question has no sub-questions, leave sub_scores as an empty array.
 """
     ).with_model("gemini", "gemini-3-flash-preview")
     
-    # Prepare question details
-    questions_text = "\n".join([
-        f"Q{q['question_number']}: Max marks = {q['max_marks']}" + 
-        (f", Rubric: {q['rubric']}" if q.get('rubric') else "")
-        for q in questions
-    ])
+    # Prepare question details with sub-questions
+    questions_text = ""
+    for q in questions:
+        q_text = f"Q{q['question_number']}: Max marks = {q['max_marks']}"
+        if q.get('rubric'):
+            q_text += f", Rubric: {q['rubric']}"
+        
+        # Add sub-questions if present
+        if q.get('sub_questions'):
+            for sq in q['sub_questions']:
+                q_text += f"\n  - Part {sq['sub_id']}: Max marks = {sq['max_marks']}"
+                if sq.get('rubric'):
+                    q_text += f", Rubric: {sq['rubric']}"
+        
+        questions_text += q_text + "\n"
     
-    # Create image contents list - ImageContent inherits from FileContent
+    # Create image contents list
     all_images = []
     
     # Add model answer images
-    for i, img in enumerate(model_answer_images[:3]):  # Limit images
+    for i, img in enumerate(model_answer_images[:3]):
         all_images.append(ImageContent(image_base64=img))
     
     # Add student answer images
-    for i, img in enumerate(images[:5]):  # Limit images
+    for i, img in enumerate(images[:5]):
         all_images.append(ImageContent(image_base64=img))
     
-    # UserMessage takes file_contents parameter (not image_contents)
     user_message = UserMessage(
         text=f"""Grade this student's handwritten answer paper.
 
@@ -602,6 +838,7 @@ Questions to grade:
 The first {min(len(model_answer_images), 3)} image(s) show the MODEL ANSWER (reference).
 The remaining images show the STUDENT'S ANSWER PAPER.
 
+IMPORTANT: Apply {grading_mode.upper()} grading mode as instructed.
 Please grade each question and provide constructive feedback.
 Return valid JSON only.""",
         file_contents=all_images
@@ -629,17 +866,41 @@ Return valid JSON only.""",
             )
             
             if score_data:
+                # Handle sub-scores
+                sub_scores = []
+                if q.get("sub_questions") and score_data.get("sub_scores"):
+                    for sq in q["sub_questions"]:
+                        sq_data = next(
+                            (ss for ss in score_data.get("sub_scores", []) if ss.get("sub_id") == sq["sub_id"]),
+                            None
+                        )
+                        if sq_data:
+                            sub_scores.append(SubQuestionScore(
+                                sub_id=sq["sub_id"],
+                                max_marks=sq["max_marks"],
+                                obtained_marks=min(sq_data.get("obtained_marks", 0), sq["max_marks"]),
+                                ai_feedback=sq_data.get("ai_feedback", "")
+                            ))
+                        else:
+                            sub_scores.append(SubQuestionScore(
+                                sub_id=sq["sub_id"],
+                                max_marks=sq["max_marks"],
+                                obtained_marks=sq["max_marks"] * 0.5,
+                                ai_feedback="Could not grade this sub-question"
+                            ))
+                
                 scores.append(QuestionScore(
                     question_number=q_num,
                     max_marks=q["max_marks"],
                     obtained_marks=min(score_data["obtained_marks"], q["max_marks"]),
-                    ai_feedback=score_data["ai_feedback"]
+                    ai_feedback=score_data["ai_feedback"],
+                    sub_scores=[s.model_dump() for s in sub_scores]
                 ))
             else:
                 scores.append(QuestionScore(
                     question_number=q_num,
                     max_marks=q["max_marks"],
-                    obtained_marks=0,
+                    obtained_marks=q["max_marks"] * 0.5,
                     ai_feedback="Could not grade this question"
                 ))
         
@@ -651,7 +912,7 @@ Return valid JSON only.""",
             QuestionScore(
                 question_number=q["question_number"],
                 max_marks=q["max_marks"],
-                obtained_marks=q["max_marks"] * 0.5,  # Default 50%
+                obtained_marks=q["max_marks"] * 0.5,
                 ai_feedback=f"Auto-graded: Please review manually. Error: {str(e)}"
             )
             for q in questions
@@ -675,7 +936,7 @@ async def upload_model_answer(
     pdf_bytes = await file.read()
     images = pdf_to_images(pdf_bytes)
     
-    # Store as base64 (for MVP; production would use cloud storage)
+    # Store as base64
     model_answer_data = base64.b64encode(pdf_bytes).decode()
     
     await db.exams.update_one(
@@ -718,10 +979,10 @@ async def upload_student_papers(
             pdf_bytes = await file.read()
             images = pdf_to_images(pdf_bytes)
             
-            # Extract student name from filename (e.g., "john_doe.pdf")
+            # Extract student name from filename
             student_name = file.filename.replace(".pdf", "").replace("_", " ").title()
             
-            # Grade with AI
+            # Grade with AI using the grading mode from exam
             scores = await grade_with_ai(
                 images=images,
                 model_answer_images=exam.get("model_answer_images", []),
@@ -778,12 +1039,13 @@ async def upload_student_papers(
 async def get_submissions(
     exam_id: Optional[str] = None,
     batch_id: Optional[str] = None,
+    status: Optional[str] = None,
     user: User = Depends(get_current_user)
 ):
     """Get submissions"""
     if user.role == "teacher":
-        # Get teacher's exams first
-        exam_query = {"teacher_id": user.user_id}
+        # Get teacher's exams first - only completed ones
+        exam_query = {"teacher_id": user.user_id, "status": "completed"}
         if batch_id:
             exam_query["batch_id"] = batch_id
         if exam_id:
@@ -792,8 +1054,12 @@ async def get_submissions(
         exams = await db.exams.find(exam_query, {"exam_id": 1, "_id": 0}).to_list(100)
         exam_ids = [e["exam_id"] for e in exams]
         
+        query = {"exam_id": {"$in": exam_ids}}
+        if status:
+            query["status"] = status
+        
         submissions = await db.submissions.find(
-            {"exam_id": {"$in": exam_ids}},
+            query,
             {"_id": 0, "file_data": 0, "file_images": 0}
         ).to_list(500)
     else:
@@ -805,11 +1071,13 @@ async def get_submissions(
     
     # Enrich with exam details
     for sub in submissions:
-        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "exam_name": 1, "subject_id": 1})
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "exam_name": 1, "subject_id": 1, "batch_id": 1})
         if exam:
             sub["exam_name"] = exam.get("exam_name", "Unknown")
             subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
             sub["subject_name"] = subject.get("name", "Unknown") if subject else "Unknown"
+            batch = await db.batches.find_one({"batch_id": exam.get("batch_id")}, {"_id": 0, "name": 1})
+            sub["batch_name"] = batch.get("name", "Unknown") if batch else "Unknown"
     
     return submissions
 
@@ -876,6 +1144,11 @@ async def get_re_evaluations(user: User = Depends(get_current_user)):
             {"_id": 0}
         ).to_list(50)
     
+    # Enrich with exam details
+    for req in requests:
+        exam = await db.exams.find_one({"exam_id": req["exam_id"]}, {"_id": 0, "exam_name": 1})
+        req["exam_name"] = exam.get("exam_name", "Unknown") if exam else "Unknown"
+    
     return requests
 
 @api_router.post("/re-evaluations")
@@ -884,9 +1157,6 @@ async def create_re_evaluation(
     user: User = Depends(get_current_user)
 ):
     """Create re-evaluation request"""
-    if user.role != "student":
-        raise HTTPException(status_code=403, detail="Only students can request re-evaluation")
-    
     submission = await db.submissions.find_one({"submission_id": request.submission_id}, {"_id": 0})
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
@@ -1160,9 +1430,6 @@ async def get_class_insights(
 @api_router.get("/analytics/student-dashboard")
 async def get_student_dashboard(user: User = Depends(get_current_user)):
     """Get student's personal dashboard analytics"""
-    if user.role != "student":
-        raise HTTPException(status_code=403, detail="Student only")
-    
     # Get student's submissions
     submissions = await db.submissions.find(
         {"student_id": user.user_id},
@@ -1179,7 +1446,9 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
             },
             "recent_results": [],
             "subject_performance": [],
-            "recommendations": ["Complete your first exam to see analytics!"]
+            "recommendations": ["Complete your first exam to see analytics!"],
+            "weak_areas": [],
+            "strong_areas": []
         }
     
     percentages = [s["percentage"] for s in submissions]
@@ -1198,31 +1467,122 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
             "date": r.get("created_at", "")
         })
     
-    # Recommendations based on weak areas
-    recommendations = []
-    weak_questions = []
-    for sub in submissions[-3:]:  # Last 3 exams
-        for qs in sub.get("question_scores", []):
-            if qs["obtained_marks"] / qs["max_marks"] < 0.5:
-                weak_questions.append(qs)
+    # Subject-wise performance
+    subject_perf = {}
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "subject_id": 1})
+        if exam:
+            subj = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
+            subj_name = subj.get("name", "Unknown") if subj else "Unknown"
+            if subj_name not in subject_perf:
+                subject_perf[subj_name] = []
+            subject_perf[subj_name].append(sub["percentage"])
     
-    if weak_questions:
+    subject_performance = [
+        {"subject": name, "average": round(sum(scores)/len(scores), 1), "exams": len(scores)}
+        for name, scores in subject_perf.items()
+    ]
+    
+    # Weak areas analysis
+    weak_areas = []
+    strong_areas = []
+    for sub in submissions[-3:]:
+        for qs in sub.get("question_scores", []):
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+            if pct < 50:
+                weak_areas.append({
+                    "question": f"Q{qs['question_number']}",
+                    "score": f"{qs['obtained_marks']}/{qs['max_marks']}",
+                    "feedback": qs.get("ai_feedback", "")[:100]
+                })
+            elif pct >= 80:
+                strong_areas.append({
+                    "question": f"Q{qs['question_number']}",
+                    "score": f"{qs['obtained_marks']}/{qs['max_marks']}"
+                })
+    
+    # Recommendations
+    recommendations = []
+    if weak_areas:
         recommendations.append("Focus on improving accuracy in detailed answer questions")
-    if percentages and sum(percentages) / len(percentages) < 60:
+    avg_pct = sum(percentages) / len(percentages)
+    if avg_pct < 60:
         recommendations.append("Consider regular revision sessions")
+        recommendations.append("Practice more problems from previous exam topics")
     else:
         recommendations.append("Great progress! Keep up the consistent effort")
+    recommendations.append("Review feedback on weak areas to understand mistakes")
+    
+    # Calculate improvement trend
+    if len(percentages) >= 2:
+        recent_avg = sum(percentages[-3:]) / min(3, len(percentages))
+        older_avg = sum(percentages[:-3]) / max(1, len(percentages) - 3) if len(percentages) > 3 else recent_avg
+        improvement = round(recent_avg - older_avg, 1)
+    else:
+        improvement = 0
     
     return {
         "stats": {
             "total_exams": len(submissions),
-            "avg_percentage": round(sum(percentages) / len(percentages), 1),
+            "avg_percentage": round(avg_pct, 1),
             "rank": "Top 10",  # Simplified for MVP
-            "improvement": round(percentages[-1] - percentages[0], 1) if len(percentages) > 1 else 0
+            "improvement": improvement
         },
         "recent_results": recent_results,
-        "subject_performance": [],  # Would require more data
-        "recommendations": recommendations
+        "subject_performance": subject_performance,
+        "recommendations": recommendations,
+        "weak_areas": weak_areas[:5],
+        "strong_areas": strong_areas[:5]
+    }
+
+# ============== STUDY MATERIALS (STUDENT) ==============
+
+@api_router.get("/study-materials")
+async def get_study_materials(subject_id: Optional[str] = None, user: User = Depends(get_current_user)):
+    """Get study material recommendations based on weak areas"""
+    # Get recent weak areas
+    submissions = await db.submissions.find(
+        {"student_id": user.user_id},
+        {"_id": 0, "question_scores": 1, "exam_id": 1}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    weak_topics = []
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "subject_id": 1})
+        subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1}) if exam else None
+        subj_name = subject.get("name", "General") if subject else "General"
+        
+        for qs in sub.get("question_scores", []):
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+            if pct < 50:
+                weak_topics.append({
+                    "subject": subj_name,
+                    "question": f"Q{qs['question_number']}",
+                    "score": f"{pct:.0f}%"
+                })
+    
+    # Generate recommendations based on weak areas
+    materials = [
+        {
+            "title": "Practice Problems",
+            "description": "Work through similar problems to strengthen weak areas",
+            "type": "practice"
+        },
+        {
+            "title": "Concept Review",
+            "description": "Review fundamental concepts related to questions you struggled with",
+            "type": "theory"
+        },
+        {
+            "title": "Video Tutorials",
+            "description": "Watch explanatory videos for complex topics",
+            "type": "video"
+        }
+    ]
+    
+    return {
+        "weak_topics": weak_topics[:10],
+        "recommended_materials": materials
     }
 
 # ============== HEALTH CHECK ==============
