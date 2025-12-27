@@ -1,143 +1,88 @@
 {
-  "timestamp": "2025-12-27T06:56:55.168875",
-  "total_tests": 27,
-  "passed_tests": 27,
-  "success_rate": 100.0,
+  "timestamp": "2025-12-27T07:38:02.326554",
+  "total_tests": 16,
+  "passed_tests": 0,
+  "success_rate": 0.0,
   "test_details": [
     {
       "test": "Health Check",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Auth Me",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Create Batch",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Duplicate Batch Prevention",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Get Batches",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Get Batch Details",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Update Batch Name",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Create Temp Batch for Deletion",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Delete Empty Batch",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Create Subject",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Get Subjects",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Create Student",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Get Students",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Create Exam with Sub-questions",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Create Exam - Strict Mode",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Create Exam - Balanced Mode",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Create Exam - Conceptual Mode",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Create Exam - Lenient Mode",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Get Exams",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Analytics Dashboard",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Detailed Student Analytics",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Get Submissions (Teacher)",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Get Submissions with Batch Filter",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Get Re-evaluation Requests",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Dashboard Analytics",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Class Report",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "AI Insights",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     }
   ]
 }
