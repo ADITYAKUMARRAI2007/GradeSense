@@ -21,7 +21,6 @@ import {
   ArrowRight, 
   ArrowLeft,
   Loader2,
-  AlertCircle,
   X
 } from "lucide-react";
 
@@ -30,26 +29,26 @@ const GRADING_MODES = [
     id: "strict", 
     name: "Strict Mode", 
     description: "Exact match with model answer required. Minimal tolerance for deviations.",
-    color: "bg-red-50 border-red-200"
+    color: "border-red-300 bg-red-50"
   },
   { 
     id: "balanced", 
     name: "Balanced Mode", 
     description: "Fair evaluation considering both accuracy and conceptual understanding.",
-    color: "bg-blue-50 border-blue-200",
+    color: "border-blue-300 bg-blue-50",
     recommended: true
   },
   { 
     id: "conceptual", 
     name: "Conceptual Mode", 
     description: "Focus on understanding of concepts over exact wording or format.",
-    color: "bg-purple-50 border-purple-200"
+    color: "border-purple-300 bg-purple-50"
   },
   { 
     id: "lenient", 
     name: "Lenient Mode", 
     description: "Generous partial credit. Rewards attempt and partial understanding.",
-    color: "bg-green-50 border-green-200"
+    color: "border-green-300 bg-green-50"
   },
 ];
 
@@ -79,7 +78,7 @@ export default function UploadGrade({ user }) {
     total_marks: 100,
     exam_date: new Date().toISOString().split("T")[0],
     grading_mode: "balanced",
-    questions: [{ question_number: 1, max_marks: 10, rubric: "" }]
+    questions: [{ question_number: 1, max_marks: 10, rubric: "", sub_questions: [] }]
   });
 
   const [modelAnswerFile, setModelAnswerFile] = useState(null);
@@ -112,7 +111,7 @@ export default function UploadGrade({ user }) {
     const nextNum = formData.questions.length + 1;
     setFormData(prev => ({
       ...prev,
-      questions: [...prev.questions, { question_number: nextNum, max_marks: 10, rubric: "" }]
+      questions: [...prev.questions, { question_number: nextNum, max_marks: 10, rubric: "", sub_questions: [] }]
     }));
   };
 
@@ -134,6 +133,38 @@ export default function UploadGrade({ user }) {
         }))
       }));
     }
+  };
+
+  // Sub-question management
+  const addSubQuestion = (questionIndex) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      const subQs = newQuestions[questionIndex].sub_questions || [];
+      const nextId = String.fromCharCode(97 + subQs.length); // a, b, c, etc.
+      newQuestions[questionIndex].sub_questions = [
+        ...subQs,
+        { sub_id: nextId, max_marks: 2, rubric: "" }
+      ];
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  const updateSubQuestion = (questionIndex, subIndex, field, value) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      newQuestions[questionIndex].sub_questions[subIndex][field] = value;
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  const removeSubQuestion = (questionIndex, subIndex) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      newQuestions[questionIndex].sub_questions = newQuestions[questionIndex].sub_questions
+        .filter((_, i) => i !== subIndex)
+        .map((sq, i) => ({ ...sq, sub_id: String.fromCharCode(97 + i) }));
+      return { ...prev, questions: newQuestions };
+    });
   };
 
   // Model answer dropzone
@@ -171,7 +202,7 @@ export default function UploadGrade({ user }) {
       handleInputChange("subject_id", response.data.subject_id);
       toast.success("Subject created");
     } catch (error) {
-      toast.error("Failed to create subject");
+      toast.error(error.response?.data?.detail || "Failed to create subject");
     }
   };
 
@@ -182,7 +213,7 @@ export default function UploadGrade({ user }) {
       handleInputChange("batch_id", response.data.batch_id);
       toast.success("Batch created");
     } catch (error) {
-      toast.error("Failed to create batch");
+      toast.error(error.response?.data?.detail || "Failed to create batch");
     }
   };
 
@@ -205,10 +236,10 @@ export default function UploadGrade({ user }) {
     
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", modelAnswerFile);
+      const formDataObj = new FormData();
+      formDataObj.append("file", modelAnswerFile);
       
-      await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
+      await axios.post(`${API}/exams/${examId}/upload-model-answer`, formDataObj, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
@@ -228,9 +259,9 @@ export default function UploadGrade({ user }) {
     setProcessingProgress(0);
     
     try {
-      const formData = new FormData();
+      const formDataObj = new FormData();
       studentFiles.forEach(file => {
-        formData.append("files", file);
+        formDataObj.append("files", file);
       });
       
       // Simulate progress
@@ -238,7 +269,7 @@ export default function UploadGrade({ user }) {
         setProcessingProgress(prev => Math.min(prev + 5, 90));
       }, 500);
       
-      const response = await axios.post(`${API}/exams/${examId}/upload-papers`, formData, {
+      const response = await axios.post(`${API}/exams/${examId}/upload-papers`, formDataObj, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
@@ -415,49 +446,94 @@ export default function UploadGrade({ user }) {
           </Card>
         )}
 
-        {/* Step 2: Question Configuration */}
+        {/* Step 2: Question Configuration with Sub-questions */}
         {step === 2 && (
           <Card className="animate-fade-in">
             <CardHeader>
               <CardTitle>Step 2: Question Configuration</CardTitle>
-              <CardDescription>Define the questions and marks distribution</CardDescription>
+              <CardDescription>Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.questions.map((question, index) => (
-                <div key={index} className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
-                  <div className="flex-1 grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Question #{question.question_number}</Label>
-                      <Input value={`Q${question.question_number}`} disabled />
+                <div key={index} className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Question #{question.question_number}</Label>
+                        <Input value={`Q${question.question_number}`} disabled />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Max Marks</Label>
+                        <Input 
+                          type="number"
+                          value={question.max_marks}
+                          onChange={(e) => updateQuestion(index, "max_marks", parseFloat(e.target.value))}
+                          data-testid={`question-${index}-marks`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Rubric (Optional)</Label>
+                        <Input 
+                          placeholder="Grading criteria..."
+                          value={question.rubric}
+                          onChange={(e) => updateQuestion(index, "rubric", e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Max Marks</Label>
-                      <Input 
-                        type="number"
-                        value={question.max_marks}
-                        onChange={(e) => updateQuestion(index, "max_marks", parseFloat(e.target.value))}
-                        data-testid={`question-${index}-marks`}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Rubric (Optional)</Label>
-                      <Input 
-                        placeholder="Grading criteria..."
-                        value={question.rubric}
-                        onChange={(e) => updateQuestion(index, "rubric", e.target.value)}
-                      />
-                    </div>
+                    {formData.questions.length > 1 && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => removeQuestion(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
-                  {formData.questions.length > 1 && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => removeQuestion(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+
+                  {/* Sub-questions */}
+                  {question.sub_questions?.length > 0 && (
+                    <div className="pl-4 border-l-2 border-primary/30 space-y-2">
+                      <Label className="text-sm text-muted-foreground">Sub-questions:</Label>
+                      {question.sub_questions.map((subQ, subIndex) => (
+                        <div key={subIndex} className="flex items-center gap-2 bg-white p-2 rounded">
+                          <span className="text-sm font-medium w-12">{question.question_number}{subQ.sub_id})</span>
+                          <Input 
+                            type="number"
+                            value={subQ.max_marks}
+                            onChange={(e) => updateSubQuestion(index, subIndex, "max_marks", parseFloat(e.target.value))}
+                            className="w-20"
+                            placeholder="Marks"
+                          />
+                          <Input 
+                            value={subQ.rubric || ""}
+                            onChange={(e) => updateSubQuestion(index, subIndex, "rubric", e.target.value)}
+                            className="flex-1"
+                            placeholder="Rubric..."
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => removeSubQuestion(index, subIndex)}
+                            className="h-8 w-8 text-destructive"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   )}
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addSubQuestion(index)}
+                    className="text-xs"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Sub-question ({question.question_number}a, {question.question_number}b...)
+                  </Button>
                 </div>
               ))}
 
@@ -485,7 +561,7 @@ export default function UploadGrade({ user }) {
           </Card>
         )}
 
-        {/* Step 3: Grading Mode Selection */}
+        {/* Step 3: Grading Mode Selection - FIXED */}
         {step === 3 && (
           <Card className="animate-fade-in">
             <CardHeader>
@@ -493,25 +569,47 @@ export default function UploadGrade({ user }) {
               <CardDescription>Choose how strictly the AI should grade the papers</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {GRADING_MODES.map((mode) => (
                   <div 
                     key={mode.id}
                     onClick={() => handleInputChange("grading_mode", mode.id)}
-                    className={`grading-mode-card p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      formData.grading_mode === mode.id ? "selected" : ""
-                    } ${mode.color}`}
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${mode.color} ${
+                      formData.grading_mode === mode.id 
+                        ? "ring-2 ring-primary ring-offset-2 border-primary" 
+                        : "hover:border-gray-400"
+                    }`}
                     data-testid={`grading-mode-${mode.id}`}
                   >
                     <div className="flex items-start justify-between">
-                      <h3 className="font-semibold">{mode.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          formData.grading_mode === mode.id 
+                            ? "border-primary bg-primary" 
+                            : "border-gray-400"
+                        }`}>
+                          {formData.grading_mode === mode.id && (
+                            <div className="w-2 h-2 bg-white rounded-full" />
+                          )}
+                        </div>
+                        <h3 className="font-semibold">{mode.name}</h3>
+                      </div>
                       {mode.recommended && (
-                        <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                        <Badge variant="secondary" className="text-xs bg-white">Recommended</Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">{mode.description}</p>
+                    <p className="text-sm text-muted-foreground mt-2 ml-6">{mode.description}</p>
                   </div>
                 ))}
+              </div>
+
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-800">
+                  <strong>Selected:</strong> {GRADING_MODES.find(m => m.id === formData.grading_mode)?.name || "Balanced Mode"}
+                </p>
+                <p className="text-xs text-orange-700 mt-1">
+                  {GRADING_MODES.find(m => m.id === formData.grading_mode)?.description}
+                </p>
               </div>
 
               <div className="flex justify-between pt-4">
@@ -539,7 +637,7 @@ export default function UploadGrade({ user }) {
             <CardContent className="space-y-4">
               <div 
                 {...getModelRootProps()} 
-                className={`dropzone upload-zone p-8 text-center ${isModelDragActive ? "active" : ""}`}
+                className={`dropzone upload-zone p-8 text-center border-2 border-dashed rounded-xl ${isModelDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
                 data-testid="model-answer-dropzone"
               >
                 <input {...getModelInputProps()} />
@@ -598,7 +696,7 @@ export default function UploadGrade({ user }) {
             <CardContent className="space-y-4">
               <div 
                 {...getStudentRootProps()} 
-                className={`dropzone upload-zone p-8 text-center ${isStudentDragActive ? "active" : ""}`}
+                className={`dropzone upload-zone p-8 text-center border-2 border-dashed rounded-xl ${isStudentDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
                 data-testid="student-papers-dropzone"
               >
                 <input {...getStudentInputProps()} />
@@ -637,7 +735,7 @@ export default function UploadGrade({ user }) {
                   </div>
                   <Progress value={processingProgress} className="h-2" />
                   <p className="text-sm text-muted-foreground">
-                    {processingProgress < 100 ? "AI is analyzing and grading..." : "Almost done!"}
+                    {processingProgress < 100 ? `AI is analyzing and grading using ${formData.grading_mode} mode...` : "Almost done!"}
                   </p>
                 </div>
               )}
@@ -674,7 +772,7 @@ export default function UploadGrade({ user }) {
                 <div>
                   <CardTitle>Grading Complete!</CardTitle>
                   <CardDescription>
-                    Successfully processed {results.processed} paper{results.processed !== 1 ? "s" : ""}
+                    Successfully processed {results.processed} paper{results.processed !== 1 ? "s" : ""} using <strong>{formData.grading_mode}</strong> mode
                   </CardDescription>
                 </div>
               </div>
@@ -729,7 +827,7 @@ export default function UploadGrade({ user }) {
                       total_marks: 100,
                       exam_date: new Date().toISOString().split("T")[0],
                       grading_mode: "balanced",
-                      questions: [{ question_number: 1, max_marks: 10, rubric: "" }]
+                      questions: [{ question_number: 1, max_marks: 10, rubric: "", sub_questions: [] }]
                     });
                     setModelAnswerFile(null);
                     setStudentFiles([]);
