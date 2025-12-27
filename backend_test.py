@@ -540,13 +540,12 @@ print('Test student created for analytics test');
         
         return teacher_result
 
-    def test_re_evaluations_api(self):
-        """Test re-evaluation requests API"""
-        # Test get re-evaluations
+    def test_insights(self):
+        """Test AI insights"""
         return self.run_api_test(
-            "Get Re-evaluation Requests",
+            "AI Insights",
             "GET",
-            "re-evaluations",
+            "analytics/insights",
             200
         )
 
