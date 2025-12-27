@@ -276,6 +276,66 @@ test_plan:
   test_all: true
   test_priority: "high_first"
 
+  - task: "Re-evaluation Feature (Student Request)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/student/RequestReEvaluation.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Student re-evaluation request page fully implemented with exam selection, question checkbox selection, reason textarea, and request history display. Integrated with POST /api/re-evaluations and GET /api/re-evaluations endpoints"
+
+  - task: "Re-evaluation Feature (Teacher Review)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReEvaluations.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Teacher re-evaluation review page implemented with pending requests list, review dialog with response textarea, approve/reject buttons. Integrated with GET /api/re-evaluations and PUT /api/re-evaluations/{id} endpoints"
+
+  - task: "Class Insights Page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ClassInsights.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Class Insights page fully implemented with exam filter, overall assessment summary, strengths/weaknesses sections, teaching recommendations, and action items checklist. Integrated with GET /api/analytics/insights endpoint"
+
+  - task: "Review Papers Page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Review Papers page fully implemented with two-panel view (list + detail), search/filter functionality, PDF image preview, question-by-question editing (scores, feedback, comments), prev/next navigation, save and approve buttons. Mobile responsive with sheet for detail view. Integrated with GET /api/submissions and PUT /api/submissions/{id} endpoints"
+
+  - task: "Class Reports Page with Export"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Class Reports page fully implemented with batch/subject/exam filters, overview stats cards, score distribution bar chart, question-wise performance chart, top performers table, needs attention table, and CSV export functionality. Integrated with GET /api/analytics/class-report endpoint. Mobile responsive design"
+
 agent_communication:
     - agent: "main"
       message: "Initial test setup complete. All P0 features have been implemented. Student pages (Dashboard, Results) were already integrated with backend APIs by previous agent. ManageBatches page has been created and added to navigation/routing. Need comprehensive end-to-end testing of all teacher and student flows including: 1) Batch CRUD operations with duplicate prevention 2) Creating exams with sub-questions 3) Uploading and grading with different grading modes 4) Student login and dashboard analytics 5) Student results viewing with question breakdown 6) Teacher viewing detailed student analytics. App is loading correctly on login page."
@@ -283,3 +343,5 @@ agent_communication:
       message: "🎉 BACKEND TESTING COMPLETE - ALL SYSTEMS OPERATIONAL! Comprehensive testing of 27 backend APIs completed with 100% success rate. ✅ CRITICAL FEATURES VERIFIED: 1) Batch Management: Full CRUD with duplicate prevention working perfectly 2) Sub-questions Support: Complex nested question structures handled correctly 3) Grading Modes: All 4 modes (strict/balanced/conceptual/lenient) functional 4) Student Analytics: Comprehensive dashboard analytics working 5) Teacher Analytics: Detailed student performance analytics operational 6) Submissions & Re-evaluations: All APIs responding correctly. All authentication, data persistence, and API responses working as expected. Backend is production-ready for all core GradeSense functionality."
     - agent: "testing"
       message: "🎉 FRONTEND TESTING COMPLETE - ALL COMPONENTS VERIFIED! Comprehensive testing of all 5 critical frontend components completed with 100% success rate. ✅ CRITICAL FEATURES VERIFIED: 1) Student Dashboard: Real analytics with stats cards, performance trends, weak/strong areas, and AI recommendations - fully responsive and accessible 2) Student Results: Expandable result cards with question-wise breakdown, detailed dialog view, and teacher comments 3) Manage Batches: Complete CRUD operations with search, batch details, students/exams lists, and proper error handling 4) Upload & Grade: Multi-step form with sub-questions support, grading mode selection, file uploads, and progress tracking 5) Manage Students: Enhanced analytics with detailed student performance, search/filter, and comprehensive side sheet view. ✅ ADDITIONAL VERIFICATION: Mobile responsiveness excellent across all components, proper data-testid attributes for testing, authentication protection working, no console errors, accessibility features implemented, keyboard navigation functional, and performance optimized. All components properly integrated with backend APIs and ready for production use."
+    - agent: "main"
+      message: "P1 and P2 tasks ready for testing. All pages were already implemented by previous agent: 1) Re-evaluation Feature - Complete student request form with exam/question selection, reason textarea, and teacher review dialog with approve/reject 2) Class Insights - AI-generated analysis with exam filter, strengths/weaknesses, recommendations, and action items 3) Review Papers - Two-panel interface with PDF preview, question editing, navigation, mobile responsive 4) Class Reports - Complete analytics dashboard with filters, charts (bar/pie), tables, CSV export. All pages are properly integrated with backend APIs and include proper data-testid attributes for testing. Need comprehensive E2E testing of all P1/P2 features."
