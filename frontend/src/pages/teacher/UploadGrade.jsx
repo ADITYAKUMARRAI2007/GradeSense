@@ -225,7 +225,7 @@ export default function UploadGrade({ user }) {
       toast.success("Exam configuration saved");
       setStep(4);
     } catch (error) {
-      toast.error("Failed to create exam");
+      toast.error(error.response?.data?.detail || "Failed to create exam");
     } finally {
       setLoading(false);
     }
