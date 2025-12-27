@@ -736,6 +736,8 @@ async def get_exam(exam_id: str, user: User = Depends(get_current_user)):
     """Get exam details"""
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
     if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    return exam
 
 @api_router.delete("/exams/{exam_id}")
 async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
@@ -761,9 +763,6 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Exam not found")
     
     return {"message": "Exam deleted successfully"}
-
-        raise HTTPException(status_code=404, detail="Exam not found")
-    return exam
 
 # ============== FILE UPLOAD & GRADING ==============
 
