@@ -307,8 +307,8 @@ print('Session Token: ' + sessionToken);
             200
         )
 
-    def test_create_exam(self):
-        """Test exam creation"""
+    def test_create_exam_with_subquestions(self):
+        """Test exam creation with sub-questions"""
         # Need batch and subject first
         if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
             print("⚠️  Skipping exam creation - missing batch or subject")
@@ -318,7 +318,7 @@ print('Session Token: ' + sessionToken);
             "batch_id": self.test_batch_id,
             "subject_id": self.test_subject_id,
             "exam_type": "Unit Test",
-            "exam_name": f"Test Exam {datetime.now().strftime('%H%M%S')}",
+            "exam_name": f"Algebra Fundamentals {datetime.now().strftime('%H%M%S')}",
             "total_marks": 100.0,
             "exam_date": "2024-01-15",
             "grading_mode": "balanced",
@@ -326,22 +326,86 @@ print('Session Token: ' + sessionToken);
                 {
                     "question_number": 1,
                     "max_marks": 50.0,
-                    "rubric": "Test question 1"
+                    "rubric": "Solve algebraic equations",
+                    "sub_questions": [
+                        {
+                            "sub_id": "a",
+                            "max_marks": 25.0,
+                            "rubric": "Solve for x: 2x + 5 = 15"
+                        },
+                        {
+                            "sub_id": "b", 
+                            "max_marks": 25.0,
+                            "rubric": "Solve for y: 3y - 7 = 14"
+                        }
+                    ]
                 },
                 {
                     "question_number": 2,
                     "max_marks": 50.0,
-                    "rubric": "Test question 2"
+                    "rubric": "Quadratic equations",
+                    "sub_questions": [
+                        {
+                            "sub_id": "a",
+                            "max_marks": 30.0,
+                            "rubric": "Find roots of x² - 5x + 6 = 0"
+                        },
+                        {
+                            "sub_id": "b",
+                            "max_marks": 20.0,
+                            "rubric": "Graph the parabola"
+                        }
+                    ]
                 }
             ]
         }
-        return self.run_api_test(
-            "Create Exam",
+        result = self.run_api_test(
+            "Create Exam with Sub-questions",
             "POST",
             "exams",
             200,
             data=exam_data
         )
+        if result:
+            self.test_exam_id = result.get('exam_id')
+        return result
+
+    def test_grading_modes(self):
+        """Test different grading modes"""
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Skipping grading modes test - missing batch or subject")
+            return None
+
+        grading_modes = ["strict", "balanced", "conceptual", "lenient"]
+        results = []
+        
+        for mode in grading_modes:
+            exam_data = {
+                "batch_id": self.test_batch_id,
+                "subject_id": self.test_subject_id,
+                "exam_type": "Quiz",
+                "exam_name": f"Grading Test {mode} {datetime.now().strftime('%H%M%S')}",
+                "total_marks": 50.0,
+                "exam_date": "2024-01-15",
+                "grading_mode": mode,
+                "questions": [
+                    {
+                        "question_number": 1,
+                        "max_marks": 50.0,
+                        "rubric": f"Test question for {mode} grading"
+                    }
+                ]
+            }
+            result = self.run_api_test(
+                f"Create Exam - {mode.title()} Mode",
+                "POST",
+                "exams",
+                200,
+                data=exam_data
+            )
+            results.append(result)
+        
+        return results
 
     def test_get_exams(self):
         """Test get exams"""
