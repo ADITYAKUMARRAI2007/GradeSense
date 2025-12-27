@@ -519,12 +519,34 @@ print('Test student created for analytics test');
             200
         )
 
-    def test_insights(self):
-        """Test AI insights"""
-        return self.run_api_test(
-            "AI Insights",
+    def test_submissions_api(self):
+        """Test submissions API for both teacher and student views"""
+        # Test teacher view
+        teacher_result = self.run_api_test(
+            "Get Submissions (Teacher)",
             "GET",
-            "analytics/insights",
+            "submissions",
+            200
+        )
+        
+        # Test with batch filtering
+        if hasattr(self, 'test_batch_id'):
+            batch_filter_result = self.run_api_test(
+                "Get Submissions with Batch Filter",
+                "GET",
+                f"submissions?batch_id={self.test_batch_id}",
+                200
+            )
+        
+        return teacher_result
+
+    def test_re_evaluations_api(self):
+        """Test re-evaluation requests API"""
+        # Test get re-evaluations
+        return self.run_api_test(
+            "Get Re-evaluation Requests",
+            "GET",
+            "re-evaluations",
             200
         )
 
