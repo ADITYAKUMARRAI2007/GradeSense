@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-12-26T07:05:30.085729",
-  "total_tests": 13,
-  "passed_tests": 13,
+  "timestamp": "2025-12-27T06:56:55.168875",
+  "total_tests": 27,
+  "passed_tests": 27,
   "success_rate": 100.0,
   "test_details": [
     {
@@ -20,7 +20,32 @@
       "details": ""
     },
     {
+      "test": "Duplicate Batch Prevention",
+      "success": true,
+      "details": ""
+    },
+    {
       "test": "Get Batches",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Batch Details",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Batch Name",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Temp Batch for Deletion",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Empty Batch",
       "success": true,
       "details": ""
     },
@@ -45,12 +70,57 @@
       "details": ""
     },
     {
-      "test": "Create Exam",
+      "test": "Create Exam with Sub-questions",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Strict Mode",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Balanced Mode",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Conceptual Mode",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Lenient Mode",
       "success": true,
       "details": ""
     },
     {
       "test": "Get Exams",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Student Analytics Dashboard",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Detailed Student Analytics",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Submissions (Teacher)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Submissions with Batch Filter",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Re-evaluation Requests",
       "success": true,
       "details": ""
     },
