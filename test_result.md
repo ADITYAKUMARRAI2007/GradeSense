@@ -324,14 +324,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Student Dashboard with Real Analytics"
-    - "Student Results Page with Details"
-    - "Manage Batches Page"
-    - "Upload & Grade with Sub-questions"
-    - "Batch Management API"
-    - "Sub-questions Support in Exams"
-    - "Grading Mode Functionality"
-    - "Student Analytics API"
+    - "Re-evaluation Feature (Student)"
+    - "Re-evaluation Feature (Teacher)"
+    - "Class Insights Page"
+    - "Review Papers Page"
+    - "Class Reports Page with Export"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
