@@ -338,14 +338,9 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus:
-    - "Re-evaluation Feature (Student)"
-    - "Re-evaluation Feature (Teacher)"
-    - "Class Insights Page"
-    - "Review Papers Page"
-    - "Class Reports Page with Export"
+  current_focus: []
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
   - task: "Re-evaluation Feature (Student Request)"
