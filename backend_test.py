@@ -284,18 +284,103 @@ print('Session Token: ' + sessionToken);
 
     def test_create_student(self):
         """Test student creation"""
+        timestamp = datetime.now().strftime('%H%M%S')
         student_data = {
-            "email": f"test.student.{datetime.now().strftime('%H%M%S')}@example.com",
-            "name": "Test Student",
+            "email": f"sarah.johnson.{timestamp}@school.edu",
+            "name": "Sarah Johnson",
             "role": "student",
-            "batches": []
+            "student_id": f"STU{timestamp}",
+            "batches": [self.test_batch_id] if hasattr(self, 'test_batch_id') else []
         }
-        return self.run_api_test(
+        result = self.run_api_test(
             "Create Student",
             "POST",
             "students",
             200,
             data=student_data
+        )
+        if result:
+            self.test_student_id = result.get('user_id')
+        return result
+
+    def test_student_analytics_api(self):
+        """Test student analytics dashboard endpoint"""
+        # Create a test student session first
+        timestamp = int(datetime.now().timestamp())
+        student_user_id = f"test-student-{timestamp}"
+        student_session_token = f"student_session_{timestamp}"
+        
+        # Create student user and session in MongoDB
+        mongo_commands = f"""
+use('test_database');
+var studentUserId = '{student_user_id}';
+var studentSessionToken = '{student_session_token}';
+var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
+
+// Insert test student
+db.users.insertOne({{
+  user_id: studentUserId,
+  email: 'test.student.analytics.{timestamp}@example.com',
+  name: 'Test Student Analytics',
+  picture: 'https://via.placeholder.com/150',
+  role: 'student',
+  batches: [],
+  created_at: new Date().toISOString()
+}});
+
+// Insert student session
+db.user_sessions.insertOne({{
+  user_id: studentUserId,
+  session_token: studentSessionToken,
+  expires_at: expiresAt.toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Test student created for analytics test');
+"""
+        
+        try:
+            with open('/tmp/mongo_student_setup.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_student_setup.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                # Test student analytics with student session
+                original_token = self.session_token
+                self.session_token = student_session_token
+                
+                analytics_result = self.run_api_test(
+                    "Student Analytics Dashboard",
+                    "GET",
+                    "analytics/student-dashboard",
+                    200
+                )
+                
+                # Restore original session
+                self.session_token = original_token
+                return analytics_result
+            else:
+                print(f"❌ Failed to create test student: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error in student analytics test: {str(e)}")
+            return None
+
+    def test_detailed_student_analytics(self):
+        """Test detailed student performance analytics for teachers"""
+        if not hasattr(self, 'test_student_id'):
+            print("⚠️  Skipping detailed student analytics - no student created")
+            return None
+            
+        return self.run_api_test(
+            "Detailed Student Analytics",
+            "GET",
+            f"students/{self.test_student_id}",
+            200
         )
 
     def test_get_students(self):
