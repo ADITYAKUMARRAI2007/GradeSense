@@ -13,6 +13,7 @@ import ClassReports from "./pages/teacher/ClassReports";
 import ClassInsights from "./pages/teacher/ClassInsights";
 import ManageStudents from "./pages/teacher/ManageStudents";
 import ManageBatches from "./pages/teacher/ManageBatches";
+import ManageExams from "./pages/teacher/ManageExams";
 import ReEvaluations from "./pages/teacher/ReEvaluations";
 import StudentDashboard from "./pages/student/Dashboard";
 import StudentResults from "./pages/student/Results";
@@ -178,6 +179,14 @@ function AppRouter() {
         element={
           <ProtectedRoute allowedRoles={["teacher"]}>
             {(props) => <ManageBatches {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teacher/exams"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <ManageExams {...props} />}
           </ProtectedRoute>
         }
       />
