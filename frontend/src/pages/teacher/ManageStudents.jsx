@@ -2,14 +2,28 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { API } from "../../App";
 import Layout from "../../components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Badge } from "../../components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import { Progress } from "../../components/ui/progress";
 import { toast } from "sonner";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  LineChart,
+  Line
+} from "recharts";
 import { 
   Plus, 
   Search, 
@@ -18,7 +32,13 @@ import {
   Users,
   Upload,
   Mail,
-  BookOpen
+  BookOpen,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  AlertTriangle,
+  CheckCircle,
+  X
 } from "lucide-react";
 
 export default function ManageStudents({ user }) {
@@ -35,6 +55,11 @@ export default function ManageStudents({ user }) {
     student_id: "",
     batches: []
   });
+  
+  // Student detail view
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentDetails, setStudentDetails] = useState(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -52,6 +77,17 @@ export default function ManageStudents({ user }) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStudentDetails = async (studentId) => {
+    try {
+      const response = await axios.get(`${API}/students/${studentId}`);
+      setStudentDetails(response.data);
+      setSelectedStudent(studentId);
+      setDetailSheetOpen(true);
+    } catch (error) {
+      toast.error("Failed to load student details");
     }
   };
 
@@ -120,7 +156,7 @@ export default function ManageStudents({ user }) {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <div>
             <h1 className="text-xl lg:text-2xl font-bold text-foreground">Manage Students</h1>
-            <p className="text-sm text-muted-foreground">Add, edit, and organize your students</p>
+            <p className="text-sm text-muted-foreground">Add, edit, and view student performance</p>
           </div>
           
           <div className="flex items-center gap-2 lg:gap-3">
@@ -238,13 +274,14 @@ export default function ManageStudents({ user }) {
 
         {/* Students List */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="p-4 lg:p-6">
+            <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
               <Users className="w-5 h-5" />
               Students ({filteredStudents.length})
             </CardTitle>
+            <CardDescription>Click on a student to view detailed performance analytics</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 lg:p-6 pt-0">
             {loading ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map(i => (
@@ -265,7 +302,8 @@ export default function ManageStudents({ user }) {
                 {filteredStudents.map((student) => (
                   <div 
                     key={student.user_id}
-                    className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => fetchStudentDetails(student.user_id)}
                     data-testid={`student-${student.user_id}`}
                   >
                     <div className="flex items-center gap-4">
@@ -306,14 +344,14 @@ export default function ManageStudents({ user }) {
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        onClick={() => openEditDialog(student)}
+                        onClick={(e) => { e.stopPropagation(); openEditDialog(student); }}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        onClick={() => handleDelete(student.user_id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(student.user_id); }}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -325,6 +363,169 @@ export default function ManageStudents({ user }) {
             )}
           </CardContent>
         </Card>
+
+        {/* Student Detail Sheet */}
+        <Sheet open={detailSheetOpen} onOpenChange={setDetailSheetOpen}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-3">
+                {studentDetails && (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xl font-bold text-primary">
+                        {studentDetails.student?.name?.charAt(0)}
+                      </span>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">{studentDetails.student?.name}</h2>
+                      <p className="text-sm text-muted-foreground">{studentDetails.student?.email}</p>
+                    </div>
+                  </>
+                )}
+              </SheetTitle>
+            </SheetHeader>
+
+            {studentDetails && (
+              <div className="mt-6 space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-700">{studentDetails.stats?.total_exams || 0}</p>
+                    <p className="text-xs text-blue-600">Exams Taken</p>
+                  </div>
+                  <div className="p-3 bg-orange-50 rounded-lg">
+                    <p className="text-2xl font-bold text-orange-700">{studentDetails.stats?.avg_percentage || 0}%</p>
+                    <p className="text-xs text-orange-600">Average</p>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <p className="text-2xl font-bold text-green-700">{studentDetails.stats?.highest_score || 0}%</p>
+                    <p className="text-xs text-green-600">Highest</p>
+                  </div>
+                  <div className="p-3 bg-purple-50 rounded-lg flex items-center gap-2">
+                    {studentDetails.stats?.trend >= 0 ? (
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <TrendingDown className="w-5 h-5 text-red-600" />
+                    )}
+                    <div>
+                      <p className="text-xl font-bold text-purple-700">
+                        {studentDetails.stats?.trend > 0 ? "+" : ""}{studentDetails.stats?.trend || 0}%
+                      </p>
+                      <p className="text-xs text-purple-600">Trend</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subject Performance */}
+                {Object.keys(studentDetails.subject_performance || {}).length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Target className="w-4 h-4" />
+                      Subject-wise Performance
+                    </h3>
+                    <div className="space-y-3">
+                      {Object.entries(studentDetails.subject_performance).map(([subject, data]) => (
+                        <div key={subject} className="p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">{subject}</span>
+                            <Badge variant="outline">{data.total_exams} exams</Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Progress value={data.average} className="flex-1 h-2" />
+                            <span className="text-sm font-medium w-12">{data.average?.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between mt-1 text-xs text-muted-foreground">
+                            <span>Lowest: {data.lowest}%</span>
+                            <span>Highest: {data.highest}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Weak & Strong Areas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Weak Areas */}
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-red-700">
+                      <AlertTriangle className="w-4 h-4" />
+                      Needs Improvement
+                    </h3>
+                    {studentDetails.weak_areas?.length > 0 ? (
+                      <div className="space-y-2">
+                        {studentDetails.weak_areas.map((area, idx) => (
+                          <div key={idx} className="p-2 bg-red-50 rounded text-sm text-red-700">
+                            {typeof area === 'string' ? area : `${area.question}: ${area.score}`}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No weak areas identified</p>
+                    )}
+                  </div>
+
+                  {/* Strong Areas */}
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-green-700">
+                      <CheckCircle className="w-4 h-4" />
+                      Strengths
+                    </h3>
+                    {studentDetails.strong_areas?.length > 0 ? (
+                      <div className="space-y-2">
+                        {studentDetails.strong_areas.map((area, idx) => (
+                          <div key={idx} className="p-2 bg-green-50 rounded text-sm text-green-700">
+                            {typeof area === 'string' ? area : `${area.question}: ${area.score}`}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Complete more exams to identify strengths</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent Submissions */}
+                {studentDetails.recent_submissions?.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Recent Results</h3>
+                    <div className="space-y-2">
+                      {studentDetails.recent_submissions.slice(0, 5).map((sub, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <span className="text-sm font-medium">{sub.exam_name || `Exam ${idx + 1}`}</span>
+                          <Badge 
+                            className={
+                              sub.percentage >= 80 ? "bg-green-100 text-green-700" :
+                              sub.percentage >= 60 ? "bg-blue-100 text-blue-700" :
+                              sub.percentage >= 40 ? "bg-yellow-100 text-yellow-700" :
+                              "bg-red-100 text-red-700"
+                            }
+                          >
+                            {sub.percentage}%
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {studentDetails.recommendations?.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Recommendations</h3>
+                    <div className="space-y-2">
+                      {studentDetails.recommendations.map((rec, idx) => (
+                        <div key={idx} className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm">
+                          {rec}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </Layout>
   );
