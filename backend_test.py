@@ -556,11 +556,11 @@ print('Test student created for analytics test');
         cleanup_commands = f"""
 use('test_database');
 // Clean up test data
-db.users.deleteMany({{email: /test\\.user\\./}});
-db.user_sessions.deleteMany({{session_token: /test_session/}});
-db.batches.deleteMany({{name: /Test Batch/}});
+db.users.deleteMany({{email: /test\\.(user|student)\\./}});
+db.user_sessions.deleteMany({{session_token: /(test_session|student_session)/}});
+db.batches.deleteMany({{name: /(Test Batch|Mathematics Grade|Updated Mathematics|Temp Delete)/}});
 db.subjects.deleteMany({{name: /Test Subject/}});
-db.exams.deleteMany({{exam_name: /Test Exam/}});
+db.exams.deleteMany({{exam_name: /(Test Exam|Algebra Fundamentals|Grading Test)/}});
 print('Test data cleaned up');
 """
         
