@@ -164,7 +164,7 @@ print('Session Token: ' + sessionToken);
     def test_create_batch(self):
         """Test batch creation"""
         batch_data = {
-            "name": f"Test Batch {datetime.now().strftime('%H%M%S')}"
+            "name": f"Mathematics Grade 10 {datetime.now().strftime('%H%M%S')}"
         }
         result = self.run_api_test(
             "Create Batch",
@@ -175,7 +175,78 @@ print('Session Token: ' + sessionToken);
         )
         if result:
             self.test_batch_id = result.get('batch_id')
+            self.test_batch_name = batch_data["name"]
         return result
+
+    def test_duplicate_batch_prevention(self):
+        """Test duplicate batch name prevention"""
+        if not hasattr(self, 'test_batch_name'):
+            print("⚠️  Skipping duplicate batch test - no batch created")
+            return None
+            
+        # Try to create batch with same name
+        duplicate_data = {"name": self.test_batch_name}
+        return self.run_api_test(
+            "Duplicate Batch Prevention",
+            "POST",
+            "batches",
+            400,  # Should fail with 400
+            data=duplicate_data
+        )
+
+    def test_update_batch(self):
+        """Test batch name update"""
+        if not hasattr(self, 'test_batch_id'):
+            print("⚠️  Skipping batch update test - no batch created")
+            return None
+            
+        update_data = {
+            "name": f"Updated Mathematics Grade 10 {datetime.now().strftime('%H%M%S')}"
+        }
+        return self.run_api_test(
+            "Update Batch Name",
+            "PUT",
+            f"batches/{self.test_batch_id}",
+            200,
+            data=update_data
+        )
+
+    def test_get_batch_details(self):
+        """Test get batch details with students list"""
+        if not hasattr(self, 'test_batch_id'):
+            print("⚠️  Skipping batch details test - no batch created")
+            return None
+            
+        return self.run_api_test(
+            "Get Batch Details",
+            "GET",
+            f"batches/{self.test_batch_id}",
+            200
+        )
+
+    def test_delete_empty_batch(self):
+        """Test deleting empty batch (should succeed)"""
+        # Create a temporary batch for deletion
+        temp_batch_data = {
+            "name": f"Temp Delete Batch {datetime.now().strftime('%H%M%S')}"
+        }
+        temp_result = self.run_api_test(
+            "Create Temp Batch for Deletion",
+            "POST",
+            "batches",
+            200,
+            data=temp_batch_data
+        )
+        
+        if temp_result:
+            temp_batch_id = temp_result.get('batch_id')
+            return self.run_api_test(
+                "Delete Empty Batch",
+                "DELETE",
+                f"batches/{temp_batch_id}",
+                200
+            )
+        return None
 
     def test_get_batches(self):
         """Test get batches"""
