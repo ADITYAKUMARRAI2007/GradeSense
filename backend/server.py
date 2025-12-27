@@ -736,6 +736,32 @@ async def get_exam(exam_id: str, user: User = Depends(get_current_user)):
     """Get exam details"""
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
     if not exam:
+
+@api_router.delete("/exams/{exam_id}")
+async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
+    """Delete an exam and all its submissions"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can delete exams")
+    
+    # Check if exam exists and belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Delete all submissions associated with this exam
+    await db.submissions.delete_many({"exam_id": exam_id})
+    
+    # Delete all re-evaluation requests associated with this exam
+    await db.re_evaluations.delete_many({"exam_id": exam_id})
+    
+    # Delete the exam
+    result = await db.exams.delete_one({"exam_id": exam_id, "teacher_id": user.user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    return {"message": "Exam deleted successfully"}
+
         raise HTTPException(status_code=404, detail="Exam not found")
     return exam
 
