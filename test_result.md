@@ -256,6 +256,66 @@ frontend:
           agent: "testing"
           comment: "✅ MANAGE STUDENTS PAGE VERIFIED: Comprehensive student management with search/filter functionality, add/edit/delete operations, detailed student analytics in side sheet showing stats, subject-wise performance, weak/strong areas, recent submissions, and recommendations. Proper integration with /api/students endpoints. Excellent responsive design with proper data-testid attributes and accessibility features."
 
+  - task: "Re-evaluation Feature (Student)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/student/RequestReEvaluation.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Student re-evaluation request page fully implemented with exam selection, question checkbox selection, reason textarea, and request history display. Integrated with POST /api/re-evaluations and GET /api/re-evaluations endpoints"
+
+  - task: "Re-evaluation Feature (Teacher)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReEvaluations.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Teacher re-evaluation review page implemented with pending requests list, review dialog with response textarea, approve/reject buttons. Integrated with GET /api/re-evaluations and PUT /api/re-evaluations/{id} endpoints"
+
+  - task: "Class Insights Page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ClassInsights.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Class Insights page fully implemented with exam filter, overall assessment summary, strengths/weaknesses sections, teaching recommendations, and action items checklist. Integrated with GET /api/analytics/insights endpoint"
+
+  - task: "Review Papers Page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Review Papers page fully implemented with two-panel view (list + detail), search/filter functionality, PDF image preview, question-by-question editing (scores, feedback, comments), prev/next navigation, save and approve buttons. Mobile responsive with sheet for detail view. Integrated with GET /api/submissions and PUT /api/submissions/{id} endpoints"
+
+  - task: "Class Reports Page with Export"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Class Reports page fully implemented with batch/subject/exam filters, overview stats cards, score distribution bar chart, question-wise performance chart, top performers table, needs attention table, and CSV export functionality. Integrated with GET /api/analytics/class-report endpoint. Mobile responsive design"
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
