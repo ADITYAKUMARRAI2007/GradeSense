@@ -602,20 +602,41 @@ print('Test data cleaned up');
         self.test_auth_me()
         
         # CRUD operations
+        print("\n📋 Testing Batch Management")
+        print("-" * 30)
         self.test_create_batch()
+        self.test_duplicate_batch_prevention()
         self.test_get_batches()
+        self.test_get_batch_details()
+        self.test_update_batch()
+        self.test_delete_empty_batch()
         
+        print("\n📚 Testing Subject & Student Management")
+        print("-" * 30)
         self.test_create_subject()
         self.test_get_subjects()
         
         self.test_create_student()
         self.test_get_students()
         
-        self.test_create_exam()
+        print("\n📝 Testing Exam Management with Sub-questions")
+        print("-" * 30)
+        self.test_create_exam_with_subquestions()
+        self.test_grading_modes()
         self.test_get_exams()
         
+        print("\n📊 Testing Student Analytics")
+        print("-" * 30)
+        self.test_student_analytics_api()
+        self.test_detailed_student_analytics()
+        
+        print("\n📋 Testing Submissions & Re-evaluations")
+        print("-" * 30)
+        self.test_submissions_api()
+        self.test_re_evaluations_api()
+        
         # Analytics
-        print("\n📊 Testing Analytics Endpoints")
+        print("\n📊 Testing Teacher Analytics Endpoints")
         print("-" * 30)
         self.test_dashboard_analytics()
         self.test_class_report()
