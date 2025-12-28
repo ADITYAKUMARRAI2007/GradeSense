@@ -1,88 +1,248 @@
 {
-  "timestamp": "2025-12-27T07:38:02.326554",
-  "total_tests": 16,
-  "passed_tests": 0,
-  "success_rate": 0.0,
+  "timestamp": "2025-12-28T07:38:03.949670",
+  "total_tests": 48,
+  "passed_tests": 48,
+  "success_rate": 100.0,
   "test_details": [
     {
       "test": "Health Check",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Auth Me",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Create Batch",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Duplicate Batch Prevention",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Get Batches",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Batch Details",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Batch Name",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Create Temp Batch for Deletion",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Empty Batch",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Create Subject",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Get Subjects",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Create Student",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Get Students",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam with Sub-questions",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Strict Mode",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Balanced Mode",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Conceptual Mode",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam - Lenient Mode",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Get Exams",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Student Analytics Dashboard",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Detailed Student Analytics",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Get Submissions (Teacher)",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Submissions with Batch Filter",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Get Re-evaluation Requests",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Dashboard Analytics",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Class Report",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
     },
     {
       "test": "AI Insights",
-      "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='handgrade-pro.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create First Exam (Test Exam 1)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Duplicate Exam (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Exam Exists Before Deletion",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Exam",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Exam Deleted",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Exam Deletion Verification",
+      "success": true,
+      "details": "Exam successfully removed from list"
+    },
+    {
+      "test": "Delete Non-existent Exam (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Valid ID (STU001)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Short ID (AB) - should fail",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Long ID - should fail",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Invalid Characters (STU@001) - should fail",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Duplicate ID Different Name - should fail",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Exam for Filename Parsing Test",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student for Auto-Add to Batch Test",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Batch Details to Verify Student Added",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Student Auto-Added to Batch Verification",
+      "success": true,
+      "details": "Student user_e70eede2e14c found in batch batch_04d73b3e"
+    },
+    {
+      "test": "Create Student with Format STU0738031 (John Doe)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Format ROLL073803 (Alice Smith)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Format A073803 (Bob Jones)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify All Students Added to Batch",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "All Created Students Found in Batch",
+      "success": true,
+      "details": "All 3 students found in batch"
     }
   ]
 }
