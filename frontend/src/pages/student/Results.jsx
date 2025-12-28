@@ -241,8 +241,9 @@ export default function StudentResults({ user }) {
                           {/* Full Question Text */}
                           {qs.question_text && (
                             <div className="mb-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-                              <p className="text-sm font-medium text-blue-900 mb-1">Question:</p>
-                              <p className="text-sm text-blue-800 whitespace-pre-wrap">{qs.question_text}</p>
+                              <p className="text-sm text-blue-800 whitespace-pre-wrap">
+                                <strong>Q{qs.question_number}.</strong> {qs.question_text}
+                              </p>
                             </div>
                           )}
                           
