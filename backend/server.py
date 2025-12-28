@@ -228,6 +228,129 @@ async def create_session(request: Request, response: Response):
         except Exception as e:
             logger.error(f"Auth service error: {e}")
             raise HTTPException(status_code=500, detail="Auth service error")
+
+
+# ============== NOTIFICATIONS ROUTES ==============
+
+@api_router.get("/notifications")
+async def get_notifications(user: User = Depends(get_current_user)):
+    """Get user's notifications"""
+    notifications = await db.notifications.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    unread_count = await db.notifications.count_documents({
+        "user_id": user.user_id,
+        "is_read": False
+    })
+    
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count
+    }
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user: User = Depends(get_current_user)):
+    """Mark notification as read"""
+    result = await db.notifications.update_one(
+        {"notification_id": notification_id, "user_id": user.user_id},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification marked as read"}
+
+async def create_notification(user_id: str, notification_type: str, title: str, message: str, link: str = None):
+    """Helper function to create notifications"""
+    notification_id = f"notif_{uuid.uuid4().hex[:12]}"
+    notification = {
+        "notification_id": notification_id,
+        "user_id": user_id,
+        "type": notification_type,
+        "title": title,
+        "message": message,
+        "link": link,
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    return notification_id
+
+# ============== SEARCH ROUTE ==============
+
+@api_router.post("/search")
+async def global_search(query: str, user: User = Depends(get_current_user)):
+    """Global search across exams, students, batches, submissions"""
+    results = {
+        "exams": [],
+        "students": [],
+        "batches": [],
+        "submissions": []
+    }
+    
+    if not query or len(query) < 2:
+        return results
+    
+    search_regex = {"$regex": query, "$options": "i"}
+    
+    # Search exams
+    if user.role == "teacher":
+        exams = await db.exams.find(
+            {"teacher_id": user.user_id, "exam_name": search_regex},
+            {"_id": 0, "exam_id": 1, "exam_name": 1, "exam_date": 1, "status": 1}
+        ).limit(10).to_list(10)
+        results["exams"] = exams
+        
+        # Search students
+        students = await db.users.find(
+            {
+                "teacher_id": user.user_id,
+                "role": "student",
+                "$or": [
+                    {"name": search_regex},
+                    {"student_id": search_regex},
+                    {"email": search_regex}
+                ]
+            },
+            {"_id": 0, "user_id": 1, "name": 1, "student_id": 1, "email": 1}
+        ).limit(10).to_list(10)
+        results["students"] = students
+        
+        # Search batches
+        batches = await db.batches.find(
+            {"teacher_id": user.user_id, "name": search_regex},
+            {"_id": 0, "batch_id": 1, "name": 1}
+        ).limit(10).to_list(10)
+        results["batches"] = batches
+        
+        # Search submissions by student name
+        submissions = await db.submissions.find(
+            {"student_name": search_regex},
+            {"_id": 0, "submission_id": 1, "student_name": 1, "exam_id": 1, "percentage": 1}
+        ).limit(10).to_list(10)
+        results["submissions"] = submissions
+    
+    elif user.role == "student":
+        # Students can only search their own data
+        exams = await db.submissions.find(
+            {"student_id": user.user_id},
+            {"_id": 0, "exam_id": 1, "submission_id": 1}
+        ).limit(10).to_list(10)
+        
+        # Get exam details for matched submissions
+        if exams:
+            exam_ids = [e["exam_id"] for e in exams]
+            exam_details = await db.exams.find(
+                {"exam_id": {"$in": exam_ids}, "exam_name": search_regex},
+                {"_id": 0, "exam_id": 1, "exam_name": 1, "exam_date": 1}
+            ).to_list(10)
+            results["exams"] = exam_details
+    
+    return results
+
     
     # Check if user exists
     user = await db.users.find_one({"email": auth_data["email"]}, {"_id": 0})
