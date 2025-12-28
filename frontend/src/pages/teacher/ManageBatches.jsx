@@ -120,9 +120,13 @@ export default function ManageBatches({ user }) {
     setDialogOpen(true);
   };
 
-  const filteredBatches = batches.filter(b => 
-    b.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredBatches = batches.filter(b => {
+    // Filter by search query
+    if (!b.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    // Filter by closed status
+    if (!showClosed && b.status === "closed") return false;
+    return true;
+  });
 
   return (
     <Layout user={user}>
