@@ -597,13 +597,32 @@ async def create_student(student: UserCreate, user: User = Depends(get_current_u
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create students")
     
-    # Check if student already exists
+    # Validate student ID format if provided
+    if student.student_id:
+        student_id = student.student_id.strip()
+        if not (3 <= len(student_id) <= 20 and student_id.replace("-", "").isalnum()):
+            raise HTTPException(
+                status_code=400, 
+                detail="Student ID must be 3-20 alphanumeric characters (letters, numbers, hyphens allowed)"
+            )
+        
+        # Check if student ID already exists
+        existing_id = await db.users.find_one({"student_id": student_id, "role": "student"})
+        if existing_id:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Student ID {student_id} already exists"
+            )
+    else:
+        # Auto-generate student ID
+        student_id = f"STU{uuid.uuid4().hex[:6].upper()}"
+    
+    # Check if email already exists
     existing = await db.users.find_one({"email": student.email})
     if existing:
         raise HTTPException(status_code=400, detail="Student with this email already exists")
     
     user_id = f"user_{uuid.uuid4().hex[:12]}"
-    student_id = student.student_id or f"STU{uuid.uuid4().hex[:6].upper()}"
     
     new_student = {
         "user_id": user_id,
