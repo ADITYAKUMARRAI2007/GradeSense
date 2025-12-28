@@ -212,14 +212,29 @@ export default function ManageBatches({ user }) {
           <div className="lg:col-span-1">
             <Card>
               <CardHeader className="p-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search batches..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search batches..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="show-closed"
+                      checked={showClosed}
+                      onCheckedChange={setShowClosed}
+                    />
+                    <label 
+                      htmlFor="show-closed"
+                      className="text-sm text-muted-foreground cursor-pointer"
+                    >
+                      Show archived batches
+                    </label>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
