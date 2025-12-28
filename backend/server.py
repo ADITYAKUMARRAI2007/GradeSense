@@ -1461,6 +1461,9 @@ async def create_re_evaluation(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
     
+    # Get exam and teacher info
+    exam = await db.exams.find_one({"exam_id": submission["exam_id"]}, {"_id": 0})
+    
     request_id = f"reeval_{uuid.uuid4().hex[:8]}"
     new_request = {
         "request_id": request_id,
@@ -1475,6 +1478,17 @@ async def create_re_evaluation(
     }
     
     await db.re_evaluations.insert_one(new_request)
+    
+    # Create notification for teacher
+    if exam:
+        await create_notification(
+            user_id=exam["teacher_id"],
+            notification_type="re_evaluation_request",
+            title="New Re-evaluation Request",
+            message=f"{user.name} requested re-evaluation for {exam.get('exam_name', 'exam')}",
+            link="/teacher/re-evaluations"
+        )
+    
     return {"request_id": request_id, "status": "pending"}
 
 @api_router.put("/re-evaluations/{request_id}")
@@ -1487,12 +1501,27 @@ async def update_re_evaluation(
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can respond")
     
+    # Get re-evaluation request
+    re_eval = await db.re_evaluations.find_one({"request_id": request_id}, {"_id": 0})
+    if not re_eval:
+        raise HTTPException(status_code=404, detail="Re-evaluation request not found")
+    
     await db.re_evaluations.update_one(
         {"request_id": request_id},
         {"$set": {
             "status": updates.get("status", "resolved"),
-            "response": updates.get("response", "")
+            "response": updates.get("response", ""),
+            "responded_at": datetime.now(timezone.utc).isoformat()
         }}
+    )
+    
+    # Create notification for student
+    await create_notification(
+        user_id=re_eval["student_id"],
+        notification_type="re_evaluation_response",
+        title="Re-evaluation Response",
+        message=f"Teacher responded to your re-evaluation request",
+        link="/student/re-evaluation"
     )
     
     return {"message": "Re-evaluation updated"}
