@@ -1314,6 +1314,15 @@ async def upload_student_papers(
         {"$set": {"status": "completed"}}
     )
     
+    # Create notification for teacher
+    await create_notification(
+        user_id=user.user_id,
+        notification_type="grading_complete",
+        title="Grading Complete",
+        message=f"Successfully graded {len(submissions)} papers for {exam['exam_name']}",
+        link=f"/teacher/review?exam={exam_id}"
+    )
+    
     result = {
         "processed": len(submissions),
         "submissions": submissions
