@@ -1078,19 +1078,53 @@ async def reopen_batch(batch_id: str, user: User = Depends(get_current_user)):
     
     return {"message": "Batch reopened successfully"}
 
-        raise HTTPException(status_code=403, detail="Only teachers can update students")
+# ============== SUBJECT ROUTES ==============
+
+@api_router.get("/subjects")
+async def get_subjects(user: User = Depends(get_current_user)):
+    """Get all subjects"""
+    if user.role == "teacher":
+        subjects = await db.subjects.find(
+            {"teacher_id": user.user_id},
+            {"_id": 0}
+        ).to_list(None)
+    else:
+        # Students see subjects from their batches
+        exams = await db.exams.find(
+            {"batch_id": {"$in": user.batches}},
+            {"subject_id": 1, "_id": 0}
+        ).to_list(None)
+        subject_ids = list(set(e["subject_id"] for e in exams))
+        subjects = await db.subjects.find(
+            {"subject_id": {"$in": subject_ids}},
+            {"_id": 0}
+        ).to_list(None)
+    return subjects
+
+@api_router.post("/subjects")
+async def create_subject(subject: SubjectCreate, user: User = Depends(get_current_user)):
+    """Create a new subject"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can create subjects")
     
-    result = await db.users.update_one(
-        {"user_id": student_user_id, "teacher_id": user.user_id},
-        {"$set": {
-            "name": student.name,
-            "email": student.email,
-            "batches": student.batches
-        }}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Student not found")
-    return {"message": "Student updated"}
+    # Check if subject already exists for this teacher
+    existing = await db.subjects.find_one({
+        "name": subject.name,
+        "teacher_id": user.user_id
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Subject already exists")
+    
+    subject_id = f"subj_{uuid.uuid4().hex[:8]}"
+    new_subject = {
+        "subject_id": subject_id,
+        "name": subject.name,
+        "teacher_id": user.user_id
+    }
+    await db.subjects.insert_one(new_subject)
+    return {"subject_id": subject_id, "name": subject.name}
+
+# ============== STUDENT ROUTES ==============
 
 @api_router.delete("/students/{student_user_id}")
 async def delete_student(student_user_id: str, user: User = Depends(get_current_user)):
