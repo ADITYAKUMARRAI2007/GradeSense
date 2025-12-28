@@ -19,6 +19,7 @@ import {
   ChevronRight, 
   Save, 
   CheckCircle,
+  CheckCircle2,
   FileText,
   RefreshCw,
   X
