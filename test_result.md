@@ -270,6 +270,51 @@ backend:
           agent: "testing"
           comment: "✅ EXAM DELETION WITH CASCADE VERIFIED: Successfully tested exam deletion functionality. DELETE /api/exams/{exam_id} returns 200 status with message 'Exam deleted successfully'. Verified exam is removed from exam list after deletion. Tested deletion of non-existent exam returns 404 as expected. CASCADE DELETION CONFIRMED: Created exam with 2 test submissions and 1 re-evaluation request, after exam deletion all related data (submissions and re-evaluations) were successfully removed from database. Cascade deletion working perfectly."
 
+  - task: "Global Search API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Global search API implemented (lines 284-352). POST /api/search searches across exams, students, batches, and submissions with query validation (min 2 chars) and grouped results by type. Supports teacher and student role-based filtering."
+        - working: true
+          agent: "testing"
+          comment: "✅ GLOBAL SEARCH API VERIFIED: Successfully tested all search functionality. Query validation working correctly - short queries (<2 chars) return empty results for all categories (exams, students, batches, submissions). Batch search, exam search, and student search all working with proper result grouping. API returns correct structure with results grouped by type. All search endpoints responding with 200 status codes and proper data structure."
+
+  - task: "Notifications API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Notifications API implemented (lines 235-280). GET /api/notifications returns notifications array + unread_count. PUT /api/notifications/{id}/read marks notification as read. Auto-notification creation helper function for grading and re-evaluation events."
+        - working: true
+          agent: "testing"
+          comment: "✅ NOTIFICATIONS API VERIFIED: Successfully tested all notification functionality. GET /api/notifications returns proper structure with notifications array and unread_count. Notification structure validation passed - all required fields present (notification_id, user_id, type, title, message, is_read, created_at). Mark as read functionality working correctly - returns 404 for non-existent notifications as expected. API responding with correct status codes and proper error handling."
+
+  - task: "Auto-Notification Creation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Auto-notification creation implemented in grading complete (lines 318-324) and re-evaluation workflows (lines 482-490, 519-525). Creates notifications for teachers on grading completion and re-evaluation requests/responses."
+        - working: true
+          agent: "testing"
+          comment: "✅ AUTO-NOTIFICATION CREATION VERIFIED: Successfully tested auto-notification creation during re-evaluation request workflow. Re-evaluation request creation successfully triggers teacher notification with type 're_evaluation_request'. Notification count increases correctly after re-evaluation events. Auto-notification system working as expected for key application events."
+
 frontend:
   - task: "Student Dashboard with Real Analytics"
     implemented: true
