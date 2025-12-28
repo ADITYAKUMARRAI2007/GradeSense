@@ -1314,6 +1314,71 @@ def pdf_to_images(pdf_bytes: bytes) -> List[str]:
     doc.close()
     return images
 
+async def extract_questions_from_model_answer(
+    model_answer_images: List[str],
+    num_questions: int
+) -> List[str]:
+    """Extract question text from model answer images using AI"""
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    
+    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not api_key:
+        return []
+    
+    try:
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"extract_{uuid.uuid4().hex[:8]}",
+            system_message="""You are an expert at extracting question text from exam papers.
+            
+Extract ONLY the question text (not answers) from the provided images.
+Return a JSON array with the question text for each question.
+
+Return this exact JSON format:
+{
+  "questions": [
+    "Full text of question 1 here",
+    "Full text of question 2 here"
+  ]
+}
+
+Important:
+- Extract the complete question text including any sub-parts (a, b, c)
+- Do NOT include answer content
+- Maintain original question numbering if visible
+- If you can't find all questions, return what you find
+"""
+        ).with_model("gemini", "gemini-3-flash-preview")
+        
+        # Create image contents
+        image_contents = [ImageContent(image_base64=img) for img in model_answer_images[:5]]
+        
+        user_message = UserMessage(
+            text=f"""Extract the question text from these model answer images.
+            
+Expected number of questions: {num_questions}
+
+Extract each question's complete text.""",
+            images=image_contents
+        )
+        
+        response = await asyncio.to_thread(chat.send_message, user_message)
+        response_text = response.text.strip()
+        
+        # Parse JSON response
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        import json
+        result = json.loads(response_text)
+        return result.get("questions", [])
+        
+    except Exception as e:
+        logger.error(f"Error extracting questions: {e}")
+        return []
+
 async def grade_with_ai(
     images: List[str],
     model_answer_images: List[str],
