@@ -1394,6 +1394,14 @@ print('Test data cleaned up');
         self.test_mark_notification_read()
         self.test_auto_notification_creation()
         
+        # P1 FEATURE TESTS: Full Question Text & Answer Sheet Display
+        print("\n📝 Testing P1 Feature: Full Question Text & Answer Sheet Display")
+        print("-" * 60)
+        self.test_p1_submission_enrichment()
+        self.test_p1_question_text_mapping()
+        self.test_p1_sub_questions_support()
+        self.test_p1_file_images_preservation()
+        
         # Cleanup
         self.cleanup_test_data()
         
