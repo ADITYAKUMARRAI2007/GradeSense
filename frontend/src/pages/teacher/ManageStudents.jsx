@@ -233,12 +233,17 @@ export default function ManageStudents({ user }) {
                     </div>
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleSubmit} disabled={!formData.name || !formData.email} data-testid="save-student-btn">
-                    {editingStudent ? "Save Changes" : "Add Student"}
-                  </Button>
-                </DialogFooter>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSubmit();
+                }}>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={!formData.name || !formData.email} data-testid="save-student-btn">
+                      {editingStudent ? "Save Changes" : "Add Student"}
+                    </Button>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
           </div>
