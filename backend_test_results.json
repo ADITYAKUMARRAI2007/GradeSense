@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-12-28T16:39:49.269814",
-  "total_tests": 59,
-  "passed_tests": 58,
-  "success_rate": 98.30508474576271,
+  "timestamp": "2025-12-28T16:41:06.114880",
+  "total_tests": 81,
+  "passed_tests": 81,
+  "success_rate": 100.0,
   "test_details": [
     {
       "test": "Health Check",
@@ -175,9 +175,9 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU001)",
-      "success": false,
-      "details": "Expected 200, got 400 - Student ID STU001 already exists"
+      "test": "Create Student with Valid ID (STU164103)",
+      "success": true,
+      "details": ""
     },
     {
       "test": "Create Student with Short ID (AB) - should fail",
@@ -191,6 +191,11 @@
     },
     {
       "test": "Create Student with Invalid Characters (STU@001) - should fail",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Student with Duplicate ID Different Name - should fail",
       "success": true,
       "details": ""
     },
@@ -212,20 +217,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_52bb65e3b73f found in batch batch_b566ff9b"
+      "details": "Student user_a12559e77d3f found in batch batch_0760202a"
     },
     {
-      "test": "Create Student with Format STU1639481 (John Doe)",
+      "test": "Create Student with Format STU1641031 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL163948 (Alice Smith)",
+      "test": "Create Student with Format ROLL164103 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A163948 (Bob Jones)",
+      "test": "Create Student with Format A164103 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -270,6 +275,16 @@
       "details": "Results: 5 exams, 3 students, 0 submissions"
     },
     {
+      "test": "Global Search - Student Name",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Student Search Results",
+      "success": true,
+      "details": "Found 1 student(s)"
+    },
+    {
       "test": "Get Notifications",
       "success": true,
       "details": ""
@@ -295,9 +310,104 @@
       "details": ""
     },
     {
+      "test": "Create Re-evaluation Request (should create notification)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Check Notifications After Re-evaluation Request",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Auto-Notification Creation",
+      "success": true,
+      "details": "Notification created: 1 new notification(s)"
+    },
+    {
+      "test": "Re-evaluation Notification Type",
+      "success": true,
+      "details": "Found re_evaluation_request notification"
+    },
+    {
       "test": "Create P1 Test Exam with Detailed Rubrics",
       "success": true,
       "details": ""
+    },
+    {
+      "test": "P1: Get Submission with Question Text Enrichment",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "P1: Question Text Enrichment - Question 1",
+      "success": true,
+      "details": "Question text found: Solve the following algebraic equation step by ste..."
+    },
+    {
+      "test": "P1: Question Text Enrichment - Question 2",
+      "success": true,
+      "details": "Question text found: Analyze the quadratic function f(x) = x\u00b2 - 4x + 3...."
+    },
+    {
+      "test": "Get P1 Test Exam for Rubric Comparison",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "P1: Rubric Mapping Q1",
+      "success": true,
+      "details": "Exam rubric correctly mapped to question_text"
+    },
+    {
+      "test": "P1: Rubric Mapping Q2",
+      "success": true,
+      "details": "Exam rubric correctly mapped to question_text"
+    },
+    {
+      "test": "P1: Overall Question Text Mapping",
+      "success": true,
+      "details": "All exam rubrics correctly mapped to submission question_text fields"
+    },
+    {
+      "test": "P1: Sub-question A Rubric",
+      "success": true,
+      "details": "Sub-question A rubric found: Isolate the variable x by performing inv..."
+    },
+    {
+      "test": "P1: Sub-question B Rubric",
+      "success": true,
+      "details": "Sub-question B rubric found: Verify your answer by substituting back ..."
+    },
+    {
+      "test": "P1: Sub-questions Structure",
+      "success": true,
+      "details": "Found 2 sub-questions with correct structure"
+    },
+    {
+      "test": "P1: No Sub-questions for Q2",
+      "success": true,
+      "details": "Question 2 correctly has no sub-questions"
+    },
+    {
+      "test": "P1: File Images Preservation",
+      "success": true,
+      "details": "file_images array preserved with 2 image(s)"
+    },
+    {
+      "test": "P1: File Images Format",
+      "success": true,
+      "details": "Images are in correct base64 string format (length: 12)"
+    },
+    {
+      "test": "P1: File Data Preservation",
+      "success": true,
+      "details": "file_data field preserved in response"
+    },
+    {
+      "test": "P1: Essential Fields Preservation",
+      "success": true,
+      "details": "All essential submission fields preserved"
     }
   ]
 }
