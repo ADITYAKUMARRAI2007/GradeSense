@@ -848,7 +848,22 @@ async def create_student(student: UserCreate, user: User = Depends(get_current_u
 async def update_student(student_user_id: str, student: UserCreate, user: User = Depends(get_current_user)):
     """Update student details"""
     if user.role != "teacher":
-
+        raise HTTPException(status_code=403, detail="Only teachers can update students")
+    
+    result = await db.users.update_one(
+        {"user_id": student_user_id, "role": "student"},
+        {"$set": {
+            "name": student.name,
+            "email": student.email,
+            "student_id": student.student_id,
+            "batches": student.batches
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    return {"message": "Student updated"}
 
 @api_router.post("/exams/{exam_id}/upload-more-papers")
 async def upload_more_papers(
