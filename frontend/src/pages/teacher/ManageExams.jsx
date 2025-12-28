@@ -425,6 +425,58 @@ export default function ManageExams({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Upload More Papers Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Additional Papers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Upload additional student papers that were missed earlier. Papers will be auto-graded immediately.
+              </p>
+            </div>
+            <div 
+              {...getRootProps()} 
+              className={`dropzone p-8 text-center border-2 border-dashed rounded-xl ${isDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
+            >
+              <input {...getInputProps()} />
+              <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="font-medium">Drop student answer PDFs here</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Format: StudentID_StudentName.pdf
+              </p>
+            </div>
+            {paperFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Selected Files ({paperFiles.length})</p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {paperFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm p-2 bg-muted rounded">
+                      <FileText className="w-4 h-4" />
+                      <span className="truncate">{file.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUploadMorePapers} 
+              disabled={paperFiles.length === 0 || uploadingPapers}
+              data-testid="upload-papers-btn"
+            >
+              {uploadingPapers ? "Uploading..." : `Upload & Grade ${paperFiles.length} Papers`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
