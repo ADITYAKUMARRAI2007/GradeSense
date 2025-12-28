@@ -210,6 +210,7 @@ async def create_session(request: Request, response: Response):
     """Exchange session_id for session_token"""
     data = await request.json()
     session_id = data.get("session_id")
+    preferred_role = data.get("preferred_role", "teacher")  # Get role from frontend
     
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
@@ -253,9 +254,9 @@ async def create_session(request: Request, response: Response):
         )
         user_role = existing_user.get("role", "teacher")
     else:
-        # Create new user (default role: teacher)
+        # Create new user with preferred role
         user_id = f"user_{uuid.uuid4().hex[:12]}"
-        user_role = "teacher"
+        user_role = preferred_role if preferred_role in ["teacher", "student"] else "teacher"
         new_user = {
             "user_id": user_id,
             "email": user_email,
