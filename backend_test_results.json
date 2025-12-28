@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-12-28T08:06:45.595988",
-  "total_tests": 58,
-  "passed_tests": 57,
-  "success_rate": 98.27586206896551,
+  "timestamp": "2025-12-28T16:39:49.269814",
+  "total_tests": 59,
+  "passed_tests": 58,
+  "success_rate": 98.30508474576271,
   "test_details": [
     {
       "test": "Health Check",
@@ -212,20 +212,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_8166a35e4b85 found in batch batch_ac0725c4"
+      "details": "Student user_52bb65e3b73f found in batch batch_b566ff9b"
     },
     {
-      "test": "Create Student with Format STU0806441 (John Doe)",
+      "test": "Create Student with Format STU1639481 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL080644 (Alice Smith)",
+      "test": "Create Student with Format ROLL163948 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A080644 (Bob Jones)",
+      "test": "Create Student with Format A163948 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -291,6 +291,11 @@
     },
     {
       "test": "Get Initial Notifications Count",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create P1 Test Exam with Detailed Rubrics",
       "success": true,
       "details": ""
     }
