@@ -1653,7 +1653,9 @@ db.users.deleteMany({{email: /test\\.(user|student)\\./}});
 db.user_sessions.deleteMany({{session_token: /(test_session|student_session)/}});
 db.batches.deleteMany({{name: /(Test Batch|Mathematics Grade|Updated Mathematics|Temp Delete)/}});
 db.subjects.deleteMany({{name: /Test Subject/}});
-db.exams.deleteMany({{exam_name: /(Test Exam|Algebra Fundamentals|Grading Test)/}});
+db.exams.deleteMany({{exam_name: /(Test Exam|Algebra Fundamentals|Grading Test|P1 Question Text Test)/}});
+db.submissions.deleteMany({{submission_id: /(test_sub_|p1_sub_)/}});
+db.re_evaluations.deleteMany({{request_id: /reeval_/}});
 print('Test data cleaned up');
 """
         
