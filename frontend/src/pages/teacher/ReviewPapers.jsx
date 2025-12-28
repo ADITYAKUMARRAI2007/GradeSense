@@ -184,15 +184,62 @@ export default function ReviewPapers({ user }) {
         {/* PDF Viewer */}
         <div className="h-48 lg:h-auto lg:flex-1 border-b lg:border-b-0 lg:border-r overflow-auto bg-muted/30 p-2 lg:p-4">
           {selectedSubmission.file_images?.length > 0 ? (
-            <div className="flex lg:flex-col gap-2 lg:gap-4 overflow-x-auto lg:overflow-x-visible">
-              {selectedSubmission.file_images.map((img, idx) => (
-                <img 
-                  key={idx}
-                  src={`data:image/jpeg;base64,${img}`}
-                  alt={`Page ${idx + 1}`}
-                  className="h-40 lg:h-auto lg:w-full rounded-lg shadow-md flex-shrink-0"
-                />
-              ))}
+            <div className="space-y-3">
+              {/* Annotation Toggle */}
+              <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10">
+                <span className="text-sm font-medium">Answer Sheet</span>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="show-annotations"
+                    checked={showAnnotations}
+                    onCheckedChange={setShowAnnotations}
+                  />
+                  <Label htmlFor="show-annotations" className="text-xs cursor-pointer flex items-center gap-1">
+                    {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    Show Mistakes
+                  </Label>
+                </div>
+              </div>
+              
+              <div className="flex lg:flex-col gap-2 lg:gap-4 overflow-x-auto lg:overflow-x-visible">
+                {selectedSubmission.file_images.map((img, idx) => (
+                  <div key={idx} className="relative flex-shrink-0">
+                    <img 
+                      src={`data:image/jpeg;base64,${img}`}
+                      alt={`Page ${idx + 1}`}
+                      className="h-40 lg:h-auto lg:w-full rounded-lg shadow-md"
+                    />
+                    {/* Annotation Overlay */}
+                    {showAnnotations && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        {selectedSubmission.question_scores?.map((qs) => {
+                          // Show red highlight for questions with low scores
+                          const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
+                          if (scorePercentage < 60) {
+                            return (
+                              <div 
+                                key={qs.question_number}
+                                className="absolute bg-red-500/20 border-2 border-red-500 rounded"
+                                style={{
+                                  top: `${(qs.question_number - 1) * 25}%`,
+                                  left: '5%',
+                                  right: '5%',
+                                  height: '20%'
+                                }}
+                              >
+                                <div className="absolute -top-6 left-0 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                                  Q{qs.question_number}: {qs.obtained_marks}/{qs.max_marks}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">
