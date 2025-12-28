@@ -32,18 +32,24 @@ export default function AuthCallback() {
           return;
         }
 
+        // Get preferred role from localStorage
+        const preferredRole = localStorage.getItem("preferredRole") || "teacher";
+        console.log("Preferred role:", preferredRole);
+
         console.log("Calling API:", `${API}/auth/session`);
         
-        // Exchange session_id for session_token
+        // Exchange session_id for session_token (include preferred_role)
         const response = await axios.post(`${API}/auth/session`, {
           session_id: sessionId,
+          preferred_role: preferredRole,
         });
 
         console.log("API Response:", response.data);
         const user = response.data;
 
-        // Clear URL fragment
+        // Clear URL fragment and localStorage
         window.history.replaceState(null, "", window.location.pathname);
+        localStorage.removeItem("preferredRole");
 
         // Redirect based on role
         const redirectPath = user.role === "student" 
