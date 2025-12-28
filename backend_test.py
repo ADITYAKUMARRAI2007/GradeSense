@@ -696,17 +696,21 @@ print('Test student created for analytics test');
         """Test student ID validation rules"""
         print("\n🔍 Testing Student ID Validation...")
         
+        # Generate unique timestamp for this test run
+        timestamp = datetime.now().strftime('%H%M%S')
+        unique_id = f"STU{timestamp}"
+        
         # Test valid student ID
         valid_student_data = {
-            "email": f"valid.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "email": f"valid.student.{timestamp}@school.edu",
             "name": "Valid Student",
             "role": "student",
-            "student_id": "STU001",
+            "student_id": unique_id,
             "batches": [self.test_batch_id] if hasattr(self, 'test_batch_id') else []
         }
         
         valid_result = self.run_api_test(
-            "Create Student with Valid ID (STU001)",
+            f"Create Student with Valid ID ({unique_id})",
             "POST",
             "students",
             200,
@@ -715,7 +719,7 @@ print('Test student created for analytics test');
         
         if valid_result:
             self.valid_student_id = valid_result.get('user_id')
-            self.valid_student_student_id = "STU001"
+            self.valid_student_student_id = unique_id
         
         # Test short ID (should fail)
         short_id_data = {
