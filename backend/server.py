@@ -1215,6 +1215,50 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
     
     return {"message": "Exam deleted successfully"}
 
+@api_router.post("/exams/{exam_id}/extract-questions")
+async def extract_and_update_questions(exam_id: str, user: User = Depends(get_current_user)):
+    """Extract question text from model answer and update exam rubrics"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can update exams")
+    
+    # Get exam
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Check if model answer exists
+    if not exam.get("model_answer_images"):
+        raise HTTPException(status_code=400, detail="No model answer found. Please upload model answer first.")
+    
+    # Extract questions from model answer
+    extracted_questions = await extract_questions_from_model_answer(
+        exam["model_answer_images"],
+        len(exam.get("questions", []))
+    )
+    
+    if not extracted_questions:
+        raise HTTPException(status_code=500, detail="Failed to extract questions from model answer")
+    
+    # Update question rubrics
+    questions = exam.get("questions", [])
+    updated_count = 0
+    
+    for i, q in enumerate(questions):
+        if i < len(extracted_questions):
+            q["rubric"] = extracted_questions[i]
+            updated_count += 1
+    
+    # Update exam in database
+    result = await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {"questions": questions}}
+    )
+    
+    return {
+        "message": f"Successfully extracted and updated {updated_count} questions",
+        "questions_updated": updated_count
+    }
+
 # ============== FILE UPLOAD & GRADING ==============
 
 def parse_student_from_filename(filename: str) -> tuple:
