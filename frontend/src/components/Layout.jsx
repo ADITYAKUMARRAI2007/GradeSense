@@ -13,6 +13,8 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Bell,
   MessageSquare,
   Menu,
@@ -29,11 +31,25 @@ const teacherNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher/dashboard" },
   { icon: Upload, label: "Upload & Grade", path: "/teacher/upload" },
   { icon: FileText, label: "Review Papers", path: "/teacher/review" },
-  { icon: BarChart3, label: "Class Reports", path: "/teacher/reports" },
-  { icon: Lightbulb, label: "Insights", path: "/teacher/insights" },
-  { icon: ClipboardList, label: "Manage Exams", path: "/teacher/exams" },
-  { icon: BookOpen, label: "Manage Batches", path: "/teacher/batches" },
-  { icon: Users, label: "Manage Students", path: "/teacher/students" },
+  { 
+    icon: BarChart3, 
+    label: "Analytics", 
+    isGroup: true,
+    children: [
+      { icon: BarChart3, label: "Class Reports", path: "/teacher/reports" },
+      { icon: Lightbulb, label: "Insights", path: "/teacher/insights" },
+    ]
+  },
+  { 
+    icon: Settings, 
+    label: "Manage", 
+    isGroup: true,
+    children: [
+      { icon: ClipboardList, label: "Manage Exams", path: "/teacher/exams" },
+      { icon: BookOpen, label: "Manage Batches", path: "/teacher/batches" },
+      { icon: Users, label: "Manage Students", path: "/teacher/students" },
+    ]
+  },
   { icon: MessageSquare, label: "Re-evaluations", path: "/teacher/re-evaluations" },
 ];
 
