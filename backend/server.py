@@ -1692,13 +1692,32 @@ async def get_submissions(
 
 @api_router.get("/submissions/{submission_id}")
 async def get_submission(submission_id: str, user: User = Depends(get_current_user)):
-    """Get submission details with PDF data"""
+    """Get submission details with PDF data and full question text"""
     submission = await db.submissions.find_one(
         {"submission_id": submission_id},
         {"_id": 0}
     )
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Enrich with full question text from exam
+    exam = await db.exams.find_one(
+        {"exam_id": submission["exam_id"]},
+        {"_id": 0, "questions": 1}
+    )
+    
+    if exam and exam.get("questions"):
+        # Create a map of question_number to question data
+        question_map = {q["question_number"]: q for q in exam["questions"]}
+        
+        # Enrich each question score with the full question text
+        for qs in submission.get("question_scores", []):
+            q_num = qs.get("question_number")
+            if q_num in question_map:
+                question_data = question_map[q_num]
+                qs["question_text"] = question_data.get("rubric", "")
+                qs["sub_questions"] = question_data.get("sub_questions", [])
+    
     return submission
 
 @api_router.put("/submissions/{submission_id}")
