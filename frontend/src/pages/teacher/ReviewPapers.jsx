@@ -113,6 +113,34 @@ export default function ReviewPapers({ user }) {
   const filteredSubmissions = submissions.filter(s => {
     if (filters.exam_id && s.exam_id !== filters.exam_id) return false;
     if (filters.search && !s.student_name.toLowerCase().includes(filters.search.toLowerCase())) return false;
+
+
+  const handleBulkApprove = async () => {
+    if (!filters.exam_id) {
+      toast.error("Please select an exam first");
+      return;
+    }
+
+    const unreviewedCount = filteredSubmissions.filter(s => s.status !== "teacher_reviewed").length;
+    
+    if (unreviewedCount === 0) {
+      toast.info("All papers are already reviewed");
+      return;
+    }
+
+    if (!confirm(`Mark ${unreviewedCount} unreviewed papers as approved?\n\nThis will:\n- Mark all papers as "teacher_reviewed"\n- Keep existing scores and feedback\n- Skip papers already reviewed`)) {
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API}/exams/${filters.exam_id}/bulk-approve`);
+      toast.success(response.data.message);
+      fetchSubmissions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to bulk approve");
+    }
+  };
+
     return true;
   });
 
