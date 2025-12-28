@@ -128,6 +128,36 @@ export default function ManageBatches({ user }) {
     return true;
   });
 
+
+  const handleCloseBatch = async (batch) => {
+    if (!confirm(`Close/archive "${batch.name}"?\n\nThis will:\n- Prevent adding new exams\n- Prevent adding/removing students\n- Keep all data accessible\n- You can reopen it later if needed`)) {
+      return;
+    }
+
+    try {
+      await axios.put(`${API}/batches/${batch.batch_id}/close`);
+      toast.success("Batch closed successfully");
+      fetchBatches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to close batch");
+    }
+  };
+
+  const handleReopenBatch = async (batch) => {
+    if (!confirm(`Reopen "${batch.name}"?`)) {
+      return;
+    }
+
+    try {
+      await axios.put(`${API}/batches/${batch.batch_id}/reopen`);
+      toast.success("Batch reopened successfully");
+      fetchBatches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to reopen batch");
+    }
+  };
+
+
   return (
     <Layout user={user}>
       <div className="space-y-4 lg:space-y-6" data-testid="manage-batches-page">
