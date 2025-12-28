@@ -694,6 +694,27 @@ export default function UploadGrade({ user }) {
               <CardDescription>Upload student answer sheets for grading</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* File Format Instructions */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-blue-900">Filename Format Required</p>
+                    <p className="text-sm text-blue-800">
+                      Name your files as: <code className="px-2 py-0.5 bg-blue-100 rounded">StudentID_StudentName.pdf</code>
+                    </p>
+                    <p className="text-xs text-blue-700 mt-2">
+                      Examples: <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs">STU001_John_Doe.pdf</code>, 
+                      <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs ml-1">ROLL42_Alice_Smith.pdf</code>
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      • Students will be auto-created and added to this exam's batch<br/>
+                      • Student ID must be 3-20 alphanumeric characters
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div 
                 {...getStudentRootProps()} 
                 className={`dropzone upload-zone p-8 text-center border-2 border-dashed rounded-xl ${isStudentDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
@@ -703,7 +724,7 @@ export default function UploadGrade({ user }) {
                 <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="font-medium">Drop student answer PDFs here</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Multiple files allowed. Each file should be named with student identifier.
+                  Multiple files allowed
                 </p>
               </div>
 
