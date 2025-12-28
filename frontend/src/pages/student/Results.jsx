@@ -238,27 +238,20 @@ export default function StudentResults({ user }) {
                                 alt={`Page ${idx + 1}`}
                                 className="w-full rounded-lg shadow-md"
                               />
-                              {/* Annotation Overlay */}
+                              {/* Annotation Indicator - Side Labels Only */}
                               {showAnnotations && (
-                                <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute right-0 top-0 bottom-0 w-12 flex flex-col justify-around py-4">
                                   {selectedSubmission.question_scores?.map((qs) => {
-                                    // Show red highlight for questions with low scores
                                     const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
                                     if (scorePercentage < 60) {
                                       return (
                                         <div 
                                           key={qs.question_number}
-                                          className="absolute bg-red-500/20 border-2 border-red-500 rounded"
-                                          style={{
-                                            top: `${(qs.question_number - 1) * 25}%`,
-                                            left: '5%',
-                                            right: '5%',
-                                            height: '20%'
-                                          }}
+                                          className="bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
+                                          title={`Q${qs.question_number}: Needs Review`}
                                         >
-                                          <div className="absolute -top-6 left-0 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                                            Q{qs.question_number}: {qs.obtained_marks}/{qs.max_marks}
-                                          </div>
+                                          <span className="font-bold">Q{qs.question_number}</span>
+                                          <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
                                         </div>
                                       );
                                     }
