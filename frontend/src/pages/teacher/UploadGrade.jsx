@@ -21,7 +21,8 @@ import {
   ArrowRight, 
   ArrowLeft,
   Loader2,
-  X
+  X,
+  AlertCircle
 } from "lucide-react";
 
 const GRADING_MODES = [
