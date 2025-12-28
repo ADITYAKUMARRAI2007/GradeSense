@@ -113,7 +113,8 @@ export default function ReviewPapers({ user }) {
   const filteredSubmissions = submissions.filter(s => {
     if (filters.exam_id && s.exam_id !== filters.exam_id) return false;
     if (filters.search && !s.student_name.toLowerCase().includes(filters.search.toLowerCase())) return false;
-
+    return true;
+  });
 
   const handleBulkApprove = async () => {
     if (!filters.exam_id) {
@@ -140,9 +141,6 @@ export default function ReviewPapers({ user }) {
       toast.error(error.response?.data?.detail || "Failed to bulk approve");
     }
   };
-
-    return true;
-  });
 
   const currentIndex = selectedSubmission 
     ? filteredSubmissions.findIndex(s => s.submission_id === selectedSubmission.submission_id)
