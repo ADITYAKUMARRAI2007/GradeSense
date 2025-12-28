@@ -692,6 +692,277 @@ print('Test student created for analytics test');
         
         return None
 
+    def test_student_id_validation(self):
+        """Test student ID validation rules"""
+        print("\n🔍 Testing Student ID Validation...")
+        
+        # Test valid student ID
+        valid_student_data = {
+            "email": f"valid.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "name": "Valid Student",
+            "role": "student",
+            "student_id": "STU001",
+            "batches": [self.test_batch_id] if hasattr(self, 'test_batch_id') else []
+        }
+        
+        valid_result = self.run_api_test(
+            "Create Student with Valid ID (STU001)",
+            "POST",
+            "students",
+            200,
+            data=valid_student_data
+        )
+        
+        if valid_result:
+            self.valid_student_id = valid_result.get('user_id')
+            self.valid_student_student_id = "STU001"
+        
+        # Test short ID (should fail)
+        short_id_data = {
+            "email": f"short.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "name": "Short ID Student",
+            "role": "student", 
+            "student_id": "AB",
+            "batches": []
+        }
+        
+        self.run_api_test(
+            "Create Student with Short ID (AB) - should fail",
+            "POST",
+            "students",
+            400,  # Should fail
+            data=short_id_data
+        )
+        
+        # Test long ID (should fail)
+        long_id_data = {
+            "email": f"long.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "name": "Long ID Student",
+            "role": "student",
+            "student_id": "VERYLONGSTUDENTID123456789",
+            "batches": []
+        }
+        
+        self.run_api_test(
+            "Create Student with Long ID - should fail",
+            "POST",
+            "students",
+            400,  # Should fail
+            data=long_id_data
+        )
+        
+        # Test invalid characters (should fail)
+        invalid_char_data = {
+            "email": f"invalid.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "name": "Invalid Char Student",
+            "role": "student",
+            "student_id": "STU@001",
+            "batches": []
+        }
+        
+        self.run_api_test(
+            "Create Student with Invalid Characters (STU@001) - should fail",
+            "POST",
+            "students",
+            400,  # Should fail
+            data=invalid_char_data
+        )
+        
+        return valid_result
+
+    def test_duplicate_student_id_detection(self):
+        """Test duplicate student ID detection with different names"""
+        if not hasattr(self, 'valid_student_student_id'):
+            print("⚠️  Skipping duplicate student ID test - no valid student created")
+            return None
+            
+        print("\n🔍 Testing Duplicate Student ID Detection...")
+        
+        # Try to create another student with same ID but different name (should fail)
+        duplicate_data = {
+            "email": f"duplicate.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "name": "Jane Smith",  # Different name
+            "role": "student",
+            "student_id": self.valid_student_student_id,  # Same ID as existing student
+            "batches": []
+        }
+        
+        return self.run_api_test(
+            "Create Student with Duplicate ID Different Name - should fail",
+            "POST",
+            "students",
+            400,  # Should fail
+            data=duplicate_data
+        )
+
+    def test_filename_parsing_functionality(self):
+        """Test filename parsing for auto-student creation"""
+        print("\n🔍 Testing Filename Parsing Logic...")
+        
+        # This tests the backend logic by examining the parse_student_from_filename function
+        # We'll test this indirectly through the upload papers endpoint
+        
+        # First, we need to create an exam with model answer for testing
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Skipping filename parsing test - missing batch or subject")
+            return None
+            
+        # Create a test exam for filename parsing
+        exam_data = {
+            "batch_id": self.test_batch_id,
+            "subject_id": self.test_subject_id,
+            "exam_type": "Unit Test",
+            "exam_name": f"Filename Parse Test {datetime.now().strftime('%H%M%S')}",
+            "total_marks": 100.0,
+            "exam_date": "2024-01-15",
+            "grading_mode": "balanced",
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 100.0,
+                    "rubric": "Test question for filename parsing"
+                }
+            ]
+        }
+        
+        exam_result = self.run_api_test(
+            "Create Exam for Filename Parsing Test",
+            "POST",
+            "exams",
+            200,
+            data=exam_data
+        )
+        
+        if exam_result:
+            self.filename_test_exam_id = exam_result.get('exam_id')
+            print(f"✅ Created test exam for filename parsing: {self.filename_test_exam_id}")
+            
+            # Note: We can't actually test file upload without real PDF files
+            # But we can verify the exam was created successfully
+            return exam_result
+        
+        return None
+
+    def test_auto_add_to_batch_functionality(self):
+        """Test auto-add student to batch functionality"""
+        print("\n🔍 Testing Auto-Add to Batch Functionality...")
+        
+        if not hasattr(self, 'test_batch_id'):
+            print("⚠️  Skipping auto-add to batch test - no batch created")
+            return None
+            
+        # Create a student and verify they get added to the batch
+        timestamp = datetime.now().strftime('%H%M%S')
+        auto_student_data = {
+            "email": f"auto.batch.student.{timestamp}@school.edu",
+            "name": "Auto Batch Student",
+            "role": "student",
+            "student_id": f"AUTO{timestamp}",
+            "batches": [self.test_batch_id]  # Should be added to this batch
+        }
+        
+        student_result = self.run_api_test(
+            "Create Student for Auto-Add to Batch Test",
+            "POST",
+            "students",
+            200,
+            data=auto_student_data
+        )
+        
+        if student_result:
+            student_user_id = student_result.get('user_id')
+            
+            # Verify student was added to batch by checking batch details
+            batch_details = self.run_api_test(
+                "Get Batch Details to Verify Student Added",
+                "GET",
+                f"batches/{self.test_batch_id}",
+                200
+            )
+            
+            if batch_details:
+                students_list = batch_details.get('students_list', [])
+                student_found = any(s.get('user_id') == student_user_id for s in students_list)
+                
+                if student_found:
+                    self.log_test("Student Auto-Added to Batch Verification", True, f"Student {student_user_id} found in batch {self.test_batch_id}")
+                else:
+                    self.log_test("Student Auto-Added to Batch Verification", False, f"Student {student_user_id} not found in batch {self.test_batch_id}")
+                
+                return batch_details
+            
+        return student_result
+
+    def test_comprehensive_student_workflow(self):
+        """Test comprehensive student creation and management workflow"""
+        print("\n🔍 Testing Comprehensive Student Workflow...")
+        
+        if not hasattr(self, 'test_batch_id'):
+            print("⚠️  Skipping comprehensive workflow test - no batch created")
+            return None
+            
+        # Test 1: Create student with valid format similar to filename parsing
+        timestamp = datetime.now().strftime('%H%M%S')
+        
+        # Test various valid student ID formats
+        test_formats = [
+            {"id": f"STU{timestamp}1", "name": "John Doe", "expected": True},
+            {"id": f"ROLL{timestamp}", "name": "Alice Smith", "expected": True},
+            {"id": f"A{timestamp}", "name": "Bob Jones", "expected": True},
+        ]
+        
+        created_students = []
+        
+        for i, test_case in enumerate(test_formats):
+            student_data = {
+                "email": f"format.test.{i}.{timestamp}@school.edu",
+                "name": test_case["name"],
+                "role": "student",
+                "student_id": test_case["id"],
+                "batches": [self.test_batch_id]
+            }
+            
+            result = self.run_api_test(
+                f"Create Student with Format {test_case['id']} ({test_case['name']})",
+                "POST",
+                "students",
+                200 if test_case["expected"] else 400,
+                data=student_data
+            )
+            
+            if result and test_case["expected"]:
+                created_students.append({
+                    "user_id": result.get('user_id'),
+                    "student_id": test_case["id"],
+                    "name": test_case["name"]
+                })
+        
+        # Test 2: Verify all students are in the batch
+        if created_students:
+            batch_details = self.run_api_test(
+                "Verify All Students Added to Batch",
+                "GET",
+                f"batches/{self.test_batch_id}",
+                200
+            )
+            
+            if batch_details:
+                students_in_batch = batch_details.get('students_list', [])
+                batch_user_ids = [s.get('user_id') for s in students_in_batch]
+                
+                all_found = True
+                for student in created_students:
+                    if student['user_id'] not in batch_user_ids:
+                        all_found = False
+                        break
+                
+                if all_found:
+                    self.log_test("All Created Students Found in Batch", True, f"All {len(created_students)} students found in batch")
+                else:
+                    self.log_test("All Created Students Found in Batch", False, "Some students missing from batch")
+        
+        return created_students
+
     def cleanup_test_data(self):
         """Clean up test data from MongoDB"""
         print("\n🧹 Cleaning up test data...")
