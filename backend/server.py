@@ -273,7 +273,7 @@ async def create_session(request: Request, response: Response):
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
     
     # Store session in database
-    await db.sessions.insert_one({
+    await db.user_sessions.insert_one({
         "session_token": session_token,
         "user_id": user_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -286,7 +286,8 @@ async def create_session(request: Request, response: Response):
         value=session_token,
         httponly=True,
         max_age=7 * 24 * 60 * 60,  # 7 days
-        samesite="lax"
+        samesite="lax",
+        path="/"
     )
     
     # Return user data
