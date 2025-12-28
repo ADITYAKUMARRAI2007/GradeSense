@@ -214,15 +214,59 @@ export default function StudentResults({ user }) {
                   {selectedSubmission.file_images?.length > 0 && (
                     <ScrollArea className="w-1/2 border-r bg-muted/30 p-4">
                       <div className="space-y-3">
-                        <h3 className="font-semibold sticky top-0 bg-muted/30 py-2">Your Answer Sheet</h3>
+                        {/* Annotation Toggle */}
+                        <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10">
+                          <h3 className="font-semibold">Your Answer Sheet</h3>
+                          <div className="flex items-center gap-2">
+                            <Checkbox 
+                              id="show-annotations-student"
+                              checked={showAnnotations}
+                              onCheckedChange={setShowAnnotations}
+                            />
+                            <Label htmlFor="show-annotations-student" className="text-xs cursor-pointer flex items-center gap-1">
+                              {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                              Show Mistakes
+                            </Label>
+                          </div>
+                        </div>
+                        
                         <div className="space-y-4">
                           {selectedSubmission.file_images.map((img, idx) => (
-                            <img 
-                              key={idx}
-                              src={`data:image/jpeg;base64,${img}`}
-                              alt={`Page ${idx + 1}`}
-                              className="w-full rounded-lg shadow-md"
-                            />
+                            <div key={idx} className="relative">
+                              <img 
+                                src={`data:image/jpeg;base64,${img}`}
+                                alt={`Page ${idx + 1}`}
+                                className="w-full rounded-lg shadow-md"
+                              />
+                              {/* Annotation Overlay */}
+                              {showAnnotations && (
+                                <div className="absolute inset-0 pointer-events-none">
+                                  {selectedSubmission.question_scores?.map((qs) => {
+                                    // Show red highlight for questions with low scores
+                                    const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
+                                    if (scorePercentage < 60) {
+                                      return (
+                                        <div 
+                                          key={qs.question_number}
+                                          className="absolute bg-red-500/20 border-2 border-red-500 rounded"
+                                          style={{
+                                            top: `${(qs.question_number - 1) * 25}%`,
+                                            left: '5%',
+                                            right: '5%',
+                                            height: '20%'
+                                          }}
+                                        >
+                                          <div className="absolute -top-6 left-0 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                                            Q{qs.question_number}: {qs.obtained_marks}/{qs.max_marks}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
