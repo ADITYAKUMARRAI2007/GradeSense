@@ -848,6 +848,221 @@ async def create_student(student: UserCreate, user: User = Depends(get_current_u
 async def update_student(student_user_id: str, student: UserCreate, user: User = Depends(get_current_user)):
     """Update student details"""
     if user.role != "teacher":
+
+
+@api_router.post("/exams/{exam_id}/upload-more-papers")
+async def upload_more_papers(
+    exam_id: str,
+    files: List[UploadFile] = File(...),
+    user: User = Depends(get_current_user)
+):
+    """Upload additional student papers to an existing exam"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can upload papers")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam.get("status") == "closed":
+        raise HTTPException(status_code=400, detail="Cannot upload papers to closed exam")
+    
+    if not exam.get("model_answer_images"):
+        raise HTTPException(status_code=400, detail="Model answer required before uploading papers")
+    
+    submissions = []
+    errors = []
+    
+    for file in files:
+        try:
+            # Parse student ID and name from filename
+            student_id, student_name = parse_student_from_filename(file.filename)
+            
+            if not student_id or not student_name:
+                errors.append({
+                    "filename": file.filename,
+                    "error": "Invalid filename format. Expected: StudentID_StudentName.pdf"
+                })
+                continue
+            
+            # Get or create student
+            user_id, error = await get_or_create_student(
+                student_id=student_id,
+                student_name=student_name,
+                batch_id=exam["batch_id"],
+                teacher_id=user.user_id
+            )
+            
+            if error:
+                errors.append({
+                    "filename": file.filename,
+                    "student_id": student_id,
+                    "error": error
+                })
+                continue
+            
+            # Process the PDF
+            pdf_bytes = await file.read()
+            images = pdf_to_images(pdf_bytes)
+            
+            # Grade with AI
+            scores = await grade_with_ai(
+                images=images,
+                model_answer_images=exam.get("model_answer_images", []),
+                questions=exam.get("questions", []),
+                grading_mode=exam.get("grading_mode", "balanced"),
+                total_marks=exam.get("total_marks", 100)
+            )
+            
+            total_score = sum(s.obtained_marks for s in scores)
+            percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
+            
+            submission_id = f"sub_{uuid.uuid4().hex[:8]}"
+            submission = {
+                "submission_id": submission_id,
+                "exam_id": exam_id,
+                "student_id": user_id,
+                "student_name": student_name,
+                "file_data": base64.b64encode(pdf_bytes).decode(),
+                "file_images": images,
+                "total_score": total_score,
+                "percentage": round(percentage, 2),
+                "question_scores": [s.model_dump() for s in scores],
+                "status": "ai_graded",
+                "graded_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.submissions.insert_one(submission)
+            submissions.append({
+                "submission_id": submission_id,
+                "student_id": student_id,
+                "student_name": student_name,
+                "total_score": total_score,
+                "percentage": percentage
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing {file.filename}: {e}")
+            errors.append({
+                "filename": file.filename,
+                "error": str(e)
+            })
+    
+    result = {
+        "processed": len(submissions),
+        "submissions": submissions
+    }
+    
+    if errors:
+        result["errors"] = errors
+    
+    return result
+
+@api_router.post("/exams/{exam_id}/bulk-approve")
+async def bulk_approve_submissions(exam_id: str, user: User = Depends(get_current_user)):
+    """Mark all submissions in an exam as reviewed"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can approve submissions")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Update all submissions for this exam
+    result = await db.submissions.update_many(
+        {"exam_id": exam_id, "status": {"$ne": "teacher_reviewed"}},
+        {"$set": {
+            "status": "teacher_reviewed",
+            "reviewed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {
+        "message": f"Marked {result.modified_count} submissions as reviewed",
+        "count": result.modified_count
+    }
+
+@api_router.put("/exams/{exam_id}/close")
+async def close_exam(exam_id: str, user: User = Depends(get_current_user)):
+    """Close an exam (prevent further uploads/edits)"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can close exams")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {
+            "status": "closed",
+            "closed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Exam closed successfully"}
+
+@api_router.put("/exams/{exam_id}/reopen")
+async def reopen_exam(exam_id: str, user: User = Depends(get_current_user)):
+    """Reopen a closed exam"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can reopen exams")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {
+            "status": "completed",
+            "reopened_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Exam reopened successfully"}
+
+@api_router.put("/batches/{batch_id}/close")
+async def close_batch(batch_id: str, user: User = Depends(get_current_user)):
+    """Close/archive a batch"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can close batches")
+    
+    batch = await db.batches.find_one({"batch_id": batch_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    await db.batches.update_one(
+        {"batch_id": batch_id},
+        {"$set": {
+            "status": "closed",
+            "closed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Batch closed successfully"}
+
+@api_router.put("/batches/{batch_id}/reopen")
+async def reopen_batch(batch_id: str, user: User = Depends(get_current_user)):
+    """Reopen a closed batch"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can reopen batches")
+    
+    batch = await db.batches.find_one({"batch_id": batch_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    await db.batches.update_one(
+        {"batch_id": batch_id},
+        {"$set": {
+            "status": "active",
+            "reopened_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Batch reopened successfully"}
+
         raise HTTPException(status_code=403, detail="Only teachers can update students")
     
     result = await db.users.update_one(
