@@ -583,6 +583,21 @@ test_plan:
           agent: "testing"
           comment: "✅ DUPLICATE ENTRY VERIFIED: This is a duplicate of the entry above. Component structure verified as production-ready with proper data-testid attributes and API integration."
 
+  - task: "P1 - Full Question Text & Answer Sheet Display"
+    implemented: true
+    working: "needs_testing"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+        - "/app/frontend/src/pages/student/Results.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P1 feature implemented: Modified backend GET /api/submissions/{submission_id} endpoint to enrich response with full question text from exam.questions.rubric field. Updated ReviewPapers.jsx to display full question text in a highlighted box above each question score card. Updated Results.jsx to show answer sheet images (file_images) at the top of the dialog and display full question text in blue highlight boxes. Both teacher and student can now see the full question text and answer sheets."
+
 agent_communication:
     - agent: "main"
       message: "Initial test setup complete. All P0 features have been implemented. Student pages (Dashboard, Results) were already integrated with backend APIs by previous agent. ManageBatches page has been created and added to navigation/routing. Need comprehensive end-to-end testing of all teacher and student flows including: 1) Batch CRUD operations with duplicate prevention 2) Creating exams with sub-questions 3) Uploading and grading with different grading modes 4) Student login and dashboard analytics 5) Student results viewing with question breakdown 6) Teacher viewing detailed student analytics. App is loading correctly on login page."
