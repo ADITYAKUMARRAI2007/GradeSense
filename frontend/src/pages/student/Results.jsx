@@ -205,6 +205,25 @@ export default function StudentResults({ user }) {
                     </div>
                   </div>
 
+                  {/* Answer Sheet Preview */}
+                  {selectedSubmission.file_images?.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold">Your Answer Sheet</h3>
+                      <div className="border rounded-lg overflow-hidden bg-muted/30 p-4">
+                        <div className="flex flex-col gap-4">
+                          {selectedSubmission.file_images.map((img, idx) => (
+                            <img 
+                              key={idx}
+                              src={`data:image/jpeg;base64,${img}`}
+                              alt={`Page ${idx + 1}`}
+                              className="w-full rounded-lg shadow-md"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Question-wise Breakdown */}
                   <div className="space-y-3">
                     <h3 className="font-semibold">Question-wise Breakdown</h3>
@@ -216,6 +235,15 @@ export default function StudentResults({ user }) {
                             {qs.obtained_marks} / {qs.max_marks}
                           </Badge>
                         </div>
+                        
+                        {/* Full Question Text */}
+                        {qs.question_text && (
+                          <div className="mb-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                            <p className="text-sm font-medium text-blue-900 mb-1">Question:</p>
+                            <p className="text-sm text-blue-800 whitespace-pre-wrap">{qs.question_text}</p>
+                          </div>
+                        )}
+                        
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
                           <div 
                             className={`h-full rounded-full transition-all ${
