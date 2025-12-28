@@ -766,6 +766,88 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
 
 # ============== FILE UPLOAD & GRADING ==============
 
+def parse_student_from_filename(filename: str) -> tuple:
+    """
+    Parse student ID and name from filename
+    Expected format: StudentID_StudentName.pdf (e.g., STU001_John_Doe.pdf)
+    Returns: (student_id, student_name) or (None, None) if parsing fails
+    """
+    try:
+        # Remove .pdf extension
+        name_part = filename.replace(".pdf", "").replace(".PDF", "")
+        
+        # Split by underscore
+        parts = name_part.split("_", 1)
+        
+        if len(parts) == 2:
+            student_id = parts[0].strip()
+            student_name = parts[1].replace("_", " ").strip().title()
+            
+            # Validate student ID: alphanumeric, 3-20 characters
+            if student_id and 3 <= len(student_id) <= 20 and student_id.replace("-", "").isalnum():
+                return (student_id, student_name)
+        
+        return (None, None)
+    except Exception as e:
+        logger.error(f"Error parsing filename {filename}: {e}")
+        return (None, None)
+
+async def get_or_create_student(
+    student_id: str,
+    student_name: str,
+    batch_id: str,
+    teacher_id: str
+) -> tuple:
+    """
+    Get existing student or create new one
+    Returns: (user_id, error_message)
+    """
+    # Check if student ID already exists
+    existing = await db.users.find_one({"student_id": student_id, "role": "student"}, {"_id": 0})
+    
+    if existing:
+        # Student exists - verify name matches
+        if existing["name"].lower() != student_name.lower():
+            return (None, f"Student ID {student_id} already exists with different name: {existing['name']}")
+        
+        # Student exists with same name - add to batch if not already there
+        user_id = existing["user_id"]
+        if batch_id not in existing.get("batches", []):
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$addToSet": {"batches": batch_id}}
+            )
+            # Also add student to batch document
+            await db.batches.update_one(
+                {"batch_id": batch_id},
+                {"$addToSet": {"students": user_id}}
+            )
+        
+        return (user_id, None)
+    
+    # Create new student
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    new_student = {
+        "user_id": user_id,
+        "email": f"{student_id.lower()}@school.temp",  # Temporary email
+        "name": student_name,
+        "role": "student",
+        "student_id": student_id,
+        "batches": [batch_id],
+        "teacher_id": teacher_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(new_student)
+    
+    # Add student to batch document
+    await db.batches.update_one(
+        {"batch_id": batch_id},
+        {"$addToSet": {"students": user_id}}
+    )
+    
+    return (user_id, None)
+
 def pdf_to_images(pdf_bytes: bytes) -> List[str]:
     """Convert PDF pages to base64 images"""
     images = []
