@@ -332,7 +332,20 @@ export default function ReviewPapers({ user }) {
           <div className="lg:col-span-4 flex flex-col">
             <Card className="flex-1 flex flex-col">
               <CardHeader className="p-3 lg:p-4 pb-2 lg:pb-3">
-                <CardTitle className="text-base lg:text-lg">Papers to Review</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base lg:text-lg">Papers to Review</CardTitle>
+                  {filters.exam_id && filteredSubmissions.length > 0 && (
+                    <Button 
+                      onClick={handleBulkApprove}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-xs"
+                      data-testid="bulk-approve-btn"
+                    >
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      Approve All
+                    </Button>
+                  )}
+                </div>
                 
                 {/* Filters */}
                 <div className="space-y-2 mt-2 lg:mt-3">
