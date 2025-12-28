@@ -269,8 +269,47 @@ export default function ManageExams({ user }) {
                       Created {new Date(selectedExam.created_at).toLocaleDateString()}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {getStatusBadge(selectedExam.status)}
+                    {selectedExam.status !== "closed" && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setUploadDialogOpen(true);
+                            setPaperFiles([]);
+                          }}
+                          className="text-blue-600 hover:text-blue-700"
+                          data-testid="upload-more-btn"
+                        >
+                          <Upload className="w-4 h-4 mr-1" />
+                          Upload More Papers
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleCloseExam(selectedExam)}
+                          className="text-orange-600 hover:text-orange-700"
+                          data-testid="close-exam-btn"
+                        >
+                          <Lock className="w-4 h-4 mr-1" />
+                          Close Exam
+                        </Button>
+                      </>
+                    )}
+                    {selectedExam.status === "closed" && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleReopenExam(selectedExam)}
+                        className="text-green-600 hover:text-green-700"
+                        data-testid="reopen-exam-btn"
+                      >
+                        <LockOpen className="w-4 h-4 mr-1" />
+                        Reopen Exam
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       size="sm"
