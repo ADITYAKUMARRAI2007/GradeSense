@@ -963,6 +963,322 @@ print('Test student created for analytics test');
         
         return created_students
 
+    def test_global_search_api(self):
+        """Test global search functionality"""
+        print("\n🔍 Testing Global Search API...")
+        
+        # Test search with query less than 2 characters (should return empty)
+        short_query_result = self.run_api_test(
+            "Global Search - Short Query (should return empty)",
+            "POST",
+            "search?query=a",
+            200
+        )
+        
+        if short_query_result:
+            # Verify all result categories are empty
+            expected_empty = all(
+                len(short_query_result.get(category, [])) == 0 
+                for category in ["exams", "students", "batches", "submissions"]
+            )
+            if expected_empty:
+                self.log_test("Short Query Returns Empty Results", True, "All categories empty for query < 2 chars")
+            else:
+                self.log_test("Short Query Returns Empty Results", False, "Expected empty results for short query")
+        
+        # Test search with valid query
+        if hasattr(self, 'test_batch_name'):
+            # Search for batch name
+            batch_search_result = self.run_api_test(
+                "Global Search - Batch Name",
+                "POST", 
+                f"search?query={self.test_batch_name[:5]}",
+                200
+            )
+            
+            if batch_search_result:
+                batches_found = batch_search_result.get("batches", [])
+                if batches_found:
+                    self.log_test("Batch Search Results", True, f"Found {len(batches_found)} batch(es)")
+                else:
+                    self.log_test("Batch Search Results", False, "No batches found in search")
+        
+        # Test search for exam name
+        if hasattr(self, 'test_exam_id'):
+            exam_search_result = self.run_api_test(
+                "Global Search - Exam Name",
+                "POST",
+                "search?query=test",
+                200
+            )
+            
+            if exam_search_result:
+                exams_found = exam_search_result.get("exams", [])
+                students_found = exam_search_result.get("students", [])
+                submissions_found = exam_search_result.get("submissions", [])
+                
+                self.log_test("Global Search Structure", True, 
+                    f"Results: {len(exams_found)} exams, {len(students_found)} students, {len(submissions_found)} submissions")
+        
+        # Test search for student name
+        if hasattr(self, 'valid_student_id'):
+            student_search_result = self.run_api_test(
+                "Global Search - Student Name",
+                "POST",
+                "search?query=Valid",
+                200
+            )
+            
+            if student_search_result:
+                students_found = student_search_result.get("students", [])
+                if students_found:
+                    self.log_test("Student Search Results", True, f"Found {len(students_found)} student(s)")
+                else:
+                    self.log_test("Student Search Results", False, "No students found in search")
+        
+        return short_query_result
+
+    def test_notifications_api(self):
+        """Test notifications API"""
+        print("\n🔔 Testing Notifications API...")
+        
+        # Test get notifications
+        notifications_result = self.run_api_test(
+            "Get Notifications",
+            "GET",
+            "notifications",
+            200
+        )
+        
+        if notifications_result:
+            notifications = notifications_result.get("notifications", [])
+            unread_count = notifications_result.get("unread_count", 0)
+            
+            self.log_test("Notifications Structure", True, 
+                f"Retrieved {len(notifications)} notifications, {unread_count} unread")
+            
+            # Verify notification structure
+            if notifications:
+                first_notification = notifications[0]
+                required_fields = ["notification_id", "user_id", "type", "title", "message", "is_read", "created_at"]
+                has_all_fields = all(field in first_notification for field in required_fields)
+                
+                if has_all_fields:
+                    self.log_test("Notification Structure Validation", True, "All required fields present")
+                    
+                    # Store a notification ID for read test
+                    self.test_notification_id = first_notification.get("notification_id")
+                else:
+                    missing_fields = [field for field in required_fields if field not in first_notification]
+                    self.log_test("Notification Structure Validation", False, f"Missing fields: {missing_fields}")
+            else:
+                self.log_test("Notification Structure Validation", True, "No notifications to validate (empty list)")
+        
+        return notifications_result
+
+    def test_mark_notification_read(self):
+        """Test marking notification as read"""
+        print("\n✅ Testing Mark Notification as Read...")
+        
+        # First, create a test notification by triggering grading complete
+        # We'll use the upload papers endpoint to trigger a notification
+        if hasattr(self, 'test_notification_id'):
+            # Test marking existing notification as read
+            mark_read_result = self.run_api_test(
+                "Mark Notification as Read",
+                "PUT",
+                f"notifications/{self.test_notification_id}/read",
+                200
+            )
+            
+            if mark_read_result:
+                # Verify notification was marked as read
+                verify_result = self.run_api_test(
+                    "Verify Notification Marked as Read",
+                    "GET",
+                    "notifications",
+                    200
+                )
+                
+                if verify_result:
+                    notifications = verify_result.get("notifications", [])
+                    marked_notification = next(
+                        (n for n in notifications if n.get("notification_id") == self.test_notification_id),
+                        None
+                    )
+                    
+                    if marked_notification and marked_notification.get("is_read"):
+                        self.log_test("Notification Read Status Verification", True, "Notification marked as read")
+                    else:
+                        self.log_test("Notification Read Status Verification", False, "Notification not marked as read")
+            
+            return mark_read_result
+        else:
+            # Test with non-existent notification ID (should return 404)
+            fake_notification_id = "notif_nonexistent123"
+            return self.run_api_test(
+                "Mark Non-existent Notification as Read (should fail)",
+                "PUT",
+                f"notifications/{fake_notification_id}/read",
+                404
+            )
+
+    def test_auto_notification_creation(self):
+        """Test auto-notification creation during grading and re-evaluation"""
+        print("\n🔔 Testing Auto-Notification Creation...")
+        
+        # Get initial notification count
+        initial_notifications = self.run_api_test(
+            "Get Initial Notifications Count",
+            "GET",
+            "notifications",
+            200
+        )
+        
+        initial_count = 0
+        if initial_notifications:
+            initial_count = len(initial_notifications.get("notifications", []))
+        
+        # Note: We can't easily test file upload and grading completion without actual PDF files
+        # But we can test re-evaluation request notification creation
+        
+        # First, create a mock submission for re-evaluation testing
+        if hasattr(self, 'test_exam_id') and hasattr(self, 'valid_student_id'):
+            # Create a test submission manually in MongoDB
+            timestamp = int(datetime.now().timestamp())
+            test_submission_id = f"test_sub_{timestamp}"
+            
+            mongo_commands = f"""
+use('test_database');
+var submissionId = '{test_submission_id}';
+var examId = '{self.test_exam_id}';
+var studentId = '{self.valid_student_id}';
+
+// Insert test submission
+db.submissions.insertOne({{
+  submission_id: submissionId,
+  exam_id: examId,
+  student_id: studentId,
+  student_name: 'Test Student',
+  total_score: 75,
+  percentage: 75.0,
+  question_scores: [{{
+    question_number: 1,
+    max_marks: 100,
+    obtained_marks: 75,
+    ai_feedback: 'Good work'
+  }}],
+  status: 'ai_graded',
+  created_at: new Date().toISOString()
+}});
+
+print('Test submission created for re-evaluation test');
+"""
+            
+            try:
+                with open('/tmp/mongo_submission_setup.js', 'w') as f:
+                    f.write(mongo_commands)
+                
+                result = subprocess.run([
+                    'mongosh', '--quiet', '--file', '/tmp/mongo_submission_setup.js'
+                ], capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0:
+                    print(f"✅ Test submission created: {test_submission_id}")
+                    
+                    # Now test re-evaluation request creation (which should create notification)
+                    # We need to create a student session for this
+                    student_timestamp = int(datetime.now().timestamp())
+                    student_session_token = f"student_reeval_session_{student_timestamp}"
+                    
+                    # Create student session
+                    student_session_commands = f"""
+use('test_database');
+var studentId = '{self.valid_student_id}';
+var sessionToken = '{student_session_token}';
+var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
+
+// Insert student session
+db.user_sessions.insertOne({{
+  user_id: studentId,
+  session_token: sessionToken,
+  expires_at: expiresAt.toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Student session created for re-evaluation test');
+"""
+                    
+                    with open('/tmp/mongo_student_session.js', 'w') as f:
+                        f.write(student_session_commands)
+                    
+                    session_result = subprocess.run([
+                        'mongosh', '--quiet', '--file', '/tmp/mongo_student_session.js'
+                    ], capture_output=True, text=True, timeout=30)
+                    
+                    if session_result.returncode == 0:
+                        # Switch to student session and create re-evaluation request
+                        original_token = self.session_token
+                        self.session_token = student_session_token
+                        
+                        reeval_data = {
+                            "submission_id": test_submission_id,
+                            "questions": [1],
+                            "reason": "I believe my answer deserves more marks"
+                        }
+                        
+                        reeval_result = self.run_api_test(
+                            "Create Re-evaluation Request (should create notification)",
+                            "POST",
+                            "re-evaluations",
+                            200,
+                            data=reeval_data
+                        )
+                        
+                        # Restore teacher session
+                        self.session_token = original_token
+                        
+                        if reeval_result:
+                            # Check if notification was created for teacher
+                            final_notifications = self.run_api_test(
+                                "Check Notifications After Re-evaluation Request",
+                                "GET",
+                                "notifications",
+                                200
+                            )
+                            
+                            if final_notifications:
+                                final_count = len(final_notifications.get("notifications", []))
+                                if final_count > initial_count:
+                                    self.log_test("Auto-Notification Creation", True, 
+                                        f"Notification created: {final_count - initial_count} new notification(s)")
+                                    
+                                    # Check for re-evaluation notification type
+                                    notifications = final_notifications.get("notifications", [])
+                                    reeval_notification = next(
+                                        (n for n in notifications if n.get("type") == "re_evaluation_request"),
+                                        None
+                                    )
+                                    
+                                    if reeval_notification:
+                                        self.log_test("Re-evaluation Notification Type", True, 
+                                            "Found re_evaluation_request notification")
+                                    else:
+                                        self.log_test("Re-evaluation Notification Type", False, 
+                                            "No re_evaluation_request notification found")
+                                else:
+                                    self.log_test("Auto-Notification Creation", False, 
+                                        "No new notifications created")
+                        
+                        return reeval_result
+                    
+            except Exception as e:
+                print(f"❌ Error in auto-notification test: {str(e)}")
+                return None
+        
+        print("⚠️  Skipping auto-notification test - missing required test data")
+        return None
+
     def cleanup_test_data(self):
         """Clean up test data from MongoDB"""
         print("\n🧹 Cleaning up test data...")
