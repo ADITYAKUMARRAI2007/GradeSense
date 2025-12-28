@@ -295,11 +295,19 @@ export default function Layout({ children, user }) {
           </div>
           
           <div className="flex items-center gap-2 lg:gap-4">
-            {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative" data-testid="notifications-btn">
-              <Bell className="w-5 h-5" />
-              <span className="notification-badge">3</span>
+            {/* Search Button */}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setSearchOpen(true)}
+              className="hidden md:flex"
+              data-testid="search-btn"
+            >
+              <Search className="w-5 h-5" />
             </Button>
+
+            {/* Notifications */}
+            <NotificationDropdown user={user} />
 
             {/* User */}
             <div className="flex items-center gap-2 lg:gap-3">
@@ -322,6 +330,9 @@ export default function Layout({ children, user }) {
           {children}
         </main>
       </div>
+
+      {/* Global Search Modal */}
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} user={user} />
     </div>
   );
 }
