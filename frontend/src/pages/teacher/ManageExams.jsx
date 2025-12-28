@@ -66,6 +66,72 @@ export default function ManageExams({ user }) {
     }
   };
 
+
+
+  const handleUploadMorePapers = async () => {
+    if (paperFiles.length === 0) {
+      toast.error("Please select PDF files to upload");
+      return;
+    }
+
+    try {
+      setUploadingPapers(true);
+      const formData = new FormData();
+      paperFiles.forEach(file => {
+        formData.append("files", file);
+      });
+
+      const response = await axios.post(`${API}/exams/${selectedExam.exam_id}/upload-more-papers`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      if (response.data.errors && response.data.errors.length > 0) {
+        toast.warning(`Uploaded ${response.data.processed} papers. ${response.data.errors.length} files had errors.`);
+        response.data.errors.forEach(error => {
+          toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
+        });
+      } else {
+        toast.success(`Successfully graded ${response.data.processed} additional papers!`);
+      }
+
+      setUploadDialogOpen(false);
+      setPaperFiles([]);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to upload papers");
+    } finally {
+      setUploadingPapers(false);
+    }
+  };
+
+  const handleCloseExam = async (exam) => {
+    if (!confirm(`Close "${exam.exam_name}"? You can reopen it later if needed.`)) {
+      return;
+    }
+
+    try {
+      await axios.put(`${API}/exams/${exam.exam_id}/close`);
+      toast.success("Exam closed successfully");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to close exam");
+    }
+  };
+
+  const handleReopenExam = async (exam) => {
+    if (!confirm(`Reopen "${exam.exam_name}"?`)) {
+      return;
+    }
+
+    try {
+      await axios.put(`${API}/exams/${exam.exam_id}/reopen`);
+      toast.success("Exam reopened successfully");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to reopen exam");
+    }
+  };
+
   const handleDelete = async (exam) => {
     if (!confirm(`Are you sure you want to delete "${exam.exam_name}"? This will also delete all submissions and re-evaluation requests associated with this exam.`)) {
       return;
