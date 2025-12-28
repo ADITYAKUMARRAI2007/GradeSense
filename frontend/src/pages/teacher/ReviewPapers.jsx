@@ -222,6 +222,13 @@ export default function ReviewPapers({ user }) {
                   </div>
                 </div>
 
+                {/* Full Question Text */}
+                {qs.question_text && (
+                  <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary">
+                    <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">{qs.question_text}</p>
+                  </div>
+                )}
+
                 <div className="space-y-2 lg:space-y-3">
                   <div>
                     <Label className="text-xs lg:text-sm text-muted-foreground">AI Feedback</Label>
