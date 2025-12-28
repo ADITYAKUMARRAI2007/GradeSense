@@ -468,8 +468,7 @@ async def global_search(query: str, user: User = Depends(get_current_user)):
         key="session_token",
         value=session_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        samesite="lax",
         path="/",
         max_age=7 * 24 * 60 * 60
     )
