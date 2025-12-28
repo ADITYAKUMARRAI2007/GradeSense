@@ -62,6 +62,7 @@ const studentNavItems = [
 export default function Layout({ children, user }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState({});
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -74,6 +75,18 @@ export default function Layout({ children, user }) {
       console.error("Logout error:", error);
     }
     window.location.href = "/login";
+  };
+
+  const toggleGroup = (label) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [label]: !prev[label]
+    }));
+  };
+
+  const isGroupActive = (item) => {
+    if (!item.children) return false;
+    return item.children.some(child => location.pathname === child.path);
   };
 
   const NavContent = ({ isMobile = false }) => (
@@ -95,8 +108,67 @@ export default function Layout({ children, user }) {
 
       {/* Navigation */}
       <nav className="flex flex-col gap-1 p-3 mt-2 flex-1">
-        {navItems.map((item) => {
+        {navItems.map((item, idx) => {
           const Icon = item.icon;
+          
+          if (item.isGroup) {
+            const isExpanded = expandedGroups[item.label];
+            const hasActiveChild = isGroupActive(item);
+            
+            return (
+              <div key={idx}>
+                {/* Group Header */}
+                <button
+                  onClick={() => toggleGroup(item.label)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all",
+                    hasActiveChild
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                  data-testid={`nav-group-${item.label.toLowerCase()}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    {(isMobile || !collapsed) && <span className="font-medium">{item.label}</span>}
+                  </div>
+                  {(isMobile || !collapsed) && (
+                    isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+
+                {/* Group Children */}
+                {isExpanded && (isMobile || !collapsed) && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon;
+                      const isActive = location.pathname === child.path;
+                      
+                      return (
+                        <Link
+                          key={child.path}
+                          to={child.path}
+                          onClick={() => isMobile && setMobileOpen(false)}
+                          data-testid={`nav-${child.label.toLowerCase().replace(/\s+/g, '-')}`}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm",
+                            isActive 
+                              ? "bg-primary text-white shadow-md shadow-orange-500/20" 
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
+                        >
+                          <ChildIcon className="w-4 h-4 flex-shrink-0" />
+                          <span className="font-medium">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          
+          // Regular item
           const isActive = location.pathname === item.path;
           
           return (
