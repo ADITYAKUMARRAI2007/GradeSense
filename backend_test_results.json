@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-28T16:41:06.114880",
+  "timestamp": "2025-12-28T16:41:19.138695",
   "total_tests": 81,
   "passed_tests": 81,
   "success_rate": 100.0,
@@ -175,7 +175,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU164103)",
+      "test": "Create Student with Valid ID (STU164116)",
       "success": true,
       "details": ""
     },
@@ -217,20 +217,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_a12559e77d3f found in batch batch_0760202a"
+      "details": "Student user_438f6d363ed9 found in batch batch_94bb68cb"
     },
     {
-      "test": "Create Student with Format STU1641031 (John Doe)",
+      "test": "Create Student with Format STU1641161 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL164103 (Alice Smith)",
+      "test": "Create Student with Format ROLL164116 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A164103 (Bob Jones)",
+      "test": "Create Student with Format A164116 (Bob Jones)",
       "success": true,
       "details": ""
     },
