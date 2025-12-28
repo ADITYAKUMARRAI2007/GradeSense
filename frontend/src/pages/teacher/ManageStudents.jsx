@@ -201,8 +201,11 @@ export default function ManageStudents({ user }) {
                     <Input 
                       value={formData.student_id}
                       onChange={(e) => setFormData(prev => ({ ...prev, student_id: e.target.value }))}
-                      placeholder="STU001"
+                      placeholder="STU001, ROLL42, A123"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      3-20 alphanumeric characters. Auto-generated if left empty.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Assign to Batches</Label>
