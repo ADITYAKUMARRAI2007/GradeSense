@@ -307,15 +307,41 @@ export default function ManageBatches({ user }) {
                       Created {new Date(batchDetails.created_at).toLocaleDateString()}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => openEditDialog(batchDetails)}
-                    >
-                      <Edit2 className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
+                  <div className="flex gap-2 flex-wrap">
+                    {batchDetails.status === "closed" && (
+                      <Badge className="bg-gray-500">Archived</Badge>
+                    )}
+                    {batchDetails.status !== "closed" ? (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => openEditDialog(batchDetails)}
+                        >
+                          <Edit2 className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleCloseBatch(batchDetails)}
+                          className="text-orange-600 hover:text-orange-700"
+                        >
+                          <Archive className="w-4 h-4 mr-1" />
+                          Archive Batch
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleReopenBatch(batchDetails)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <LockOpen className="w-4 h-4 mr-1" />
+                        Reopen Batch
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       size="sm"
