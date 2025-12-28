@@ -169,48 +169,49 @@ export default function StudentResults({ user }) {
 
         {/* Detail Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-            <DialogHeader>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+            <DialogHeader className="p-4 border-b">
               <DialogTitle>
                 Result Details - {selectedSubmission?.exam_name || "Exam"}
               </DialogTitle>
             </DialogHeader>
             
             {selectedSubmission && (
-              <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-4 py-4">
-                  {/* Summary */}
-                  <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg">
-                    <div className="text-center">
-                      <p className="text-4xl font-bold text-primary">
-                        {selectedSubmission.percentage}%
-                      </p>
-                      <p className="text-sm text-muted-foreground">Overall Score</p>
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {/* Summary */}
+                <div className="flex items-center gap-4 p-4 bg-primary/5 border-b">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-primary">
+                      {selectedSubmission.percentage}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">Overall Score</p>
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Marks</p>
+                      <p className="font-medium">{selectedSubmission.total_score}</p>
                     </div>
-                    <div className="flex-1 grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Marks</p>
-                        <p className="font-medium">{selectedSubmission.total_score}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Status</p>
-                        <Badge className={
-                          selectedSubmission.status === "teacher_reviewed" 
-                            ? "bg-green-100 text-green-700" 
-                            : "bg-yellow-100 text-yellow-700"
-                        }>
-                          {selectedSubmission.status === "teacher_reviewed" ? "Reviewed" : "AI Graded"}
-                        </Badge>
-                      </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <Badge className={
+                        selectedSubmission.status === "teacher_reviewed" 
+                          ? "bg-green-100 text-green-700" 
+                          : "bg-yellow-100 text-yellow-700"
+                      }>
+                        {selectedSubmission.status === "teacher_reviewed" ? "Reviewed" : "AI Graded"}
+                      </Badge>
                     </div>
                   </div>
+                </div>
 
-                  {/* Answer Sheet Preview */}
+                {/* Two-Panel Layout: Answer Sheet | Questions */}
+                <div className="flex-1 overflow-hidden flex">
+                  {/* Left Panel - Answer Sheet */}
                   {selectedSubmission.file_images?.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="font-semibold">Your Answer Sheet</h3>
-                      <div className="border rounded-lg overflow-hidden bg-muted/30 p-4">
-                        <div className="flex flex-col gap-4">
+                    <ScrollArea className="w-1/2 border-r bg-muted/30 p-4">
+                      <div className="space-y-3">
+                        <h3 className="font-semibold sticky top-0 bg-muted/30 py-2">Your Answer Sheet</h3>
+                        <div className="space-y-4">
                           {selectedSubmission.file_images.map((img, idx) => (
                             <img 
                               key={idx}
@@ -221,54 +222,56 @@ export default function StudentResults({ user }) {
                           ))}
                         </div>
                       </div>
-                    </div>
+                    </ScrollArea>
                   )}
 
-                  {/* Question-wise Breakdown */}
-                  <div className="space-y-3">
-                    <h3 className="font-semibold">Question-wise Breakdown</h3>
-                    {selectedSubmission.question_scores?.map((qs, idx) => (
-                      <div key={idx} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">Question {qs.question_number}</span>
-                          <Badge variant="outline">
-                            {qs.obtained_marks} / {qs.max_marks}
-                          </Badge>
-                        </div>
-                        
-                        {/* Full Question Text */}
-                        {qs.question_text && (
-                          <div className="mb-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-                            <p className="text-sm font-medium text-blue-900 mb-1">Question:</p>
-                            <p className="text-sm text-blue-800 whitespace-pre-wrap">{qs.question_text}</p>
+                  {/* Right Panel - Questions & Feedback */}
+                  <ScrollArea className={selectedSubmission.file_images?.length > 0 ? "w-1/2 p-4" : "w-full p-4"}>
+                    <div className="space-y-3">
+                      <h3 className="font-semibold sticky top-0 bg-background py-2">Question-wise Breakdown</h3>
+                      {selectedSubmission.question_scores?.map((qs, idx) => (
+                        <div key={idx} className="p-4 border rounded-lg bg-white">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">Question {qs.question_number}</span>
+                            <Badge variant="outline">
+                              {qs.obtained_marks} / {qs.max_marks}
+                            </Badge>
                           </div>
-                        )}
-                        
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
-                          <div 
-                            className={`h-full rounded-full transition-all ${
-                              (qs.obtained_marks / qs.max_marks) >= 0.8 ? "bg-green-500" :
-                              (qs.obtained_marks / qs.max_marks) >= 0.5 ? "bg-yellow-500" : "bg-red-500"
-                            }`}
-                            style={{ width: `${(qs.obtained_marks / qs.max_marks) * 100}%` }}
-                          />
-                        </div>
-                        <div className="bg-muted/50 p-3 rounded-lg">
-                          <p className="text-sm text-muted-foreground mb-1">Feedback:</p>
-                          <p className="text-sm">{qs.ai_feedback}</p>
-                        </div>
-                        {qs.teacher_comment && (
-                          <div className="bg-blue-50 p-3 rounded-lg mt-2">
-                            <p className="text-sm text-blue-700">
-                              <strong>Teacher Note:</strong> {qs.teacher_comment}
-                            </p>
+                          
+                          {/* Full Question Text */}
+                          {qs.question_text && (
+                            <div className="mb-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                              <p className="text-sm font-medium text-blue-900 mb-1">Question:</p>
+                              <p className="text-sm text-blue-800 whitespace-pre-wrap">{qs.question_text}</p>
+                            </div>
+                          )}
+                          
+                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
+                            <div 
+                              className={`h-full rounded-full transition-all ${
+                                (qs.obtained_marks / qs.max_marks) >= 0.8 ? "bg-green-500" :
+                                (qs.obtained_marks / qs.max_marks) >= 0.5 ? "bg-yellow-500" : "bg-red-500"
+                              }`}
+                              style={{ width: `${(qs.obtained_marks / qs.max_marks) * 100}%` }}
+                            />
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Feedback:</p>
+                            <p className="text-sm">{qs.ai_feedback}</p>
+                          </div>
+                          {qs.teacher_comment && (
+                            <div className="bg-blue-50 p-3 rounded-lg mt-2">
+                              <p className="text-sm text-blue-700">
+                                <strong>Teacher Note:</strong> {qs.teacher_comment}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
-              </ScrollArea>
+              </div>
             )}
           </DialogContent>
         </Dialog>
