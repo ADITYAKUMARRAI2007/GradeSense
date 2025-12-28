@@ -22,7 +22,9 @@ import {
   CheckCircle2,
   FileText,
   RefreshCw,
-  X
+  X,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 export default function ReviewPapers({ user }) {
@@ -38,6 +40,7 @@ export default function ReviewPapers({ user }) {
   });
   const [saving, setSaving] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(false);
 
   useEffect(() => {
     fetchData();
