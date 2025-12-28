@@ -7,7 +7,12 @@ export default function LoginPage() {
   const handleGoogleLogin = (role) => {
     // Store role preference for after auth
     localStorage.setItem("preferredRole", role);
-    const redirectUrl = window.location.origin + "/teacher/dashboard";
+    
+    // Redirect based on role
+    const redirectUrl = role === "student" 
+      ? window.location.origin + "/student/dashboard"
+      : window.location.origin + "/teacher/dashboard";
+    
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
