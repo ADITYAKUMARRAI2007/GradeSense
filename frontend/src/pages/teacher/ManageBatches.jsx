@@ -37,6 +37,8 @@ export default function ManageBatches({ user }) {
   const [batchDetails, setBatchDetails] = useState(null);
   const navigate = useNavigate();
 
+  const [showClosed, setShowClosed] = useState(false);
+
   useEffect(() => {
     fetchBatches();
   }, []);
