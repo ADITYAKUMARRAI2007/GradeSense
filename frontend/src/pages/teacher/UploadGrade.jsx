@@ -277,7 +277,19 @@ export default function UploadGrade({ user }) {
       clearInterval(progressInterval);
       setProcessingProgress(100);
       setResults(response.data);
-      toast.success(`Graded ${response.data.processed} papers`);
+      
+      // Show success/error messages
+      if (response.data.errors && response.data.errors.length > 0) {
+        toast.warning(`Graded ${response.data.processed} papers. ${response.data.errors.length} files had errors.`);
+        
+        // Show detailed errors
+        response.data.errors.forEach(error => {
+          toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
+        });
+      } else {
+        toast.success(`Successfully graded ${response.data.processed} papers`);
+      }
+      
       setStep(6);
     } catch (error) {
       toast.error("Grading failed: " + (error.response?.data?.detail || error.message));
