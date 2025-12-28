@@ -757,7 +757,7 @@ print('Test student created for analytics test');
         
         # Test invalid characters (should fail)
         invalid_char_data = {
-            "email": f"invalid.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "email": f"invalid.student.{timestamp}@school.edu",
             "name": "Invalid Char Student",
             "role": "student",
             "student_id": "STU@001",
