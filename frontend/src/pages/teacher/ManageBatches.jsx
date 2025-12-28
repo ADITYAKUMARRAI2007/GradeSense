@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import { API } from "../../App";
 import Layout from "../../components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
@@ -26,7 +26,6 @@ import {
   LockOpen,
   Archive
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 export default function ManageBatches({ user }) {
   const [batches, setBatches] = useState([]);
