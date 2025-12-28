@@ -140,22 +140,30 @@ export default function ManageBatches({ user }) {
               <DialogHeader>
                 <DialogTitle>{editingBatch ? "Edit Batch" : "Create New Batch"}</DialogTitle>
               </DialogHeader>
-              <div className="py-4">
-                <Label>Batch Name *</Label>
-                <Input 
-                  value={batchName}
-                  onChange={(e) => setBatchName(e.target.value)}
-                  placeholder="e.g., Class 10-A, Grade 5 Science"
-                  className="mt-2"
-                  data-testid="batch-name-input"
-                />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleSubmit} disabled={!batchName.trim()} data-testid="save-batch-btn">
-                  {editingBatch ? "Save Changes" : "Create Batch"}
-                </Button>
-              </DialogFooter>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}>
+                <div className="py-4">
+                  <Label htmlFor="batch-name-field">Batch Name *</Label>
+                  <Input 
+                    id="batch-name-field"
+                    name="batchName"
+                    value={batchName}
+                    onChange={(e) => setBatchName(e.target.value)}
+                    placeholder="e.g., Class 10-A, Grade 5 Science"
+                    className="mt-2"
+                    data-testid="batch-name-input"
+                    required
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={!batchName.trim()} data-testid="save-batch-btn">
+                    {editingBatch ? "Save Changes" : "Create Batch"}
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
