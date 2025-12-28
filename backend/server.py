@@ -228,6 +228,76 @@ async def create_session(request: Request, response: Response):
         except Exception as e:
             logger.error(f"Auth service error: {e}")
             raise HTTPException(status_code=500, detail="Auth service error")
+    
+    # Extract user data from auth response
+    user_email = auth_data.get("email")
+    user_name = auth_data.get("name")
+    user_picture = auth_data.get("picture")
+    
+    if not user_email:
+        raise HTTPException(status_code=400, detail="Email not found in auth data")
+    
+    # Check if user exists, create if not
+    existing_user = await db.users.find_one({"email": user_email}, {"_id": 0})
+    
+    if existing_user:
+        user_id = existing_user["user_id"]
+        # Update user data
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "name": user_name,
+                "picture": user_picture,
+                "last_login": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        user_role = existing_user.get("role", "teacher")
+    else:
+        # Create new user (default role: teacher)
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        user_role = "teacher"
+        new_user = {
+            "user_id": user_id,
+            "email": user_email,
+            "name": user_name,
+            "picture": user_picture,
+            "role": user_role,
+            "batches": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_login": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(new_user)
+    
+    # Create session token
+    session_token = f"session_{uuid.uuid4().hex}"
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    
+    # Store session in database
+    await db.sessions.insert_one({
+        "session_token": session_token,
+        "user_id": user_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": expires_at
+    })
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        max_age=7 * 24 * 60 * 60,  # 7 days
+        samesite="lax"
+    )
+    
+    # Return user data
+    return {
+        "user_id": user_id,
+        "email": user_email,
+        "name": user_name,
+        "picture": user_picture,
+        "role": user_role,
+        "session_token": session_token
+    }
 
 
 # ============== NOTIFICATIONS ROUTES ==============
