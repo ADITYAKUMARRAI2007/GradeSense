@@ -1386,6 +1386,14 @@ print('Test data cleaned up');
         self.test_auto_add_to_batch_functionality()
         self.test_comprehensive_student_workflow()
         
+        # NEW TESTS: Global Search & Notifications System
+        print("\n🔍 Testing Global Search & Notifications System")
+        print("-" * 50)
+        self.test_global_search_api()
+        self.test_notifications_api()
+        self.test_mark_notification_read()
+        self.test_auto_notification_creation()
+        
         # Cleanup
         self.cleanup_test_data()
         
