@@ -33,6 +33,17 @@ export default function ManageExams({ user }) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedExam, setSelectedExam] = useState(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadingPapers, setUploadingPapers] = useState(false);
+  const [paperFiles, setPaperFiles] = useState([]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: { 'application/pdf': ['.pdf'] },
+    multiple: true,
+    onDrop: (acceptedFiles) => {
+      setPaperFiles(acceptedFiles);
+    }
+  });
 
   useEffect(() => {
     fetchData();
