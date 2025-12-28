@@ -740,7 +740,7 @@ print('Test student created for analytics test');
         
         # Test long ID (should fail)
         long_id_data = {
-            "email": f"long.student.{datetime.now().strftime('%H%M%S')}@school.edu",
+            "email": f"long.student.{timestamp}@school.edu",
             "name": "Long ID Student",
             "role": "student",
             "student_id": "VERYLONGSTUDENTID123456789",
