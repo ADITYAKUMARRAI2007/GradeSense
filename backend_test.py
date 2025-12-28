@@ -1279,6 +1279,369 @@ print('Student session created for re-evaluation test');
         print("⚠️  Skipping auto-notification test - missing required test data")
         return None
 
+    def test_p1_submission_enrichment(self):
+        """Test P1 Feature: GET /api/submissions/{submission_id} enriches response with question text"""
+        print("\n📝 Testing P1: Submission Enrichment with Question Text...")
+        
+        # First, create a test exam with detailed question rubrics for P1 testing
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Skipping P1 submission enrichment test - missing batch or subject")
+            return None
+        
+        # Create exam with detailed question rubrics
+        p1_exam_data = {
+            "batch_id": self.test_batch_id,
+            "subject_id": self.test_subject_id,
+            "exam_type": "P1 Test",
+            "exam_name": f"P1 Question Text Test {datetime.now().strftime('%H%M%S')}",
+            "total_marks": 100.0,
+            "exam_date": "2024-01-15",
+            "grading_mode": "balanced",
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 50.0,
+                    "rubric": "Solve the following algebraic equation step by step: 2x + 5 = 15. Show all working and verify your answer.",
+                    "sub_questions": [
+                        {
+                            "sub_id": "a",
+                            "max_marks": 25.0,
+                            "rubric": "Isolate the variable x by performing inverse operations"
+                        },
+                        {
+                            "sub_id": "b", 
+                            "max_marks": 25.0,
+                            "rubric": "Verify your answer by substituting back into the original equation"
+                        }
+                    ]
+                },
+                {
+                    "question_number": 2,
+                    "max_marks": 50.0,
+                    "rubric": "Analyze the quadratic function f(x) = x² - 4x + 3. Find the vertex, roots, and sketch the graph.",
+                    "sub_questions": []
+                }
+            ]
+        }
+        
+        exam_result = self.run_api_test(
+            "Create P1 Test Exam with Detailed Rubrics",
+            "POST",
+            "exams",
+            200,
+            data=p1_exam_data
+        )
+        
+        if not exam_result:
+            print("❌ Failed to create P1 test exam")
+            return None
+            
+        self.p1_exam_id = exam_result.get('exam_id')
+        
+        # Create a test submission manually in MongoDB with question scores
+        timestamp = int(datetime.now().timestamp())
+        p1_submission_id = f"p1_sub_{timestamp}"
+        
+        if not hasattr(self, 'valid_student_id'):
+            print("⚠️  Skipping P1 test - no valid student created")
+            return None
+        
+        mongo_commands = f"""
+use('test_database');
+var submissionId = '{p1_submission_id}';
+var examId = '{self.p1_exam_id}';
+var studentId = '{self.valid_student_id}';
+
+// Insert P1 test submission with question scores
+db.submissions.insertOne({{
+  submission_id: submissionId,
+  exam_id: examId,
+  student_id: studentId,
+  student_name: 'P1 Test Student',
+  file_data: 'base64encodedpdfdata',
+  file_images: ['base64image1', 'base64image2'],
+  total_score: 85,
+  percentage: 85.0,
+  question_scores: [
+    {{
+      question_number: 1,
+      max_marks: 50,
+      obtained_marks: 45,
+      ai_feedback: 'Good algebraic manipulation',
+      teacher_comment: null,
+      is_reviewed: false,
+      sub_scores: [
+        {{
+          sub_id: 'a',
+          max_marks: 25,
+          obtained_marks: 23,
+          ai_feedback: 'Correct isolation of variable'
+        }},
+        {{
+          sub_id: 'b',
+          max_marks: 25,
+          obtained_marks: 22,
+          ai_feedback: 'Verification step completed correctly'
+        }}
+      ]
+    }},
+    {{
+      question_number: 2,
+      max_marks: 50,
+      obtained_marks: 40,
+      ai_feedback: 'Good analysis of quadratic function',
+      teacher_comment: null,
+      is_reviewed: false,
+      sub_scores: []
+    }}
+  ],
+  status: 'ai_graded',
+  graded_at: new Date().toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('P1 test submission created');
+"""
+        
+        try:
+            with open('/tmp/mongo_p1_submission.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_p1_submission.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"✅ P1 test submission created: {p1_submission_id}")
+                
+                # Now test the GET /api/submissions/{submission_id} endpoint
+                submission_result = self.run_api_test(
+                    "P1: Get Submission with Question Text Enrichment",
+                    "GET",
+                    f"submissions/{p1_submission_id}",
+                    200
+                )
+                
+                if submission_result:
+                    # Verify question_text field is added to question_scores
+                    question_scores = submission_result.get("question_scores", [])
+                    
+                    if question_scores:
+                        # Check first question
+                        q1 = next((q for q in question_scores if q.get("question_number") == 1), None)
+                        if q1:
+                            question_text = q1.get("question_text")
+                            if question_text and "algebraic equation" in question_text:
+                                self.log_test("P1: Question Text Enrichment - Question 1", True, 
+                                    f"Question text found: {question_text[:50]}...")
+                            else:
+                                self.log_test("P1: Question Text Enrichment - Question 1", False, 
+                                    f"Question text missing or incorrect: {question_text}")
+                        
+                        # Check second question
+                        q2 = next((q for q in question_scores if q.get("question_number") == 2), None)
+                        if q2:
+                            question_text = q2.get("question_text")
+                            if question_text and "quadratic function" in question_text:
+                                self.log_test("P1: Question Text Enrichment - Question 2", True, 
+                                    f"Question text found: {question_text[:50]}...")
+                            else:
+                                self.log_test("P1: Question Text Enrichment - Question 2", False, 
+                                    f"Question text missing or incorrect: {question_text}")
+                        
+                        # Store for other P1 tests
+                        self.p1_submission_id = p1_submission_id
+                        self.p1_submission_data = submission_result
+                        
+                        return submission_result
+                    else:
+                        self.log_test("P1: Question Scores Structure", False, "No question_scores found in submission")
+                
+                return None
+            else:
+                print(f"❌ Failed to create P1 test submission: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error in P1 submission enrichment test: {str(e)}")
+            return None
+
+    def test_p1_question_text_mapping(self):
+        """Test P1 Feature: Verify question text mapping from exam rubrics"""
+        print("\n🔍 Testing P1: Question Text Mapping from Exam Rubrics...")
+        
+        if not hasattr(self, 'p1_submission_data'):
+            print("⚠️  Skipping P1 question text mapping test - no P1 submission data")
+            return None
+        
+        # Get the original exam to compare rubrics
+        if hasattr(self, 'p1_exam_id'):
+            exam_result = self.run_api_test(
+                "Get P1 Test Exam for Rubric Comparison",
+                "GET",
+                f"exams/{self.p1_exam_id}",
+                200
+            )
+            
+            if exam_result:
+                exam_questions = exam_result.get("questions", [])
+                submission_questions = self.p1_submission_data.get("question_scores", [])
+                
+                # Verify mapping for each question
+                mapping_success = True
+                for exam_q in exam_questions:
+                    q_num = exam_q.get("question_number")
+                    exam_rubric = exam_q.get("rubric", "")
+                    
+                    # Find corresponding submission question
+                    sub_q = next((sq for sq in submission_questions if sq.get("question_number") == q_num), None)
+                    
+                    if sub_q:
+                        sub_question_text = sub_q.get("question_text", "")
+                        
+                        if exam_rubric == sub_question_text:
+                            self.log_test(f"P1: Rubric Mapping Q{q_num}", True, 
+                                f"Exam rubric correctly mapped to question_text")
+                        else:
+                            self.log_test(f"P1: Rubric Mapping Q{q_num}", False, 
+                                f"Rubric mismatch - Exam: '{exam_rubric[:30]}...' vs Submission: '{sub_question_text[:30]}...'")
+                            mapping_success = False
+                    else:
+                        self.log_test(f"P1: Rubric Mapping Q{q_num}", False, 
+                            f"Question {q_num} not found in submission")
+                        mapping_success = False
+                
+                if mapping_success:
+                    self.log_test("P1: Overall Question Text Mapping", True, 
+                        "All exam rubrics correctly mapped to submission question_text fields")
+                else:
+                    self.log_test("P1: Overall Question Text Mapping", False, 
+                        "Some rubrics not correctly mapped")
+                
+                return exam_result
+            
+        return None
+
+    def test_p1_sub_questions_support(self):
+        """Test P1 Feature: Verify sub-questions are included in enriched response"""
+        print("\n📋 Testing P1: Sub-questions Support in Enriched Response...")
+        
+        if not hasattr(self, 'p1_submission_data'):
+            print("⚠️  Skipping P1 sub-questions test - no P1 submission data")
+            return None
+        
+        submission_questions = self.p1_submission_data.get("question_scores", [])
+        
+        # Check question 1 which should have sub-questions
+        q1 = next((q for q in submission_questions if q.get("question_number") == 1), None)
+        
+        if q1:
+            sub_questions = q1.get("sub_questions", [])
+            
+            if sub_questions and len(sub_questions) == 2:
+                # Verify sub-question structure
+                sub_a = next((sq for sq in sub_questions if sq.get("sub_id") == "a"), None)
+                sub_b = next((sq for sq in sub_questions if sq.get("sub_id") == "b"), None)
+                
+                if sub_a and sub_b:
+                    # Check if sub-questions have rubrics
+                    sub_a_rubric = sub_a.get("rubric", "")
+                    sub_b_rubric = sub_b.get("rubric", "")
+                    
+                    if sub_a_rubric and "inverse operations" in sub_a_rubric:
+                        self.log_test("P1: Sub-question A Rubric", True, 
+                            f"Sub-question A rubric found: {sub_a_rubric[:40]}...")
+                    else:
+                        self.log_test("P1: Sub-question A Rubric", False, 
+                            f"Sub-question A rubric missing or incorrect: {sub_a_rubric}")
+                    
+                    if sub_b_rubric and "substituting back" in sub_b_rubric:
+                        self.log_test("P1: Sub-question B Rubric", True, 
+                            f"Sub-question B rubric found: {sub_b_rubric[:40]}...")
+                    else:
+                        self.log_test("P1: Sub-question B Rubric", False, 
+                            f"Sub-question B rubric missing or incorrect: {sub_b_rubric}")
+                    
+                    self.log_test("P1: Sub-questions Structure", True, 
+                        f"Found {len(sub_questions)} sub-questions with correct structure")
+                else:
+                    self.log_test("P1: Sub-questions Structure", False, 
+                        "Sub-questions a and b not found or incomplete")
+            else:
+                self.log_test("P1: Sub-questions Structure", False, 
+                    f"Expected 2 sub-questions, found {len(sub_questions)}")
+        else:
+            self.log_test("P1: Sub-questions Structure", False, 
+                "Question 1 not found in submission")
+        
+        # Check question 2 which should have no sub-questions
+        q2 = next((q for q in submission_questions if q.get("question_number") == 2), None)
+        
+        if q2:
+            sub_questions_q2 = q2.get("sub_questions", [])
+            if len(sub_questions_q2) == 0:
+                self.log_test("P1: No Sub-questions for Q2", True, 
+                    "Question 2 correctly has no sub-questions")
+            else:
+                self.log_test("P1: No Sub-questions for Q2", False, 
+                    f"Question 2 should have no sub-questions, found {len(sub_questions_q2)}")
+        
+        return True
+
+    def test_p1_file_images_preservation(self):
+        """Test P1 Feature: Verify file_images array is preserved in enriched response"""
+        print("\n🖼️  Testing P1: File Images Preservation in Enriched Response...")
+        
+        if not hasattr(self, 'p1_submission_data'):
+            print("⚠️  Skipping P1 file images test - no P1 submission data")
+            return None
+        
+        # Check if file_images array is present and preserved
+        file_images = self.p1_submission_data.get("file_images", [])
+        
+        if file_images and len(file_images) > 0:
+            self.log_test("P1: File Images Preservation", True, 
+                f"file_images array preserved with {len(file_images)} image(s)")
+            
+            # Verify images are base64 strings
+            first_image = file_images[0]
+            if isinstance(first_image, str) and len(first_image) > 10:
+                self.log_test("P1: File Images Format", True, 
+                    f"Images are in correct base64 string format (length: {len(first_image)})")
+            else:
+                self.log_test("P1: File Images Format", False, 
+                    f"Images not in expected base64 format: {type(first_image)}")
+        else:
+            self.log_test("P1: File Images Preservation", False, 
+                "file_images array missing or empty")
+        
+        # Check if file_data is also preserved
+        file_data = self.p1_submission_data.get("file_data")
+        if file_data:
+            self.log_test("P1: File Data Preservation", True, 
+                "file_data field preserved in response")
+        else:
+            self.log_test("P1: File Data Preservation", False, 
+                "file_data field missing from response")
+        
+        # Verify other essential fields are preserved
+        essential_fields = ["submission_id", "exam_id", "student_id", "student_name", 
+                          "total_score", "percentage", "status", "question_scores"]
+        
+        missing_fields = []
+        for field in essential_fields:
+            if field not in self.p1_submission_data:
+                missing_fields.append(field)
+        
+        if not missing_fields:
+            self.log_test("P1: Essential Fields Preservation", True, 
+                "All essential submission fields preserved")
+        else:
+            self.log_test("P1: Essential Fields Preservation", False, 
+                f"Missing essential fields: {missing_fields}")
+        
+        return True
+
     def cleanup_test_data(self):
         """Clean up test data from MongoDB"""
         print("\n🧹 Cleaning up test data...")
