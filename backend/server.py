@@ -210,7 +210,7 @@ async def create_session(request: Request, response: Response):
     """Exchange session_id for session_token"""
     data = await request.json()
     session_id = data.get("session_id")
-    preferred_role = data.get("preferred_role", "teacher")  # Get role from frontend
+    preferred_role = data.get("preferred_role", "teacher")
     
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
@@ -238,36 +238,56 @@ async def create_session(request: Request, response: Response):
     if not user_email:
         raise HTTPException(status_code=400, detail="Email not found in auth data")
     
-    # Check if user exists, create if not
-    existing_user = await db.users.find_one({"email": user_email}, {"_id": 0})
+    # IMPORTANT: Check if this email was already created by a teacher as a student
+    existing_student = await db.users.find_one({
+        "email": user_email,
+        "role": "student"
+    }, {"_id": 0})
     
-    if existing_user:
-        user_id = existing_user["user_id"]
-        # Update user data
+    if existing_student:
+        # Student record exists (teacher created it)
+        # Just update login info and return
+        user_id = existing_student["user_id"]
         await db.users.update_one(
             {"user_id": user_id},
             {"$set": {
-                "name": user_name,
+                "name": user_name,  # Update with Google name
                 "picture": user_picture,
                 "last_login": datetime.now(timezone.utc).isoformat()
             }}
         )
-        user_role = existing_user.get("role", "teacher")
+        user_role = "student"
     else:
-        # Create new user with preferred role
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        user_role = preferred_role if preferred_role in ["teacher", "student"] else "teacher"
-        new_user = {
-            "user_id": user_id,
-            "email": user_email,
-            "name": user_name,
-            "picture": user_picture,
-            "role": user_role,
-            "batches": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "last_login": datetime.now(timezone.utc).isoformat()
-        }
-        await db.users.insert_one(new_user)
+        # Check if user exists with different role
+        existing_user = await db.users.find_one({"email": user_email}, {"_id": 0})
+        
+        if existing_user:
+            user_id = existing_user["user_id"]
+            # Update user data
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "name": user_name,
+                    "picture": user_picture,
+                    "last_login": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            user_role = existing_user.get("role", "teacher")
+        else:
+            # Create new user with preferred role
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            user_role = preferred_role if preferred_role in ["teacher", "student"] else "teacher"
+            new_user = {
+                "user_id": user_id,
+                "email": user_email,
+                "name": user_name,
+                "picture": user_picture,
+                "role": user_role,
+                "batches": [],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_login": datetime.now(timezone.utc).isoformat()
+            }
+            await db.users.insert_one(new_user)
     
     # Create session token
     session_token = f"session_{uuid.uuid4().hex}"
