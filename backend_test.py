@@ -1061,6 +1061,15 @@ print('Test data cleaned up');
         self.test_duplicate_exam_prevention()
         self.test_exam_deletion()
         
+        # NEW TESTS: Auto-Student Creation & Navigation Dropdowns
+        print("\n🎓 Testing Auto-Student Creation & Validation Features")
+        print("-" * 50)
+        self.test_student_id_validation()
+        self.test_duplicate_student_id_detection()
+        self.test_filename_parsing_functionality()
+        self.test_auto_add_to_batch_functionality()
+        self.test_comprehensive_student_workflow()
+        
         # Cleanup
         self.cleanup_test_data()
         
