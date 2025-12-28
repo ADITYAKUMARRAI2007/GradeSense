@@ -7,7 +7,9 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Badge } from "../../components/ui/badge";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { toast } from "sonner";
+import { useDropzone } from "react-dropzone";
 import { 
   FileText,
   Search,
@@ -17,7 +19,11 @@ import {
   BookOpen,
   ChevronRight,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Upload,
+  Lock,
+  LockOpen,
+  CheckCircle2
 } from "lucide-react";
 
 export default function ManageExams({ user }) {
