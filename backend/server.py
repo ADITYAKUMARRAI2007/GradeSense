@@ -1070,7 +1070,7 @@ async def upload_student_papers(
     files: List[UploadFile] = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload and grade student papers"""
+    """Upload and grade student papers with auto-student creation"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload papers")
     
@@ -1088,14 +1088,39 @@ async def upload_student_papers(
     )
     
     submissions = []
+    errors = []
     
     for file in files:
         try:
+            # Parse student ID and name from filename
+            student_id, student_name = parse_student_from_filename(file.filename)
+            
+            if not student_id or not student_name:
+                errors.append({
+                    "filename": file.filename,
+                    "error": "Invalid filename format. Expected: StudentID_StudentName.pdf (e.g., STU001_John_Doe.pdf)"
+                })
+                continue
+            
+            # Get or create student
+            user_id, error = await get_or_create_student(
+                student_id=student_id,
+                student_name=student_name,
+                batch_id=exam["batch_id"],
+                teacher_id=user.user_id
+            )
+            
+            if error:
+                errors.append({
+                    "filename": file.filename,
+                    "student_id": student_id,
+                    "error": error
+                })
+                continue
+            
+            # Process the PDF
             pdf_bytes = await file.read()
             images = pdf_to_images(pdf_bytes)
-            
-            # Extract student name from filename
-            student_name = file.filename.replace(".pdf", "").replace("_", " ").title()
             
             # Grade with AI using the grading mode from exam
             scores = await grade_with_ai(
@@ -1113,7 +1138,7 @@ async def upload_student_papers(
             submission = {
                 "submission_id": submission_id,
                 "exam_id": exam_id,
-                "student_id": f"unknown_{uuid.uuid4().hex[:6]}",
+                "student_id": user_id,
                 "student_name": student_name,
                 "file_data": base64.b64encode(pdf_bytes).decode(),
                 "file_images": images,
@@ -1128,6 +1153,7 @@ async def upload_student_papers(
             await db.submissions.insert_one(submission)
             submissions.append({
                 "submission_id": submission_id,
+                "student_id": student_id,
                 "student_name": student_name,
                 "total_score": total_score,
                 "percentage": percentage
@@ -1135,7 +1161,7 @@ async def upload_student_papers(
             
         except Exception as e:
             logger.error(f"Error processing {file.filename}: {e}")
-            submissions.append({
+            errors.append({
                 "filename": file.filename,
                 "error": str(e)
             })
@@ -1146,7 +1172,15 @@ async def upload_student_papers(
         {"$set": {"status": "completed"}}
     )
     
-    return {"processed": len(submissions), "submissions": submissions}
+    result = {
+        "processed": len(submissions),
+        "submissions": submissions
+    }
+    
+    if errors:
+        result["errors"] = errors
+    
+    return result
 
 # ============== SUBMISSION ROUTES ==============
 
