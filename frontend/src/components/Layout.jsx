@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   GraduationCap, 
@@ -18,7 +18,8 @@ import {
   Bell,
   MessageSquare,
   Menu,
-  X
+  X,
+  Search
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -26,6 +27,8 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { cn } from "../lib/utils";
 import axios from "axios";
 import { API } from "../App";
+import GlobalSearch from "./GlobalSearch";
+import NotificationDropdown from "./NotificationDropdown";
 
 const teacherNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher/dashboard" },
@@ -63,10 +66,24 @@ export default function Layout({ children, user }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [searchOpen, setSearchOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
   const navItems = user?.role === "student" ? studentNavItems : teacherNavItems;
+
+  // Keyboard shortcut for search (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleLogout = async () => {
     try {
