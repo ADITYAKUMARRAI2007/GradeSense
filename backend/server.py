@@ -911,15 +911,32 @@ async def upload_more_papers(
     
     for file in files:
         try:
-            # Parse student ID and name from filename
-            student_id, student_name = parse_student_from_filename(file.filename)
+            # Process the PDF first to get images
+            pdf_bytes = await file.read()
+            images = pdf_to_images(pdf_bytes)
             
-            if not student_id or not student_name:
+            if not images:
                 errors.append({
                     "filename": file.filename,
-                    "error": "Invalid filename format. Expected: StudentID_StudentName.pdf"
+                    "error": "Failed to extract images from PDF"
                 })
                 continue
+            
+            # Extract student ID and name from the paper using AI
+            student_id, student_name = await extract_student_info_from_paper(images, file.filename)
+            
+            # Fallback to filename if AI extraction fails
+            if not student_id or not student_name:
+                _, filename_name = parse_student_from_filename(file.filename)
+                if not student_id and not student_name:
+                    errors.append({
+                        "filename": file.filename,
+                        "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
+                    })
+                    continue
+                # Use filename name if we have it
+                if filename_name and not student_name:
+                    student_name = filename_name
             
             # Get or create student
             user_id, error = await get_or_create_student(
@@ -936,10 +953,6 @@ async def upload_more_papers(
                     "error": error
                 })
                 continue
-            
-            # Process the PDF
-            pdf_bytes = await file.read()
-            images = pdf_to_images(pdf_bytes)
             
             # Grade with AI
             scores = await grade_with_ai(
