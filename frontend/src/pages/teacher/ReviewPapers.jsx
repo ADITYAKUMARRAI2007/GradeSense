@@ -191,57 +191,102 @@ export default function ReviewPapers({ user }) {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-        {/* PDF Viewer */}
+        {/* Student Answer + Model Answer Panels */}
         <div className="h-48 lg:h-auto lg:flex-1 border-b lg:border-b-0 lg:border-r overflow-auto bg-muted/30 p-2 lg:p-4">
           {selectedSubmission.file_images?.length > 0 ? (
             <div className="space-y-3">
-              {/* Annotation Toggle */}
-              <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10">
+              {/* Toggle Controls */}
+              <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10 gap-2 flex-wrap">
                 <span className="text-sm font-medium">Answer Sheet</span>
-                <div className="flex items-center gap-2">
-                  <Checkbox 
-                    id="show-annotations"
-                    checked={showAnnotations}
-                    onCheckedChange={setShowAnnotations}
-                  />
-                  <Label htmlFor="show-annotations" className="text-xs cursor-pointer flex items-center gap-1">
-                    {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                    Show Mistakes
-                  </Label>
+                <div className="flex items-center gap-3">
+                  {/* Model Answer Toggle */}
+                  {modelAnswerImages.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="show-model-answer"
+                        checked={showModelAnswer}
+                        onCheckedChange={setShowModelAnswer}
+                      />
+                      <Label htmlFor="show-model-answer" className="text-xs cursor-pointer flex items-center gap-1">
+                        <FileText className="w-3 h-3" />
+                        Model Answer
+                      </Label>
+                    </div>
+                  )}
+                  
+                  {/* Mistakes Toggle */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="show-annotations"
+                      checked={showAnnotations}
+                      onCheckedChange={setShowAnnotations}
+                    />
+                    <Label htmlFor="show-annotations" className="text-xs cursor-pointer flex items-center gap-1">
+                      {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                      Show Mistakes
+                    </Label>
+                  </div>
                 </div>
               </div>
               
-              <div className="flex lg:flex-col gap-2 lg:gap-4 overflow-x-auto lg:overflow-x-visible">
-                {selectedSubmission.file_images.map((img, idx) => (
-                  <div key={idx} className="relative flex-shrink-0">
-                    <img 
-                      src={`data:image/jpeg;base64,${img}`}
-                      alt={`Page ${idx + 1}`}
-                      className="h-40 lg:h-auto lg:w-full rounded-lg shadow-md"
-                    />
-                    {/* Annotation Indicator - Side Labels Only */}
-                    {showAnnotations && (
-                      <div className="absolute right-0 top-0 bottom-0 w-8 lg:w-12 flex flex-col justify-around py-2 lg:py-4">
-                        {selectedSubmission.question_scores?.map((qs) => {
-                          const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
-                          if (scorePercentage < 60) {
-                            return (
-                              <div 
-                                key={qs.question_number}
-                                className="bg-red-500 text-white text-[10px] lg:text-xs px-1 lg:px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
-                                title={`Q${qs.question_number}: Needs Review`}
-                              >
-                                <span className="font-bold">Q{qs.question_number}</span>
-                                <span className="text-[8px] lg:text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })}
+              {/* Answer Sheets Display */}
+              <div className={showModelAnswer ? "grid grid-cols-1 md:grid-cols-2 gap-4" : ""}>
+                {/* Student Answer */}
+                <div className="space-y-2">
+                  {showModelAnswer && (
+                    <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student's Answer</h3>
+                  )}
+                  <div className="flex lg:flex-col gap-2 lg:gap-4 overflow-x-auto lg:overflow-x-visible">
+                    {selectedSubmission.file_images.map((img, idx) => (
+                      <div key={idx} className="relative flex-shrink-0">
+                        <img 
+                          src={`data:image/jpeg;base64,${img}`}
+                          alt={`Page ${idx + 1}`}
+                          className="h-40 lg:h-auto lg:w-full rounded-lg shadow-md"
+                        />
+                        {/* Annotation Indicator */}
+                        {showAnnotations && (
+                          <div className="absolute right-0 top-0 bottom-0 w-8 lg:w-12 flex flex-col justify-around py-2 lg:py-4">
+                            {selectedSubmission.question_scores?.map((qs) => {
+                              const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
+                              if (scorePercentage < 60) {
+                                return (
+                                  <div 
+                                    key={qs.question_number}
+                                    className="bg-red-500 text-white text-[10px] lg:text-xs px-1 lg:px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
+                                    title={`Q${qs.question_number}: Needs Review`}
+                                  >
+                                    <span className="font-bold">Q{qs.question_number}</span>
+                                    <span className="text-[8px] lg:text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                {/* Model Answer */}
+                {showModelAnswer && modelAnswerImages.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-green-700 sticky top-0 bg-muted/30 py-1">Model Answer (Correct)</h3>
+                    <div className="flex lg:flex-col gap-2 lg:gap-4 overflow-x-auto lg:overflow-x-visible">
+                      {modelAnswerImages.map((img, idx) => (
+                        <div key={idx} className="relative flex-shrink-0">
+                          <img 
+                            src={`data:image/jpeg;base64,${img}`}
+                            alt={`Model Page ${idx + 1}`}
+                            className="h-40 lg:h-auto lg:w-full rounded-lg shadow-md border-2 border-green-200"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
