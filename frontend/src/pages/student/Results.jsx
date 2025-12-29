@@ -316,12 +316,25 @@ export default function StudentResults({ user }) {
                             <h4 className="text-sm font-semibold text-green-700 border-b border-green-200 pb-1">Model Answer (Correct)</h4>
                             <div className="space-y-4">
                               {modelAnswerImages.map((img, idx) => (
-                                <div key={idx} className="relative">
-                                  <img 
-                                    src={`data:image/jpeg;base64,${img}`}
-                                    alt={`Model Page ${idx + 1}`}
-                                    className="w-full rounded-lg shadow-md border-2 border-green-300"
-                                  />
+                                <div key={idx} className="relative group">
+                                  <div 
+                                    className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
+                                    onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Model Answer - Page ${idx + 1}` })}
+                                  >
+                                    <img 
+                                      src={`data:image/jpeg;base64,${img}`}
+                                      alt={`Model Page ${idx + 1}`}
+                                      className="w-full rounded-lg shadow-md border-2 border-green-300"
+                                      style={{ minHeight: '500px', objectFit: 'contain' }}
+                                    />
+                                    {/* Zoom Overlay */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                      <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
+                                        <Maximize2 className="w-4 h-4" />
+                                        <span className="text-sm font-medium">Click to enlarge</span>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>
