@@ -312,21 +312,6 @@ export default function StudentResults({ user }) {
                       </div>
                     </ScrollArea>
                   )}
-                                          <span className="font-bold">Q{qs.question_number}</span>
-                                          <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </ScrollArea>
-                  )}
 
                   {/* Right Panel - Questions & Feedback */}
                   <ScrollArea className={selectedSubmission.file_images?.length > 0 ? "w-1/2 p-4" : "w-full p-4"}>
