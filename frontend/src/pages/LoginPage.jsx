@@ -8,12 +8,9 @@ export default function LoginPage() {
     // Store role preference for after auth
     localStorage.setItem("preferredRole", role);
     
-    // Redirect based on role
-    const redirectUrl = role === "student" 
-      ? window.location.origin + "/student/dashboard"
-      : window.location.origin + "/teacher/dashboard";
-    
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    // Use window.location.origin directly without path concatenation
+    // The auth callback will handle routing based on role
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(window.location.origin)}`;
   };
 
   return (
