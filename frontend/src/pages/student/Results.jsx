@@ -49,6 +49,12 @@ export default function StudentResults({ user }) {
       const response = await axios.get(`${API}/submissions/${submissionId}`);
       setSelectedSubmission(response.data);
       setDialogOpen(true);
+      
+      // Fetch exam to get model answer
+      if (response.data.exam_id) {
+        const examResponse = await axios.get(`${API}/exams/${response.data.exam_id}`);
+        setModelAnswerImages(examResponse.data.model_answer_images || []);
+      }
     } catch (error) {
       console.error("Error fetching details:", error);
     }
