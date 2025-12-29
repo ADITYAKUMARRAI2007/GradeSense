@@ -386,6 +386,62 @@ export default function StudentDashboard({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Improvement Details Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="w-5 h-5" />
+              Area Needing Improvement
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedWeakArea && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h3 className="font-semibold text-lg mb-2">{selectedWeakArea.question}</h3>
+                <p className="text-sm text-red-700 font-medium mb-1">
+                  Your Score: {selectedWeakArea.score}
+                </p>
+              </div>
+
+              {selectedWeakArea.feedback && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Feedback:</h4>
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm">{selectedWeakArea.feedback}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <h4 className="font-semibold">What to do next:</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li>Review the question and your answer carefully</li>
+                  <li>Check your class notes or textbook for similar problems</li>
+                  <li>Practice more questions on this topic</li>
+                  <li>Ask your teacher for clarification if needed</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/student/results")}
+                >
+                  View Full Results
+                </Button>
+                <Button
+                  onClick={() => setDialogOpen(false)}
+                >
+                  Got It, Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
