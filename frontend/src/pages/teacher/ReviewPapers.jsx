@@ -138,10 +138,12 @@ export default function ReviewPapers({ user }) {
 
     try {
       const response = await axios.post(`${API}/exams/${filters.exam_id}/bulk-approve`);
-      toast.success(response.data.message);
-      fetchSubmissions();
+      toast.success(response.data.message || "Papers approved successfully");
+      await fetchData(); // Refresh all data
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to bulk approve");
+      console.error("Bulk approve error:", error);
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to bulk approve";
+      toast.error(errorMessage);
     }
   };
 
