@@ -28,6 +28,8 @@ export default function StudentResults({ user }) {
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
+  const [zoomedImage, setZoomedImage] = useState(null);
+  const [imageZoom, setImageZoom] = useState(100);
 
   useEffect(() => {
     fetchSubmissions();
