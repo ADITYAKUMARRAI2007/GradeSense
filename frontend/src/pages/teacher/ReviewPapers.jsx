@@ -293,14 +293,27 @@ export default function ReviewPapers({ user }) {
                 {showModelAnswer && modelAnswerImages.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="text-xs font-semibold text-green-700 sticky top-0 bg-muted/30 py-1">Model Answer (Correct)</h3>
-                    <div className="flex lg:flex-col gap-2 lg:gap-4 overflow-x-auto lg:overflow-x-visible">
+                    <div className="space-y-4">
                       {modelAnswerImages.map((img, idx) => (
-                        <div key={idx} className="relative flex-shrink-0">
-                          <img 
-                            src={`data:image/jpeg;base64,${img}`}
-                            alt={`Model Page ${idx + 1}`}
-                            className="h-40 lg:h-auto lg:w-full rounded-lg shadow-md border-2 border-green-200"
-                          />
+                        <div key={idx} className="relative group">
+                          <div 
+                            className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
+                            onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Model Answer - Page ${idx + 1}` })}
+                          >
+                            <img 
+                              src={`data:image/jpeg;base64,${img}`}
+                              alt={`Model Page ${idx + 1}`}
+                              className="w-full rounded-lg shadow-md border-2 border-green-200"
+                              style={{ minHeight: '400px', objectFit: 'contain' }}
+                            />
+                            {/* Zoom Overlay */}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
+                                <Maximize2 className="w-4 h-4" />
+                                <span className="text-sm font-medium">Click to enlarge</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
