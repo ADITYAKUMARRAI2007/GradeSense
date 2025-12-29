@@ -70,6 +70,12 @@ export default function ReviewPapers({ user }) {
       const response = await axios.get(`${API}/submissions/${submissionId}`);
       setSelectedSubmission(response.data);
       setMobileDetailOpen(true);
+      
+      // Fetch exam to get model answer
+      if (response.data.exam_id) {
+        const examResponse = await axios.get(`${API}/exams/${response.data.exam_id}`);
+        setModelAnswerImages(examResponse.data.model_answer_images || []);
+      }
     } catch (error) {
       toast.error("Failed to load submission details");
     }
