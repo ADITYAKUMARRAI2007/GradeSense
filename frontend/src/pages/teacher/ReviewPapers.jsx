@@ -24,7 +24,10 @@ import {
   RefreshCw,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  ZoomIn,
+  ZoomOut,
+  Maximize2
 } from "lucide-react";
 
 export default function ReviewPapers({ user }) {
