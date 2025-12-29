@@ -457,6 +457,54 @@ export default function ReviewPapers({ user }) {
           </Button>
         </div>
       </div>
+
+      {/* Image Zoom Modal */}
+      <Dialog open={!!zoomedImage} onOpenChange={() => setZoomedImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle>{zoomedImage?.title || "Image Viewer"}</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(100)}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {zoomedImage && (
+              <img 
+                src={zoomedImage.src}
+                alt={zoomedImage.title}
+                className="mx-auto"
+                style={{ 
+                  width: `${imageZoom}%`,
+                  transition: 'width 0.2s'
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 
