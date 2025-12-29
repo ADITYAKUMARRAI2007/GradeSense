@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../..
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Progress } from "../../components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { 
   BarChart, 
   Bar, 
@@ -26,13 +27,16 @@ import {
   ArrowRight,
   AlertTriangle,
   CheckCircle,
-  Lightbulb
+  Lightbulb,
+  X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function StudentDashboard({ user }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedWeakArea, setSelectedWeakArea] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
