@@ -284,12 +284,23 @@ export default function StudentDashboard({ user }) {
                 <CardContent className="p-4 pt-0">
                   <div className="space-y-2">
                     {weakAreas.slice(0, 3).map((area, idx) => (
-                      <div key={idx} className="p-2 bg-white rounded text-sm">
+                      <div 
+                        key={idx} 
+                        className="p-3 bg-white rounded border border-red-200 hover:border-red-300 hover:shadow-sm cursor-pointer transition-all"
+                        onClick={() => {
+                          setSelectedWeakArea(area);
+                          setDialogOpen(true);
+                        }}
+                      >
                         <p className="font-medium text-red-700">{area.question}</p>
                         <p className="text-xs text-red-600">Score: {area.score}</p>
                         {area.feedback && (
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{area.feedback}</p>
                         )}
+                        <p className="text-xs text-primary mt-2 flex items-center gap-1">
+                          <span>Click to learn more</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </p>
                       </div>
                     ))}
                   </div>
