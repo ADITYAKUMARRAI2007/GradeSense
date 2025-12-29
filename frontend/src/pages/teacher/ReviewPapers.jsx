@@ -41,6 +41,8 @@ export default function ReviewPapers({ user }) {
   const [saving, setSaving] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
+  const [showModelAnswer, setShowModelAnswer] = useState(false);
+  const [modelAnswerImages, setModelAnswerImages] = useState([]);
 
   useEffect(() => {
     fetchData();
