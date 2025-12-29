@@ -1261,26 +1261,94 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
 
 # ============== FILE UPLOAD & GRADING ==============
 
+async def extract_student_info_from_paper(file_images: List[str], filename: str) -> tuple:
+    """
+    Extract student ID/roll number and name from the answer paper using AI
+    Returns: (student_id, student_name) or (None, None) if extraction fails
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    
+    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not api_key:
+        return (None, None)
+    
+    try:
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"extract_{uuid.uuid4().hex[:8]}",
+            system_message="""You are an expert at reading handwritten and printed student information from exam papers.
+
+Extract the student's Roll Number/ID and Name from the answer sheet.
+
+Return ONLY a JSON object in this exact format:
+{
+  "student_id": "the roll number or student ID (can be numbers or alphanumeric)",
+  "student_name": "the student's full name"
+}
+
+Important:
+- Student ID can be just numbers (e.g., "123", "2024001") or alphanumeric (e.g., "STU001", "CS-2024-001")
+- Look for labels like "Roll No", "Roll Number", "Student ID", "ID No", "Reg No", etc.
+- Student name is usually written at the top of the page
+- If you cannot find either field, use null
+- Do NOT include any explanation, ONLY return the JSON"""
+        ).with_model("gemini", "gemini-2.5-flash")
+        
+        # Use first page (usually has student info)
+        image_content = ImageContent(image_base64=file_images[0])
+        
+        user_message = UserMessage(
+            text="Extract the student ID/roll number and name from this answer sheet.",
+            images=[image_content]
+        )
+        
+        response = await asyncio.to_thread(chat.send_message, user_message)
+        response_text = response.text.strip()
+        
+        # Parse JSON response
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        import json
+        result = json.loads(response_text)
+        
+        student_id = result.get("student_id")
+        student_name = result.get("student_name")
+        
+        # Basic validation
+        if student_id and student_name:
+            # Clean up
+            student_id = str(student_id).strip()
+            student_name = str(student_name).strip().title()
+            
+            # Validate student ID is not too short or too long
+            if 1 <= len(student_id) <= 30 and len(student_name) >= 2:
+                return (student_id, student_name)
+        
+        return (None, None)
+        
+    except Exception as e:
+        logger.error(f"Error extracting student info from paper: {e}")
+        return (None, None)
+
 def parse_student_from_filename(filename: str) -> tuple:
     """
-    Parse student ID and name from filename
-    Expected format: StudentID_StudentName.pdf (e.g., STU001_John_Doe.pdf)
-    Returns: (student_id, student_name) or (None, None) if parsing fails
+    Parse student name from filename (student ID is now extracted from paper)
+    Optional format: StudentName.pdf or any filename
+    Returns: (None, student_name) - ID will be extracted from paper
     """
     try:
         # Remove .pdf extension
         name_part = filename.replace(".pdf", "").replace(".PDF", "")
         
-        # Split by underscore
-        parts = name_part.split("_", 1)
+        # Clean up the filename to get potential name
+        student_name = name_part.replace("_", " ").replace("-", " ").strip().title()
         
-        if len(parts) == 2:
-            student_id = parts[0].strip()
-            student_name = parts[1].replace("_", " ").strip().title()
-            
-            # Validate student ID: alphanumeric, 3-20 characters
-            if student_id and 3 <= len(student_id) <= 20 and student_id.replace("-", "").isalnum():
-                return (student_id, student_name)
+        # Return None for ID (will be extracted from paper), and cleaned name
+        if student_name and len(student_name) >= 2:
+            return (None, student_name)
         
         return (None, None)
     except Exception as e:
