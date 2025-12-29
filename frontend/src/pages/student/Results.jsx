@@ -26,6 +26,8 @@ export default function StudentResults({ user }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState([]);
   const [showAnnotations, setShowAnnotations] = useState(false);
+  const [showModelAnswer, setShowModelAnswer] = useState(false);
+  const [modelAnswerImages, setModelAnswerImages] = useState([]);
 
   useEffect(() => {
     fetchSubmissions();
