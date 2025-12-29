@@ -16,7 +16,10 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ZoomIn,
+  ZoomOut,
+  Maximize2
 } from "lucide-react";
 
 export default function StudentResults({ user }) {
