@@ -712,17 +712,23 @@ export default function UploadGrade({ user }) {
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-blue-900">Filename Format Required</p>
+                    <p className="text-sm font-medium text-blue-900">✨ Smart Student Identification</p>
                     <p className="text-sm text-blue-800">
-                      Name your files as: <code className="px-2 py-0.5 bg-blue-100 rounded">StudentID_StudentName.pdf</code>
+                      Our AI automatically extracts student ID and name from the answer sheet!
                     </p>
                     <p className="text-xs text-blue-700 mt-2">
-                      Examples: <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs">STU001_John_Doe.pdf</code>, 
-                      <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs ml-1">ROLL42_Alice_Smith.pdf</code>
+                      <strong>Important:</strong> Students must write their <strong>Roll Number/Student ID</strong> and <strong>Name</strong> clearly at the top of their answer sheet.
+                    </p>
+                    <p className="text-xs text-blue-700 mt-2">
+                      <strong>Supported ID formats:</strong><br/>
+                      • Numbers only: <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs">123</code>, <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs">2024001</code><br/>
+                      • Alphanumeric: <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs">STU001</code>, <code className="px-1.5 py-0.5 bg-blue-100 rounded text-xs">CS-2024-42</code>
+                    </p>
+                    <p className="text-xs text-blue-700 mt-2">
+                      📝 <strong>Optional:</strong> You can name files as <code className="px-1.5 py-0.5 bg-blue-100 rounded">StudentName.pdf</code> as a fallback (e.g., <code className="px-1.5 py-0.5 bg-blue-100 rounded">John_Doe.pdf</code>)
                     </p>
                     <p className="text-xs text-blue-700 mt-1">
-                      • Students will be auto-created and added to this exam's batch<br/>
-                      • Student ID must be 3-20 alphanumeric characters
+                      ✓ Students will be auto-created and added to this exam's batch
                     </p>
                   </div>
                 </div>
