@@ -218,46 +218,100 @@ export default function StudentResults({ user }) {
 
                 {/* Two-Panel Layout: Answer Sheet | Questions */}
                 <div className="flex-1 overflow-hidden flex">
-                  {/* Left Panel - Answer Sheet */}
+                  {/* Left Panel - Answer Sheets (Student + Model) */}
                   {selectedSubmission.file_images?.length > 0 && (
                     <ScrollArea className="w-1/2 border-r bg-muted/30 p-4">
                       <div className="space-y-3">
-                        {/* Annotation Toggle */}
-                        <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10">
-                          <h3 className="font-semibold">Your Answer Sheet</h3>
-                          <div className="flex items-center gap-2">
-                            <Checkbox 
-                              id="show-annotations-student"
-                              checked={showAnnotations}
-                              onCheckedChange={setShowAnnotations}
-                            />
-                            <Label htmlFor="show-annotations-student" className="text-xs cursor-pointer flex items-center gap-1">
-                              {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                              Show Mistakes
-                            </Label>
+                        {/* Toggle Controls */}
+                        <div className="sticky top-0 bg-muted/30 py-2 z-10 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold">Answer Sheets</h3>
+                            <div className="flex items-center gap-2">
+                              <Checkbox 
+                                id="show-annotations-student"
+                                checked={showAnnotations}
+                                onCheckedChange={setShowAnnotations}
+                              />
+                              <Label htmlFor="show-annotations-student" className="text-xs cursor-pointer flex items-center gap-1">
+                                {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                Mistakes
+                              </Label>
+                            </div>
                           </div>
+                          
+                          {/* Model Answer Toggle */}
+                          {modelAnswerImages.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <Checkbox 
+                                id="show-model-answer-student"
+                                checked={showModelAnswer}
+                                onCheckedChange={setShowModelAnswer}
+                              />
+                              <Label htmlFor="show-model-answer-student" className="text-xs cursor-pointer flex items-center gap-1 text-green-700">
+                                <FileText className="w-3 h-3" />
+                                Show Model Answer (Correct Solution)
+                              </Label>
+                            </div>
+                          )}
                         </div>
                         
-                        <div className="space-y-4">
-                          {selectedSubmission.file_images.map((img, idx) => (
-                            <div key={idx} className="relative">
-                              <img 
-                                src={`data:image/jpeg;base64,${img}`}
-                                alt={`Page ${idx + 1}`}
-                                className="w-full rounded-lg shadow-md"
-                              />
-                              {/* Annotation Indicator - Side Labels Only */}
-                              {showAnnotations && (
-                                <div className="absolute right-0 top-0 bottom-0 w-12 flex flex-col justify-around py-4">
-                                  {selectedSubmission.question_scores?.map((qs) => {
-                                    const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
-                                    if (scorePercentage < 60) {
-                                      return (
-                                        <div 
-                                          key={qs.question_number}
-                                          className="bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
-                                          title={`Q${qs.question_number}: Needs Review`}
-                                        >
+                        {/* Your Answer */}
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold text-blue-700 border-b pb-1">Your Answer</h4>
+                          <div className="space-y-4">
+                            {selectedSubmission.file_images.map((img, idx) => (
+                              <div key={idx} className="relative">
+                                <img 
+                                  src={`data:image/jpeg;base64,${img}`}
+                                  alt={`Page ${idx + 1}`}
+                                  className="w-full rounded-lg shadow-md"
+                                />
+                                {/* Annotation Indicator */}
+                                {showAnnotations && (
+                                  <div className="absolute right-0 top-0 bottom-0 w-12 flex flex-col justify-around py-4">
+                                    {selectedSubmission.question_scores?.map((qs) => {
+                                      const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
+                                      if (scorePercentage < 60) {
+                                        return (
+                                          <div 
+                                            key={qs.question_number}
+                                            className="bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
+                                            title={`Q${qs.question_number}: Needs Review`}
+                                          >
+                                            <span className="font-bold">Q{qs.question_number}</span>
+                                            <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Model Answer */}
+                        {showModelAnswer && modelAnswerImages.length > 0 && (
+                          <div className="space-y-2 pt-4 border-t-2 border-green-200">
+                            <h4 className="text-sm font-semibold text-green-700 border-b border-green-200 pb-1">Model Answer (Correct)</h4>
+                            <div className="space-y-4">
+                              {modelAnswerImages.map((img, idx) => (
+                                <div key={idx} className="relative">
+                                  <img 
+                                    src={`data:image/jpeg;base64,${img}`}
+                                    alt={`Model Page ${idx + 1}`}
+                                    className="w-full rounded-lg shadow-md border-2 border-green-300"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  )}
                                           <span className="font-bold">Q{qs.question_number}</span>
                                           <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
                                         </div>
