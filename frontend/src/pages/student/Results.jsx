@@ -265,15 +265,28 @@ export default function StudentResults({ user }) {
                           <h4 className="text-sm font-semibold text-blue-700 border-b pb-1">Your Answer</h4>
                           <div className="space-y-4">
                             {selectedSubmission.file_images.map((img, idx) => (
-                              <div key={idx} className="relative">
-                                <img 
-                                  src={`data:image/jpeg;base64,${img}`}
-                                  alt={`Page ${idx + 1}`}
-                                  className="w-full rounded-lg shadow-md"
-                                />
+                              <div key={idx} className="relative group">
+                                <div 
+                                  className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
+                                  onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Your Answer - Page ${idx + 1}` })}
+                                >
+                                  <img 
+                                    src={`data:image/jpeg;base64,${img}`}
+                                    alt={`Page ${idx + 1}`}
+                                    className="w-full rounded-lg shadow-md"
+                                    style={{ minHeight: '500px', objectFit: 'contain' }}
+                                  />
+                                  {/* Zoom Overlay */}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                    <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
+                                      <Maximize2 className="w-4 h-4" />
+                                      <span className="text-sm font-medium">Click to enlarge</span>
+                                    </div>
+                                  </div>
+                                </div>
                                 {/* Annotation Indicator */}
                                 {showAnnotations && (
-                                  <div className="absolute right-0 top-0 bottom-0 w-12 flex flex-col justify-around py-4">
+                                  <div className="absolute right-2 top-2 bottom-2 w-12 flex flex-col justify-around py-2 gap-2">
                                     {selectedSubmission.question_scores?.map((qs) => {
                                       const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
                                       if (scorePercentage < 60) {
