@@ -1013,23 +1013,34 @@ async def bulk_approve_submissions(exam_id: str, user: User = Depends(get_curren
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can approve submissions")
     
-    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Update all submissions for this exam
     result = await db.submissions.update_many(
         {"exam_id": exam_id, "status": {"$ne": "teacher_reviewed"}},
-        {"$set": {
-            "status": "teacher_reviewed",
-            "reviewed_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"$set": {"status": "teacher_reviewed", "is_reviewed": True}}
     )
     
-    return {
-        "message": f"Marked {result.modified_count} submissions as reviewed",
-        "count": result.modified_count
-    }
+    return {"message": f"Approved {result.modified_count} submissions"}
+
+@api_router.put("/submissions/{submission_id}/unapprove")
+async def unapprove_submission(submission_id: str, user: User = Depends(get_current_user)):
+    """Revert a submission back to pending review status"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can unapprove submissions")
+    
+    submission = await db.submissions.find_one({"submission_id": submission_id}, {"_id": 0})
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Update to pending review
+    await db.submissions.update_one(
+        {"submission_id": submission_id},
+        {"$set": {"status": "pending_review", "is_reviewed": False}}
+    )
+    
+    return {"message": "Submission reverted to pending review"}
 
 @api_router.put("/exams/{exam_id}/close")
 async def close_exam(exam_id: str, user: User = Depends(get_current_user)):
