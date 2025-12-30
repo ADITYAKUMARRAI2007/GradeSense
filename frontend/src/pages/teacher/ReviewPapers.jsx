@@ -623,37 +623,14 @@ export default function ReviewPapers({ user }) {
               </CardContent>
             </Card>
           </div>
-
-          {/* Desktop Detail View */}
-          <div className="hidden lg:flex lg:col-span-8 flex-col">
-            {!selectedSubmission ? (
-              <Card className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <FileText className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                  <p className="text-lg font-medium text-muted-foreground">Select a paper to review</p>
-                  <p className="text-sm text-muted-foreground">Click on a submission from the list</p>
-                </div>
-              </Card>
-            ) : (
-              <Card className="flex-1 flex flex-col overflow-hidden">
-                <DetailContent />
-              </Card>
-            )}
-          </div>
         </div>
 
-        {/* Mobile Detail Sheet */}
-        <Sheet open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
-          <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col lg:hidden">
-            <SheetHeader className="p-4 border-b flex-row items-center justify-between">
-              <SheetTitle>Review Paper</SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => setDialogOpen(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </SheetHeader>
+        {/* Review Dialog - Full Screen */}
+        <Dialog open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-[98vw] max-h-[98vh] p-0 flex flex-col">
             {selectedSubmission && <DetailContent />}
-          </SheetContent>
-        </Sheet>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
