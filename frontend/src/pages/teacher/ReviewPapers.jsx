@@ -75,7 +75,7 @@ export default function ReviewPapers({ user }) {
     try {
       const response = await axios.get(`${API}/submissions/${submissionId}`);
       setSelectedSubmission(response.data);
-      setMobileDetailOpen(true);
+      setDialogOpen(true);
       
       // Fetch exam to get model answer
       if (response.data.exam_id) {
