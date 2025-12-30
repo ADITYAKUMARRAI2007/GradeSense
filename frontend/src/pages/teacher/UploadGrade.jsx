@@ -689,7 +689,7 @@ export default function UploadGrade({ user }) {
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>💡 Model Answer is Optional:</strong> You can skip this step if you don't have a model answer. 
+                  <strong>💡 Model Answer is Optional:</strong> You can skip this step if you don&apos;t have a model answer. 
                   The AI will grade based on the question rubrics you defined earlier.
                 </p>
               </div>
