@@ -658,8 +658,6 @@ export default function ReviewPapers({ user }) {
                 </ScrollArea>
               </CardContent>
             </Card>
-          </div>
-        </div>
 
         {/* Review Dialog - Full Screen */}
         <Dialog open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
