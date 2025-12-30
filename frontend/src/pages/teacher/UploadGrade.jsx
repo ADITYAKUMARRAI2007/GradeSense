@@ -741,7 +741,7 @@ export default function UploadGrade({ user }) {
                       📝 <strong>Optional:</strong> You can name files as <code className="px-1.5 py-0.5 bg-blue-100 rounded">StudentName.pdf</code> as a fallback (e.g., <code className="px-1.5 py-0.5 bg-blue-100 rounded">John_Doe.pdf</code>)
                     </p>
                     <p className="text-xs text-blue-700 mt-1">
-                      ✓ Students will be auto-created and added to this exam's batch
+                      ✓ Students will be auto-created and added to this exam&apos;s batch
                     </p>
                   </div>
                 </div>
