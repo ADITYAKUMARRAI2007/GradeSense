@@ -643,11 +643,11 @@ export default function ReviewPapers({ user }) {
         </div>
 
         {/* Mobile Detail Sheet */}
-        <Sheet open={mobileDetailOpen && !!selectedSubmission} onOpenChange={setMobileDetailOpen}>
+        <Sheet open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
           <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col lg:hidden">
             <SheetHeader className="p-4 border-b flex-row items-center justify-between">
               <SheetTitle>Review Paper</SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => setMobileDetailOpen(false)}>
+              <Button variant="ghost" size="icon" onClick={() => setDialogOpen(false)}>
                 <X className="w-4 h-4" />
               </Button>
             </SheetHeader>
