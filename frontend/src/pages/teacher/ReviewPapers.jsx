@@ -175,23 +175,60 @@ export default function ReviewPapers({ user }) {
   const DetailContent = () => (
     <>
       {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
+      <div className="p-4 border-b bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex items-center justify-between mb-3">
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold truncate">{selectedSubmission.student_name}</h3>
+            <h3 className="text-xl font-semibold truncate">{selectedSubmission.student_name}</h3>
             <p className="text-sm text-muted-foreground">
-              Score: {selectedSubmission.total_score} ({selectedSubmission.percentage}%)
+              Score: {selectedSubmission.total_score} / {selectedSubmission.question_scores?.reduce((sum, q) => sum + q.max_marks, 0)} ({selectedSubmission.percentage}%)
             </p>
           </div>
-          <Badge 
-            className={
-              selectedSubmission.status === "teacher_reviewed" 
-                ? "bg-green-100 text-green-700" 
-                : "bg-yellow-100 text-yellow-700"
-            }
+          <div className="flex items-center gap-2">
+            <Badge 
+              className={
+                selectedSubmission.status === "teacher_reviewed" 
+                  ? "bg-green-100 text-green-700" 
+                  : "bg-yellow-100 text-yellow-700"
+              }
+            >
+              {selectedSubmission.status === "teacher_reviewed" ? "Reviewed" : "AI Graded"}
+            </Badge>
+            {modelAnswerImages.length > 0 && (
+              <Button
+                variant={showModelAnswer ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowModelAnswer(!showModelAnswer)}
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                {showModelAnswer ? "Hide" : "Show"} Model Answer
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        {/* Navigation */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigateSubmission("prev")}
+            disabled={currentIndex === 0}
           >
-            {selectedSubmission.status === "teacher_reviewed" ? "Reviewed" : "AI Graded"}
-          </Badge>
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {currentIndex + 1} of {filteredSubmissions.length}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigateSubmission("next")}
+            disabled={currentIndex === filteredSubmissions.length - 1}
+          >
+            Next
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
         </div>
       </div>
 
