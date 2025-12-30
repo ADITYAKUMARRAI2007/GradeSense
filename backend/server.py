@@ -903,8 +903,7 @@ async def upload_more_papers(
     if exam.get("status") == "closed":
         raise HTTPException(status_code=400, detail="Cannot upload papers to closed exam")
     
-    if not exam.get("model_answer_images"):
-        raise HTTPException(status_code=400, detail="Model answer required before uploading papers")
+    # Model answer is now optional - AI can grade without it
     
     submissions = []
     errors = []
