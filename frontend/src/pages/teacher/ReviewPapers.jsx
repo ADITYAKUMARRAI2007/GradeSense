@@ -511,26 +511,25 @@ export default function ReviewPapers({ user }) {
   return (
     <Layout user={user}>
       <div className="space-y-4" data-testid="review-papers-page">
-        {/* Mobile: Stack layout, Desktop: Side-by-side */}
-        <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:h-[calc(100vh-8rem)]">
+        {/* Submissions List - Full Width */}
+        <div className="max-w-7xl mx-auto">
           {/* Submissions List */}
-          <div className="lg:col-span-4 flex flex-col">
-            <Card className="flex-1 flex flex-col">
-              <CardHeader className="p-3 lg:p-4 pb-2 lg:pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base lg:text-lg">Papers to Review</CardTitle>
-                  {filters.exam_id && filteredSubmissions.length > 0 && (
-                    <Button 
-                      onClick={handleBulkApprove}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-xs"
-                      data-testid="bulk-approve-btn"
-                    >
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      Approve All
-                    </Button>
-                  )}
-                </div>
+          <Card className="flex flex-col">
+            <CardHeader className="p-3 lg:p-4 pb-2 lg:pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base lg:text-lg">Papers to Review</CardTitle>
+                {filters.exam_id && filteredSubmissions.length > 0 && (
+                  <Button 
+                    onClick={handleBulkApprove}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-xs"
+                    data-testid="bulk-approve-btn"
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Approve All
+                  </Button>
+                )}
+              </div>
                 
                 {/* Filters */}
                 <div className="space-y-2 mt-2 lg:mt-3">
