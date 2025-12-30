@@ -1718,8 +1718,7 @@ async def upload_student_papers(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    if not exam.get("model_answer_images"):
-        raise HTTPException(status_code=400, detail="Upload model answer first")
+    # Model answer is now optional
     
     # Update exam status
     await db.exams.update_one(
