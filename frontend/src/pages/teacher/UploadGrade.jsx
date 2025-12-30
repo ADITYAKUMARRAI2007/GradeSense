@@ -694,11 +694,11 @@ export default function UploadGrade({ user }) {
                 </Button>
                 <Button 
                   onClick={handleUploadModelAnswer} 
-                  disabled={!modelAnswerFile || loading}
+                  disabled={loading}
                   data-testid="upload-model-btn"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Upload & Continue
+                  {modelAnswerFile ? "Upload & Continue" : "Skip & Continue"}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
