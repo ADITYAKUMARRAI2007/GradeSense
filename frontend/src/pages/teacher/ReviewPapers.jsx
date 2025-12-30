@@ -43,7 +43,7 @@ export default function ReviewPapers({ user }) {
     search: ""
   });
   const [saving, setSaving] = useState(false);
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
