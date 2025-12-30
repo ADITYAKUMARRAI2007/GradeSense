@@ -43,6 +43,7 @@ export default function ReviewPapers({ user }) {
     batch_id: "",
     search: ""
   });
+  const [searchInput, setSearchInput] = useState(""); // Separate state for input
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
