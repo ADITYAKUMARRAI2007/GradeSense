@@ -233,7 +233,14 @@ export default function UploadGrade({ user }) {
   };
 
   const handleUploadModelAnswer = async () => {
-    if (!modelAnswerFile || !examId) return;
+    if (!examId) return;
+    
+    // If no model answer, just move to next step
+    if (!modelAnswerFile) {
+      setStep(5);
+      toast.info("Proceeding without model answer. AI will grade based on question rubrics.");
+      return;
+    }
     
     setLoading(true);
     try {
