@@ -1535,8 +1535,8 @@ async def grade_with_ai(
 GRADING MODE: {grading_mode.upper()}
 {grading_instruction}
 
-You will receive the model answer and student answer as images.
-Grade each question and provide detailed feedback.
+You will receive student answer images {'and model answer images for reference' if model_answer_images else ''}.
+Grade each question based on the rubric and provide detailed feedback.
 
 Return your response in this exact JSON format:
 {{
@@ -1555,7 +1555,7 @@ Return your response in this exact JSON format:
 
 If a question has no sub-questions, leave sub_scores as an empty array.
 """
-    ).with_model("gemini", "gemini-3-flash-preview")
+    ).with_model("openai", "gpt-4o")
     
     # Prepare question details with sub-questions
     questions_text = ""
@@ -1576,16 +1576,18 @@ If a question has no sub-questions, leave sub_scores as an empty array.
     # Create image contents list
     all_images = []
     
-    # Add model answer images
-    for i, img in enumerate(model_answer_images[:3]):
-        all_images.append(ImageContent(image_base64=img))
+    # Add model answer images if provided (now optional)
+    if model_answer_images:
+        for i, img in enumerate(model_answer_images[:3]):
+            all_images.append(ImageContent(image_base64=img))
     
     # Add student answer images
     for i, img in enumerate(images[:5]):
         all_images.append(ImageContent(image_base64=img))
     
-    user_message = UserMessage(
-        text=f"""Grade this student's handwritten answer paper.
+    # Construct prompt based on whether model answer is available
+    if model_answer_images:
+        prompt_text = f"""Grade this student's handwritten answer paper.
 
 Questions to grade:
 {questions_text}
@@ -1595,7 +1597,25 @@ The remaining images show the STUDENT'S ANSWER PAPER.
 
 IMPORTANT: Apply {grading_mode.upper()} grading mode as instructed.
 Please grade each question and provide constructive feedback.
-Return valid JSON only.""",
+Return valid JSON only."""
+    else:
+        prompt_text = f"""Grade this student's handwritten answer paper WITHOUT a model answer.
+
+Questions to grade:
+{questions_text}
+
+The images show the STUDENT'S ANSWER PAPER.
+
+IMPORTANT: 
+- Apply {grading_mode.upper()} grading mode as instructed.
+- Use the provided rubrics and your knowledge to assess correctness.
+- Focus on conceptual understanding, calculation accuracy, and completeness.
+- Provide constructive feedback to help the student improve.
+
+Return valid JSON only."""
+    
+    user_message = UserMessage(
+        text=prompt_text,
         file_contents=all_images
     )
     
