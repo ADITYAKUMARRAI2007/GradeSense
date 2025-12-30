@@ -1304,7 +1304,7 @@ Important:
 - Student name is usually written at the top of the page
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("openai", "gpt-4o")
         
         # Use first page (usually has student info)
         image_content = ImageContent(image_base64=file_images[0])
