@@ -687,6 +687,12 @@ export default function UploadGrade({ user }) {
                 )}
               </div>
 
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>💡 Model Answer is Optional:</strong> You can skip this step if you don't have a model answer. 
+                  The AI will grade based on the question rubrics you defined earlier.
+                </p>
+              </div>
               <div className="flex justify-between pt-4">
                 <Button variant="outline" onClick={() => setStep(3)}>
                   <ArrowLeft className="w-4 h-4 mr-2" />
