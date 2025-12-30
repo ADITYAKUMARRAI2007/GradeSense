@@ -245,9 +245,6 @@ export default function ReviewPapers({ user }) {
                 <span className="sm:hidden">Model</span>
               </Button>
             )}
-                {showModelAnswer ? "Hide" : "Show"} Model Answer
-              </Button>
-            )}
           </div>
         </div>
         
