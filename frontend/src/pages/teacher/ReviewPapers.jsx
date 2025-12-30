@@ -129,7 +129,14 @@ export default function ReviewPapers({ user }) {
   };
 
   const filteredSubmissions = submissions.filter(s => {
+    // Filter by batch
+    if (filters.batch_id) {
+      const exam = exams.find(e => e.exam_id === s.exam_id);
+      if (!exam || exam.batch_id !== filters.batch_id) return false;
+    }
+    // Filter by exam
     if (filters.exam_id && s.exam_id !== filters.exam_id) return false;
+    // Filter by search
     if (filters.search && !s.student_name.toLowerCase().includes(filters.search.toLowerCase())) return false;
     return true;
   });
