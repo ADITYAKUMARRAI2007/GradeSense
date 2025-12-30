@@ -56,6 +56,14 @@ export default function ReviewPapers({ user }) {
     fetchData();
   }, []);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const fetchData = async () => {
     try {
       const [submissionsRes, examsRes, batchesRes] = await Promise.all([
