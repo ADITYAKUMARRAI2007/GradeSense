@@ -651,8 +651,8 @@ export default function UploadGrade({ user }) {
         {step === 4 && (
           <Card className="animate-fade-in">
             <CardHeader>
-              <CardTitle>Step 4: Upload Model Answer</CardTitle>
-              <CardDescription>Upload the reference answer sheet for AI grading</CardDescription>
+              <CardTitle>Step 4: Upload Model Answer (Optional)</CardTitle>
+              <CardDescription>Upload the reference answer sheet for AI grading, or skip to use question rubrics only</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div 
