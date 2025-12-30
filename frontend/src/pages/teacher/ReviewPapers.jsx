@@ -173,6 +173,28 @@ export default function ReviewPapers({ user }) {
     ? filteredSubmissions.findIndex(s => s.submission_id === selectedSubmission.submission_id)
     : -1;
 
+  const handleUnapprove = async () => {
+    if (!selectedSubmission) return;
+    
+    try {
+      await axios.put(`${API}/submissions/${selectedSubmission.submission_id}/unapprove`);
+      toast.success("Submission reverted to pending review");
+      
+      // Refresh data
+      await fetchData();
+      
+      // Update current submission
+      setSelectedSubmission(prev => ({
+        ...prev,
+        status: "pending_review",
+        is_reviewed: false
+      }));
+    } catch (error) {
+      console.error("Unapprove error:", error);
+      toast.error(error.response?.data?.detail || "Failed to unapprove");
+    }
+  };
+
   const navigatePaper = (direction) => {
     const newIndex = currentIndex + direction;
     if (newIndex >= 0 && newIndex < filteredSubmissions.length) {
