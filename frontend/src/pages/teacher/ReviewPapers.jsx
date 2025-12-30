@@ -658,14 +658,15 @@ export default function ReviewPapers({ user }) {
                 </ScrollArea>
               </CardContent>
             </Card>
+          </div>
 
-        {/* Review Dialog - Full Screen */}
-        <Dialog open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-[98vw] max-h-[98vh] p-0 flex flex-col">
-            {selectedSubmission && <DetailContent />}
-          </DialogContent>
-        </Dialog>
-      </div>
-    </Layout>
-  );
-}
+          {/* Review Dialog - Full Screen */}
+          <Dialog open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
+            <DialogContent className="max-w-[98vw] max-h-[98vh] p-0 flex flex-col">
+              {selectedSubmission && <DetailContent />}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </Layout>
+    );
+  }
