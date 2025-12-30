@@ -237,7 +237,7 @@ export default function UploadGrade({ user }) {
     
     // If no model answer, just move to next step
     if (!modelAnswerFile) {
-      setCurrentStep(5);
+      setStep(5);
       toast.info("Proceeding without model answer. AI will grade based on question rubrics.");
       return;
     }
@@ -252,7 +252,7 @@ export default function UploadGrade({ user }) {
       });
       
       toast.success("Model answer uploaded successfully");
-      setCurrentStep(5);
+      setStep(5);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to upload model answer");
