@@ -581,6 +581,26 @@ export default function ReviewPapers({ user }) {
                       data-testid="search-input"
                     />
                   </div>
+                  
+                  {/* Batch Filter */}
+                  <Select 
+                    value={filters.batch_id || "all"} 
+                    onValueChange={(v) => setFilters(prev => ({ ...prev, batch_id: v === "all" ? "" : v, exam_id: "" }))}
+                  >
+                    <SelectTrigger data-testid="batch-filter" className="text-sm">
+                      <SelectValue placeholder="Filter by batch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Batches</SelectItem>
+                      {batches.map(batch => (
+                        <SelectItem key={batch.batch_id} value={batch.batch_id}>
+                          {batch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Exam Filter */}
                   <Select 
                     value={filters.exam_id || "all"} 
                     onValueChange={(v) => setFilters(prev => ({ ...prev, exam_id: v === "all" ? "" : v }))}
@@ -590,11 +610,13 @@ export default function ReviewPapers({ user }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Exams</SelectItem>
-                      {exams.map(exam => (
-                        <SelectItem key={exam.exam_id} value={exam.exam_id}>
-                          {exam.exam_name}
-                        </SelectItem>
-                      ))}
+                      {exams
+                        .filter(exam => !filters.batch_id || exam.batch_id === filters.batch_id)
+                        .map(exam => (
+                          <SelectItem key={exam.exam_id} value={exam.exam_id}>
+                            {exam.exam_name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
