@@ -72,7 +72,7 @@ export default function ReviewPapers({ user }) {
     }
   };
 
-  const fetchSubmissionDetails = async (submissionId) => {
+  const fetchSubmissionDetails = useCallback(async (submissionId) => {
     try {
       const response = await axios.get(`${API}/submissions/${submissionId}`);
       setSelectedSubmission(response.data);
@@ -86,7 +86,7 @@ export default function ReviewPapers({ user }) {
     } catch (error) {
       toast.error("Failed to load submission details");
     }
-  };
+  }, []);
 
   const handleSaveChanges = async () => {
     if (!selectedSubmission) return;
