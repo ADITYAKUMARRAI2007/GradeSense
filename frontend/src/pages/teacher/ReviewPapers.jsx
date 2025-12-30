@@ -211,7 +211,7 @@ export default function ReviewPapers({ user }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigateSubmission("prev")}
+            onClick={() => navigatePaper(-1)}
             disabled={currentIndex === 0}
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
@@ -223,7 +223,7 @@ export default function ReviewPapers({ user }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigateSubmission("next")}
+            onClick={() => navigatePaper(1)}
             disabled={currentIndex === filteredSubmissions.length - 1}
           >
             Next
