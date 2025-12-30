@@ -237,23 +237,24 @@ export default function UploadGrade({ user }) {
     
     // If no model answer, just move to next step
     if (!modelAnswerFile) {
-      setStep(5);
+      setCurrentStep(4);
       toast.info("Proceeding without model answer. AI will grade based on question rubrics.");
       return;
     }
     
     setLoading(true);
     try {
-      const formDataObj = new FormData();
-      formDataObj.append("file", modelAnswerFile);
+      const formData = new FormData();
+      formData.append("file", modelAnswerFile);
       
-      await axios.post(`${API}/exams/${examId}/upload-model-answer`, formDataObj, {
+      await axios.post(`${API}/exams/${examId}/model-answer`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
-      toast.success("Model answer uploaded");
-      setStep(5);
+      toast.success("Model answer uploaded successfully");
+      setCurrentStep(4);
     } catch (error) {
+      console.error("Error:", error);
       toast.error("Failed to upload model answer");
     } finally {
       setLoading(false);
