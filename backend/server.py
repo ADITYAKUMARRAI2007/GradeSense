@@ -1720,7 +1720,7 @@ If there are no errors, leave error_annotations as an empty array.
     
     # Construct prompt based on whether model answer is available
     if model_answer_images:
-        prompt_text = f"""Grade this student's handwritten answer paper.
+        prompt_text = f"""Grade this student's handwritten answer paper CONSISTENTLY and DETERMINISTICALLY.
 
 Questions to grade:
 {questions_text}
@@ -1728,22 +1728,32 @@ Questions to grade:
 The first {min(len(model_answer_images), 3)} image(s) show the MODEL ANSWER (reference).
 The remaining images show the STUDENT'S ANSWER PAPER.
 
-IMPORTANT: Apply {grading_mode.upper()} grading mode as instructed.
+CRITICAL GRADING REQUIREMENTS:
+1. Apply {grading_mode.upper()} grading mode strictly
+2. Use EXACT same criteria for identical answers
+3. Be DETERMINISTIC - same answer = same score ALWAYS
+4. Give precise numerical scores (use decimals like 8.5, not ranges)
+5. Apply consistent partial credit rules
+
 Please grade each question and provide constructive feedback.
 Return valid JSON only."""
     else:
-        prompt_text = f"""Grade this student's handwritten answer paper WITHOUT a model answer.
+        prompt_text = f"""Grade this student's handwritten answer paper CONSISTENTLY and DETERMINISTICALLY WITHOUT a model answer.
 
 Questions to grade:
 {questions_text}
 
 The images show the STUDENT'S ANSWER PAPER.
 
-IMPORTANT: 
-- Apply {grading_mode.upper()} grading mode as instructed.
-- Use the provided rubrics and your knowledge to assess correctness.
-- Focus on conceptual understanding, calculation accuracy, and completeness.
-- Provide constructive feedback to help the student improve.
+CRITICAL GRADING REQUIREMENTS:
+1. Apply {grading_mode.upper()} grading mode strictly
+2. Use EXACT same criteria for identical answers
+3. Be DETERMINISTIC - same answer = same score ALWAYS  
+4. Give precise numerical scores (use decimals like 8.5, not ranges)
+5. Apply consistent partial credit rules
+6. Use the provided rubrics and your knowledge to assess correctness
+7. Focus on conceptual understanding, calculation accuracy, and completeness
+8. Provide constructive feedback to help the student improve
 
 Return valid JSON only."""
     
