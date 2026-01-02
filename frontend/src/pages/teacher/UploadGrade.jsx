@@ -247,7 +247,7 @@ export default function UploadGrade({ user }) {
       const formData = new FormData();
       formData.append("file", modelAnswerFile);
       
-      await axios.post(`${API}/exams/${examId}/model-answer`, formData, {
+      await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
@@ -255,7 +255,7 @@ export default function UploadGrade({ user }) {
       setStep(5);
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Failed to upload model answer");
+      toast.error(error.response?.data?.detail || "Failed to upload model answer");
     } finally {
       setLoading(false);
     }
