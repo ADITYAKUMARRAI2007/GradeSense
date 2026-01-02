@@ -814,15 +814,15 @@ export default function ClassReports({ user }) {
                   </div>
                 )}
                 
-                {/* Worst Questions */}
-                {studentDeepDive.worst_questions?.length > 0 && (
+                {/* Worst Questions - Only show if student has weak areas */}
+                {studentDeepDive.worst_questions?.filter(q => q.percentage < 60).length > 0 ? (
                   <div>
                     <h4 className="font-semibold mb-3 flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-red-600" />
-                      Weakest Areas
+                      Areas Needing Improvement
                     </h4>
                     <div className="space-y-3">
-                      {studentDeepDive.worst_questions.map((q, idx) => (
+                      {studentDeepDive.worst_questions.filter(q => q.percentage < 60).map((q, idx) => (
                         <div key={idx} className="p-3 border rounded-lg bg-red-50/50">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium">{q.exam_name} - Q{q.question_number}</span>
@@ -839,6 +839,12 @@ export default function ClassReports({ user }) {
                         </div>
                       ))}
                     </div>
+                  </div>
+                ) : studentDeepDive.overall_average >= 60 && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                    <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                    <p className="font-medium text-green-800">Great Performance!</p>
+                    <p className="text-sm text-green-600">This student is doing well across all areas.</p>
                   </div>
                 )}
                 
