@@ -771,3 +771,76 @@ agent_communication:
 
     - agent: "main"
       message: "RESIZABLE PANELS COMPLETE: Implemented drag-to-resize panels in the teacher Review Papers page. Desktop view now uses react-resizable-panels with Left Panel (55% default) for answer sheets and Right Panel (45% default) for questions/feedback. Teachers can drag the resize handle to adjust panel sizes (30%-70% range). Mobile view remains unchanged with stacked layout. Need testing with teacher auth to verify: 1) Resize handle appears and is draggable 2) Panel sizes adjust smoothly 3) Content scrolls correctly in both panels 4) Mobile view doesn't show resize handle"
+
+  - task: "Enhanced Analytics - Common Misconceptions (Why Engine)"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: Common Misconceptions analysis with AI-powered insights. Backend endpoint GET /api/analytics/misconceptions returns question_insights (fail rates, wrong answers), misconceptions list, and AI analysis (confusion patterns, recommendations). Frontend shows clickable question cards with fail rates, sample wrong answers, and AI insights panel. Click on question reveals detailed breakdown with student feedback snippets."
+
+  - task: "Enhanced Analytics - Topic Mastery Heatmap"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: Topic Mastery Heatmap with color-coded grid. Backend endpoint GET /api/analytics/topic-mastery returns topics with avg_percentage, level (mastered/developing/critical), color (green/amber/red), and students_by_topic mapping. Frontend displays grid with hover tooltips showing struggling students. Legend shows: Green (>=70%), Amber (50-69%), Red (<50%)."
+
+  - task: "Enhanced Analytics - Student Deep Dive Modal"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: Student Deep Dive modal. Backend endpoint GET /api/analytics/student-deep-dive/{student_id} returns worst_questions, performance_trend, and AI analysis (summary, recommendations, concepts_to_review). Click on student name in Top Performers or Needs Attention opens modal with overview stats, AI-generated analysis, weakest areas breakdown, and performance trend chart."
+
+  - task: "Enhanced Analytics - Generate Review Packet"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: AI-powered review packet generation. Backend endpoint POST /api/analytics/generate-review-packet generates 5 practice questions targeting weak areas. Frontend shows 'Generate Review Packet' button in Quick Actions, opens modal with generated questions (marks, difficulty, hints), and allows download as text file."
+
+  - task: "ManageExams - Extract Questions & Topic Inference"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ManageExams.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: AI Tools section in ManageExams. 1) Extract Questions from Model Answer button - calls POST /api/exams/{exam_id}/extract-questions 2) Auto-Infer Topic Tags button - calls POST /api/exams/{exam_id}/infer-topics. Questions section now shows topic_tags badges. Topic tags stored in questions array."
+
+    - agent: "main"
+      message: "ADVANCED ANALYTICS IMPLEMENTATION COMPLETE: Implemented comprehensive analytics enhancements including: 1) Why Engine - Common Misconceptions with AI analysis showing confusion patterns 2) Topic Mastery Heatmap with color-coded grid and hover tooltips 3) Student Deep Dive modal with AI-generated insights and recommendations 4) Generate Review Packet button for AI-created practice questions 5) AI Tools section in ManageExams for question extraction and topic inference. All features use GPT-4o via Emergent LLM Key. Need comprehensive testing with teacher authentication."
