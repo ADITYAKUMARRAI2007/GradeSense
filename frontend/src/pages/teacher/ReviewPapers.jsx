@@ -663,6 +663,110 @@ export default function ReviewPapers({ user }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AI Feedback Dialog */}
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-orange-500" />
+              Improve AI Grading
+            </DialogTitle>
+          </DialogHeader>
+          
+          {feedbackQuestion && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium mb-1">Question {feedbackQuestion.question_number}</p>
+                {feedbackQuestion.question_text && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{feedbackQuestion.question_text}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">AI Grade</Label>
+                  <div className="p-2 bg-muted rounded text-center font-medium">
+                    {feedbackQuestion.obtained_marks} / {feedbackQuestion.max_marks}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">Your Expected Grade</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    max={feedbackQuestion.max_marks}
+                    step="0.5"
+                    value={feedbackForm.teacher_expected_grade}
+                    onChange={(e) => setFeedbackForm(prev => ({ ...prev, teacher_expected_grade: e.target.value }))}
+                    className="text-center"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs">AI's Feedback</Label>
+                <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground max-h-20 overflow-y-auto">
+                  {feedbackQuestion.ai_feedback || "No AI feedback available"}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs">Feedback Type</Label>
+                <Select 
+                  value={feedbackForm.feedback_type}
+                  onValueChange={(v) => setFeedbackForm(prev => ({ ...prev, feedback_type: v }))}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="question_grading">Grading Issue</SelectItem>
+                    <SelectItem value="correction">AI Mistake</SelectItem>
+                    <SelectItem value="general_suggestion">General Suggestion</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Your Correction / Feedback *</Label>
+                <Textarea 
+                  value={feedbackForm.teacher_correction}
+                  onChange={(e) => setFeedbackForm(prev => ({ ...prev, teacher_correction: e.target.value }))}
+                  placeholder="Explain what the AI got wrong and how it should grade this type of answer..."
+                  rows={3}
+                  className="text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your feedback helps train the AI to grade more accurately.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setFeedbackDialogOpen(false)}
+                  disabled={submittingFeedback}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmitFeedback}
+                  disabled={submittingFeedback || !feedbackForm.teacher_correction.trim()}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  {submittingFeedback ? (
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Submit Feedback
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 
