@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-12-28T16:41:19.138695",
-  "total_tests": 81,
-  "passed_tests": 81,
+  "timestamp": "2026-01-02T05:15:38.888270",
+  "total_tests": 97,
+  "passed_tests": 97,
   "success_rate": 100.0,
   "test_details": [
     {
@@ -175,7 +175,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU164116)",
+      "test": "Create Student with Valid ID (STU051536)",
       "success": true,
       "details": ""
     },
@@ -217,20 +217,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_438f6d363ed9 found in batch batch_94bb68cb"
+      "details": "Student user_29a3c3c8d994 found in batch batch_a9068503"
     },
     {
-      "test": "Create Student with Format STU1641161 (John Doe)",
+      "test": "Create Student with Format STU0515361 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL164116 (Alice Smith)",
+      "test": "Create Student with Format ROLL051536 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A164116 (Bob Jones)",
+      "test": "Create Student with Format A051536 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -408,6 +408,86 @@
       "test": "P1: Essential Fields Preservation",
       "success": true,
       "details": "All essential submission fields preserved"
+    },
+    {
+      "test": "Submit Question-Specific Feedback",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Feedback ID Generation",
+      "success": true,
+      "details": "Generated feedback_id: feedback_81b925dc"
+    },
+    {
+      "test": "Submit General Feedback",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "General Feedback ID Generation",
+      "success": true,
+      "details": "Generated feedback_id: feedback_acee1e4b"
+    },
+    {
+      "test": "Submit Feedback Without Auth (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submit Feedback Missing Required Fields (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submit Feedback Invalid Type",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get My Feedback Submissions",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Feedback Response Structure",
+      "success": true,
+      "details": "Retrieved 3 feedback submissions"
+    },
+    {
+      "test": "Feedback Structure Validation",
+      "success": true,
+      "details": "All required fields present"
+    },
+    {
+      "test": "Submit Grading Issue Feedback",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submit AI Mistake Feedback",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submit General Suggestion Feedback",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Complete Workflow - All Feedback Types",
+      "success": true,
+      "details": "Successfully submitted 3 different feedback types"
+    },
+    {
+      "test": "Verify Feedback Storage",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Feedback Storage Verification",
+      "success": true,
+      "details": "All 3 feedback submissions stored correctly"
     }
   ]
 }
