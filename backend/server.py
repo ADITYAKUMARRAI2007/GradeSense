@@ -2865,7 +2865,7 @@ async def infer_question_topics(
     subject_name = subject.get("name", "General") if subject else "General"
     
     try:
-        from emergentintegrations.llm.chat import get_text_simple
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
         
         # Build question data
@@ -2897,14 +2897,15 @@ Return as JSON:
 
 Only return the JSON object."""
 
-        ai_response = await asyncio.to_thread(
-            get_text_simple,
-            emergent_api_key=llm_key,
-            llm_type="openai",
-            model_id="gpt-4o",
-            prompt=inference_prompt,
-            temperature=0.3
-        )
+        chat = LlmChat(
+            api_key=llm_key,
+            session_id=f"infer_topics_{uuid.uuid4().hex[:8]}",
+            system_message="You are an expert at analyzing exam questions and categorizing them by topic."
+        ).with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(text=inference_prompt)
+        response = await asyncio.to_thread(chat.send_message, user_message)
+        ai_response = response.text.strip()
         
         import json
         try:
