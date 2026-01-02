@@ -122,6 +122,13 @@ class SubQuestionScore(BaseModel):
     obtained_marks: float
     ai_feedback: str
 
+class ErrorAnnotation(BaseModel):
+    error_type: str  # calculation_error, conceptual_error, incomplete, spelling, formatting
+    description: str
+    severity: str  # minor, moderate, major
+    page: int = 1
+    region: str = "middle"  # top, middle, bottom
+
 class QuestionScore(BaseModel):
     question_number: int
     max_marks: float
@@ -130,6 +137,8 @@ class QuestionScore(BaseModel):
     teacher_comment: Optional[str] = None
     is_reviewed: bool = False
     sub_scores: List[SubQuestionScore] = []  # For sub-question scores
+    error_annotations: List[dict] = []  # Error locations for visual annotations
+    question_text: Optional[str] = None  # The question text
 
 class Submission(BaseModel):
     model_config = ConfigDict(extra="ignore")
