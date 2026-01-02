@@ -331,6 +331,74 @@ backend:
           agent: "testing"
           comment: "✅ AUTO-NOTIFICATION CREATION VERIFIED: Successfully tested auto-notification creation during re-evaluation request workflow. Re-evaluation request creation successfully triggers teacher notification with type 're_evaluation_request'. Notification count increases correctly after re-evaluation events. Auto-notification system working as expected for key application events."
 
+  - task: "Editable AI Feedback and Teacher Comment Textareas"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P1 USER VERIFICATION REQUIRED: Previous agent implemented fix to make AI Feedback and Teacher Comment textareas editable in ReviewPapers.jsx. User reported textareas were not editable. Agent ensured value and onChange props are correctly wired via updateQuestionScore handler. Root cause suspected to be unstable nested DetailContent component. Need user to test: 1) Open ReviewPapers page 2) Select a submission 3) Try typing in 'AI Feedback' textarea 4) Try typing in 'Teacher Comment' textarea 5) Report if textareas accept input or remain read-only."
+
+  - task: "Visual Annotations for Error Highlighting"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P2 USER VERIFICATION REQUIRED: Previous agent implemented visual annotation feature to display red boxes over student errors on answer sheet images. Backend: Updated AI grading prompt to request error coordinates (x, y, width, height as percentages). Frontend: Added rendering logic in ReviewPapers.jsx to overlay red boxes on student answer images. Need user to: 1) Grade a NEW paper (not previously graded) 2) Open ReviewPapers page 3) View the student's answer sheet 4) Check if red boxes appear over errors 5) Report if annotations are visible and accurately positioned."
+
+  - task: "Topic Mastery Heatmap Interactivity"
+    implemented: true
+    working: false
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "P1 ANALYTICS BUG: User reported Topic Mastery Heatmap is not interactive and shows question text instead of actual topics. User wants: 1) Heatmap to display actual topic names (not questions) 2) Topics to be clickable 3) Clicking a topic should show which students are struggling with which questions in that topic. Current implementation: Backend endpoint /api/analytics/topic-mastery returns topics with percentages and colors. Frontend shows basic grid. Needs: 1) Backend to properly aggregate by topic_tags 2) Frontend to render clickable topic blocks 3) TopicDetailModal to show struggling students per topic."
+
+  - task: "Student Deep-Dive Modal Logic Fix"
+    implemented: true
+    working: false
+    files:
+        - "/app/backend/server.py"
+        - "/app/frontend/src/pages/teacher/ClassReports.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "P1 ANALYTICS BUG: User reported Student Deep-Dive modal incorrectly shows weak areas for ALL students, even top performers. Also has scrolling issue cutting off content. Agent fixed scrolling with overflow-y-auto. Still need to: 1) Fix backend logic in /api/analytics/student-deep-dive/{student_id} to only return weak areas if student is actually underperforming 2) Update modal to conditionally display sections based on student performance level 3) Ensure top performers show strengths, not weaknesses."
+
+  - task: "Class Insights Page Enhancement"
+    implemented: true
+    working: false
+    files:
+        - "/app/frontend/src/pages/teacher/ClassInsights.jsx"
+    stuck_count: 1
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "P1 ANALYTICS UX: User finds Class Insights page 'bland' and not interactive. Need to enhance with: 1) More visual elements (charts, graphs) 2) Interactive components (clickable cards, expandable sections) 3) Better data visualization 4) Action-oriented UI elements. Current implementation shows static text-based insights."
+
 frontend:
   - task: "Student Dashboard with Real Analytics"
     implemented: true
