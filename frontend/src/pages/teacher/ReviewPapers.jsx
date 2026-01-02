@@ -484,10 +484,10 @@ export default function ReviewPapers({ user }) {
       </div>
 
       {/* Desktop: Resizable Panels */}
-      <div className="hidden lg:flex flex-1 overflow-hidden">
-        <PanelGroup direction="horizontal" className="w-full">
+      <div className="hidden lg:flex flex-1 overflow-hidden" style={{ height: 'calc(100% - 60px)' }}>
+        <PanelGroup direction="horizontal" className="h-full">
           {/* Left Panel - Answer Sheets */}
-          <Panel defaultSize={55} minSize={30} maxSize={70}>
+          <Panel defaultSize={55} minSize={30} maxSize={70} className="h-full">
             <div className="h-full overflow-auto bg-muted/30 p-4">
               {selectedSubmission.file_images?.length > 0 ? (
                 <div className="space-y-3">
