@@ -745,14 +745,24 @@ export default function ReviewPapers({ user }) {
                       </div>
                     </div>
 
-                    {/* Full Question Text */}
-                    {qs.question_text && (
-                      <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary">
-                        <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">
-                          <strong>Q{qs.question_number}.</strong> {qs.question_text}
-                        </p>
-                      </div>
-                    )}
+                    {/* Full Question Text - from exam questions or submission */}
+                    {(() => {
+                      const examQuestion = examQuestions.find(q => q.question_number === qs.question_number);
+                      const questionText = qs.question_text || examQuestion?.rubric || examQuestion?.question_text;
+                      return questionText ? (
+                        <div className="mb-3 p-2 bg-blue-50 rounded border-l-4 border-blue-500">
+                          <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">
+                            <strong className="text-blue-700">Q{qs.question_number}:</strong> {questionText}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-muted-foreground">
+                          <p className="text-xs text-muted-foreground italic">
+                            Question text not available. Check question paper or model answer.
+                          </p>
+                        </div>
+                      );
+                    })()}
 
                     <div className="space-y-2 lg:space-y-3">
                       <div>
