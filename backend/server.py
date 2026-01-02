@@ -1888,16 +1888,29 @@ async def upload_student_papers(
             
             # Fallback to filename if AI extraction fails
             if not student_id or not student_name:
-                _, filename_name = parse_student_from_filename(file.filename)
+                filename_id, filename_name = parse_student_from_filename(file.filename)
+                
+                # Use filename ID if AI didn't find it
+                if not student_id and filename_id:
+                    student_id = filename_id
+                
+                # Use filename name if AI didn't find it
+                if not student_name and filename_name:
+                    student_name = filename_name
+                
+                # If still no ID or name, report error
                 if not student_id and not student_name:
                     errors.append({
                         "filename": file.filename,
-                        "error": "Could not extract student ID/name from paper. Please ensure student writes their roll number and name clearly."
+                        "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
                     })
                     continue
-                # Use filename name if we have it
-                if filename_name and not student_name:
-                    student_name = filename_name
+                
+                # If we have one but not the other, use what we have
+                if not student_id:
+                    student_id = f"AUTO_{uuid.uuid4().hex[:6]}"
+                if not student_name:
+                    student_name = f"Student {student_id}"
             
             # Get or create student
             user_id, error = await get_or_create_student(
