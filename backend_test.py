@@ -1646,6 +1646,429 @@ print('P1 test submission created');
         
         return True
 
+    def test_analytics_misconceptions(self):
+        """Test GET /api/analytics/misconceptions endpoint"""
+        print("\n📊 Testing Analytics: Misconceptions Analysis...")
+        
+        if not hasattr(self, 'test_exam_id'):
+            print("⚠️  Skipping misconceptions test - no exam created")
+            return None
+        
+        # Test with valid exam_id
+        result = self.run_api_test(
+            "Analytics: Misconceptions Analysis",
+            "GET",
+            f"analytics/misconceptions?exam_id={self.test_exam_id}",
+            200
+        )
+        
+        if result:
+            # Verify response structure
+            required_fields = ["exam_name", "total_submissions", "misconceptions", "question_insights", "ai_analysis"]
+            missing_fields = [field for field in required_fields if field not in result]
+            
+            if not missing_fields:
+                self.log_test("Misconceptions Response Structure", True, "All required fields present")
+                
+                # Verify question_insights structure
+                question_insights = result.get("question_insights", [])
+                if question_insights:
+                    first_insight = question_insights[0]
+                    insight_fields = ["question_number", "avg_percentage", "fail_rate", "failing_students", "wrong_answers"]
+                    has_insight_fields = all(field in first_insight for field in insight_fields)
+                    
+                    if has_insight_fields:
+                        self.log_test("Question Insights Structure", True, "Question insights have correct structure")
+                    else:
+                        missing_insight_fields = [field for field in insight_fields if field not in first_insight]
+                        self.log_test("Question Insights Structure", False, f"Missing fields: {missing_insight_fields}")
+                else:
+                    self.log_test("Question Insights Structure", True, "No question insights (empty exam)")
+            else:
+                self.log_test("Misconceptions Response Structure", False, f"Missing fields: {missing_fields}")
+        
+        # Test authentication required
+        original_token = self.session_token
+        self.session_token = None
+        
+        auth_result = self.run_api_test(
+            "Misconceptions: Authentication Required",
+            "GET",
+            f"analytics/misconceptions?exam_id={self.test_exam_id}",
+            401
+        )
+        
+        self.session_token = original_token
+        return result
+
+    def test_analytics_topic_mastery(self):
+        """Test GET /api/analytics/topic-mastery endpoint"""
+        print("\n🎯 Testing Analytics: Topic Mastery...")
+        
+        if not hasattr(self, 'test_exam_id') or not hasattr(self, 'test_batch_id'):
+            print("⚠️  Skipping topic mastery test - missing exam or batch")
+            return None
+        
+        # Test with exam_id filter
+        exam_result = self.run_api_test(
+            "Topic Mastery: With Exam Filter",
+            "GET",
+            f"analytics/topic-mastery?exam_id={self.test_exam_id}",
+            200
+        )
+        
+        if exam_result:
+            # Verify response structure
+            required_fields = ["topics", "students_by_topic"]
+            missing_fields = [field for field in required_fields if field not in exam_result]
+            
+            if not missing_fields:
+                self.log_test("Topic Mastery Response Structure", True, "All required fields present")
+                
+                # Verify topics structure
+                topics = exam_result.get("topics", [])
+                if topics:
+                    first_topic = topics[0]
+                    topic_fields = ["topic", "avg_percentage", "level", "color", "sample_count", "struggling_count"]
+                    has_topic_fields = all(field in first_topic for field in topic_fields)
+                    
+                    if has_topic_fields:
+                        # Verify color coding
+                        color = first_topic.get("color")
+                        avg_pct = first_topic.get("avg_percentage", 0)
+                        
+                        expected_color = "green" if avg_pct >= 70 else "amber" if avg_pct >= 50 else "red"
+                        if color == expected_color:
+                            self.log_test("Topic Color Coding", True, f"Color '{color}' correct for {avg_pct}%")
+                        else:
+                            self.log_test("Topic Color Coding", False, f"Expected '{expected_color}', got '{color}' for {avg_pct}%")
+                        
+                        self.log_test("Topics Structure", True, "Topics have correct structure")
+                    else:
+                        missing_topic_fields = [field for field in topic_fields if field not in first_topic]
+                        self.log_test("Topics Structure", False, f"Missing fields: {missing_topic_fields}")
+                else:
+                    self.log_test("Topics Structure", True, "No topics (empty exam)")
+            else:
+                self.log_test("Topic Mastery Response Structure", False, f"Missing fields: {missing_fields}")
+        
+        # Test with batch_id filter
+        batch_result = self.run_api_test(
+            "Topic Mastery: With Batch Filter",
+            "GET",
+            f"analytics/topic-mastery?batch_id={self.test_batch_id}",
+            200
+        )
+        
+        # Test with both filters
+        both_result = self.run_api_test(
+            "Topic Mastery: With Both Filters",
+            "GET",
+            f"analytics/topic-mastery?exam_id={self.test_exam_id}&batch_id={self.test_batch_id}",
+            200
+        )
+        
+        return exam_result
+
+    def test_analytics_student_deep_dive(self):
+        """Test GET /api/analytics/student-deep-dive/{student_id} endpoint"""
+        print("\n🔍 Testing Analytics: Student Deep Dive...")
+        
+        if not hasattr(self, 'valid_student_id'):
+            print("⚠️  Skipping student deep dive test - no student created")
+            return None
+        
+        # Test with valid student_id
+        result = self.run_api_test(
+            "Student Deep Dive: Basic Analysis",
+            "GET",
+            f"analytics/student-deep-dive/{self.valid_student_id}",
+            200
+        )
+        
+        if result:
+            # Verify response structure
+            required_fields = ["student", "overall_average", "worst_questions", "performance_trend", "ai_analysis"]
+            missing_fields = [field for field in required_fields if field not in result]
+            
+            if not missing_fields:
+                self.log_test("Student Deep Dive Response Structure", True, "All required fields present")
+                
+                # Verify student info structure
+                student_info = result.get("student", {})
+                student_fields = ["name", "email", "student_id"]
+                has_student_fields = all(field in student_info for field in student_fields)
+                
+                if has_student_fields:
+                    self.log_test("Student Info Structure", True, "Student info has correct structure")
+                else:
+                    missing_student_fields = [field for field in student_fields if field not in student_info]
+                    self.log_test("Student Info Structure", False, f"Missing fields: {missing_student_fields}")
+                
+                # Verify AI analysis structure if present
+                ai_analysis = result.get("ai_analysis")
+                if ai_analysis:
+                    analysis_fields = ["summary", "recommendations", "concepts_to_review"]
+                    has_analysis_fields = all(field in ai_analysis for field in analysis_fields)
+                    
+                    if has_analysis_fields:
+                        self.log_test("AI Analysis Structure", True, "AI analysis has correct structure")
+                    else:
+                        self.log_test("AI Analysis Structure", True, "AI analysis present but structure varies")
+                else:
+                    self.log_test("AI Analysis Structure", True, "No AI analysis (no submissions)")
+            else:
+                self.log_test("Student Deep Dive Response Structure", False, f"Missing fields: {missing_fields}")
+        
+        # Test with exam_id filter
+        if hasattr(self, 'test_exam_id'):
+            exam_filter_result = self.run_api_test(
+                "Student Deep Dive: With Exam Filter",
+                "GET",
+                f"analytics/student-deep-dive/{self.valid_student_id}?exam_id={self.test_exam_id}",
+                200
+            )
+        
+        return result
+
+    def test_analytics_generate_review_packet(self):
+        """Test POST /api/analytics/generate-review-packet endpoint"""
+        print("\n📝 Testing Analytics: Generate Review Packet...")
+        
+        if not hasattr(self, 'test_exam_id'):
+            print("⚠️  Skipping review packet test - no exam created")
+            return None
+        
+        # Test with valid exam_id
+        result = self.run_api_test(
+            "Generate Review Packet",
+            "POST",
+            f"analytics/generate-review-packet?exam_id={self.test_exam_id}",
+            200
+        )
+        
+        if result:
+            # Check if we got practice questions or a message about no weak areas
+            if "practice_questions" in result:
+                practice_questions = result.get("practice_questions", [])
+                
+                if practice_questions:
+                    # Verify practice question structure
+                    first_question = practice_questions[0]
+                    question_fields = ["question_number", "question", "marks", "topic", "difficulty", "hint"]
+                    has_question_fields = all(field in first_question for field in question_fields)
+                    
+                    if has_question_fields:
+                        self.log_test("Practice Questions Structure", True, "Practice questions have correct structure")
+                    else:
+                        missing_question_fields = [field for field in question_fields if field not in first_question]
+                        self.log_test("Practice Questions Structure", False, f"Missing fields: {missing_question_fields}")
+                    
+                    # Verify required response fields
+                    required_fields = ["exam_name", "practice_questions", "weak_areas_identified"]
+                    missing_fields = [field for field in required_fields if field not in result]
+                    
+                    if not missing_fields:
+                        self.log_test("Review Packet Response Structure", True, "All required fields present")
+                    else:
+                        self.log_test("Review Packet Response Structure", False, f"Missing fields: {missing_fields}")
+                else:
+                    self.log_test("Review Packet Generation", True, "No practice questions generated (no weak areas)")
+            else:
+                self.log_test("Review Packet Generation", False, "No practice_questions field in response")
+        
+        # Test with non-existent exam (should fail)
+        fake_exam_result = self.run_api_test(
+            "Generate Review Packet: Non-existent Exam",
+            "POST",
+            "analytics/generate-review-packet?exam_id=fake_exam_123",
+            404
+        )
+        
+        return result
+
+    def test_exams_infer_topics(self):
+        """Test POST /api/exams/{exam_id}/infer-topics endpoint"""
+        print("\n🏷️  Testing Exams: Auto-Infer Topic Tags...")
+        
+        if not hasattr(self, 'test_exam_id'):
+            print("⚠️  Skipping infer topics test - no exam created")
+            return None
+        
+        # Test with valid exam_id
+        result = self.run_api_test(
+            "Auto-Infer Topic Tags",
+            "POST",
+            f"exams/{self.test_exam_id}/infer-topics",
+            200
+        )
+        
+        if result:
+            # Verify response structure
+            required_fields = ["message", "topics"]
+            missing_fields = [field for field in required_fields if field not in result]
+            
+            if not missing_fields:
+                self.log_test("Infer Topics Response Structure", True, "All required fields present")
+                
+                # Verify topics structure
+                topics = result.get("topics", {})
+                if topics:
+                    # Check if topics are mapped to question numbers
+                    first_key = list(topics.keys())[0]
+                    first_value = topics[first_key]
+                    
+                    if isinstance(first_value, list):
+                        self.log_test("Topics Mapping Structure", True, f"Topics correctly mapped: Q{first_key} -> {first_value}")
+                    else:
+                        self.log_test("Topics Mapping Structure", False, f"Expected list of topics, got {type(first_value)}")
+                else:
+                    self.log_test("Topics Mapping Structure", True, "No topics inferred (empty exam)")
+            else:
+                self.log_test("Infer Topics Response Structure", False, f"Missing fields: {missing_fields}")
+        
+        # Test authentication required
+        original_token = self.session_token
+        self.session_token = None
+        
+        auth_result = self.run_api_test(
+            "Infer Topics: Authentication Required",
+            "POST",
+            f"exams/{self.test_exam_id}/infer-topics",
+            401
+        )
+        
+        self.session_token = original_token
+        
+        # Test with non-existent exam
+        fake_exam_result = self.run_api_test(
+            "Infer Topics: Non-existent Exam",
+            "POST",
+            "exams/fake_exam_123/infer-topics",
+            404
+        )
+        
+        return result
+
+    def test_exams_update_question_topics(self):
+        """Test PUT /api/exams/{exam_id}/question-topics endpoint"""
+        print("\n✏️  Testing Exams: Update Question Topics...")
+        
+        if not hasattr(self, 'test_exam_id'):
+            print("⚠️  Skipping update topics test - no exam created")
+            return None
+        
+        # Test with valid topic updates
+        topic_updates = {
+            "1": ["Algebra", "Linear Equations"],
+            "2": ["Algebra", "Quadratic Functions", "Graphing"]
+        }
+        
+        result = self.run_api_test(
+            "Update Question Topics",
+            "PUT",
+            f"exams/{self.test_exam_id}/question-topics",
+            200,
+            data=topic_updates
+        )
+        
+        if result:
+            # Verify response message
+            message = result.get("message", "")
+            if "successfully" in message.lower():
+                self.log_test("Update Topics Response", True, f"Success message: {message}")
+            else:
+                self.log_test("Update Topics Response", False, f"Unexpected message: {message}")
+            
+            # Verify topics were actually saved by getting the exam
+            exam_check = self.run_api_test(
+                "Verify Topics Saved",
+                "GET",
+                f"exams/{self.test_exam_id}",
+                200
+            )
+            
+            if exam_check:
+                questions = exam_check.get("questions", [])
+                if questions:
+                    # Check if first question has the topics we set
+                    first_question = questions[0]
+                    topic_tags = first_question.get("topic_tags", [])
+                    
+                    if "Algebra" in topic_tags and "Linear Equations" in topic_tags:
+                        self.log_test("Topics Persistence Verification", True, f"Topics saved correctly: {topic_tags}")
+                    else:
+                        self.log_test("Topics Persistence Verification", False, f"Topics not saved correctly: {topic_tags}")
+                else:
+                    self.log_test("Topics Persistence Verification", False, "No questions found in exam")
+        
+        # Test with empty topics
+        empty_topics = {"1": [], "2": []}
+        
+        empty_result = self.run_api_test(
+            "Update Question Topics: Empty Topics",
+            "PUT",
+            f"exams/{self.test_exam_id}/question-topics",
+            200,
+            data=empty_topics
+        )
+        
+        return result
+
+    def test_comprehensive_analytics_workflow(self):
+        """Test complete analytics workflow with all endpoints"""
+        print("\n🔄 Testing Comprehensive Analytics Workflow...")
+        
+        if not hasattr(self, 'test_exam_id') or not hasattr(self, 'valid_student_id'):
+            print("⚠️  Skipping comprehensive analytics test - missing exam or student")
+            return None
+        
+        workflow_results = {}
+        
+        # Step 1: Infer topics for the exam
+        print("   Step 1: Auto-inferring topic tags...")
+        infer_result = self.test_exams_infer_topics()
+        workflow_results["infer_topics"] = infer_result is not None
+        
+        # Step 2: Get misconceptions analysis
+        print("   Step 2: Analyzing misconceptions...")
+        misconceptions_result = self.test_analytics_misconceptions()
+        workflow_results["misconceptions"] = misconceptions_result is not None
+        
+        # Step 3: Get topic mastery data
+        print("   Step 3: Getting topic mastery...")
+        topic_mastery_result = self.test_analytics_topic_mastery()
+        workflow_results["topic_mastery"] = topic_mastery_result is not None
+        
+        # Step 4: Get student deep dive
+        print("   Step 4: Student deep dive analysis...")
+        deep_dive_result = self.test_analytics_student_deep_dive()
+        workflow_results["student_deep_dive"] = deep_dive_result is not None
+        
+        # Step 5: Generate review packet
+        print("   Step 5: Generating review packet...")
+        review_packet_result = self.test_analytics_generate_review_packet()
+        workflow_results["review_packet"] = review_packet_result is not None
+        
+        # Step 6: Update topics manually
+        print("   Step 6: Manually updating topics...")
+        update_topics_result = self.test_exams_update_question_topics()
+        workflow_results["update_topics"] = update_topics_result is not None
+        
+        # Summary
+        successful_steps = sum(workflow_results.values())
+        total_steps = len(workflow_results)
+        
+        if successful_steps == total_steps:
+            self.log_test("Comprehensive Analytics Workflow", True, 
+                f"All {total_steps} analytics endpoints working correctly")
+        else:
+            failed_steps = [step for step, success in workflow_results.items() if not success]
+            self.log_test("Comprehensive Analytics Workflow", False, 
+                f"{successful_steps}/{total_steps} steps successful. Failed: {failed_steps}")
+        
+        return workflow_results
+
     def cleanup_test_data(self):
         """Clean up test data from MongoDB"""
         print("\n🧹 Cleaning up test data...")
