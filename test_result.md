@@ -503,7 +503,11 @@ metadata:
           comment: "✅ COMPONENT STRUCTURE VERIFIED: Upload & Grade page duplicate prevention properly implemented with backend API integration. Component has proper data-testid attributes (upload-grade-page, exam-name-input, create-exam-btn). Multi-step form process working correctly with exam configuration, question setup, grading mode selection. Backend API call to /api/exams properly configured with error handling and toast notifications for duplicate prevention. Form validation and user feedback mechanisms in place. OAuth authentication prevents full E2E testing but component structure is production-ready."
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "LLM Feedback Loop - Teacher Dashboard Integration"
+    - "LLM Feedback Loop - Review Papers Integration"
+    - "Resizable Panels - Review Papers Desktop View"
+    - "Resizable Panels - Review Papers Mobile View"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
