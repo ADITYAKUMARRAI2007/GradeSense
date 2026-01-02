@@ -917,13 +917,16 @@ agent_communication:
     working: "NA"
     files:
         - "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
           comment: "RESIZABLE PANELS IMPLEMENTED: Added react-resizable-panels to the teacher Review Papers dialog. Features: 1) Desktop view uses PanelGroup with horizontal direction 2) Left Panel (default 55%, min 30%, max 70%) shows answer sheets with model answer toggle and mistake annotations 3) Right Panel (default 45%, min 30%, max 70%) shows questions breakdown with scoring and feedback 4) PanelResizeHandle between panels with visual indicator (vertical line) and hover effect 5) Mobile view remains stacked (non-resizable) for better UX on small screens 6) Drag handle is styled with bg-border hover:bg-primary/20 and cursor-col-resize. The library react-resizable-panels was already installed in previous fork. Need testing to verify drag-to-resize works correctly on desktop."
+        - working: "NA"
+          agent: "main"
+          comment: "P1 USER VERIFICATION REQUIRED: Previous agent implemented resizable panels with react-resizable-panels library. User reported panels don't resize when dragged. Need user to test: 1) Go to ReviewPapers page 2) Open a submission 3) Try dragging the resize handle between left (answer sheet) and right (questions) panels 4) Report if handle is draggable or stuck. Code shows h-[calc(100vh-150px)] added to PanelGroup and proper styling on PanelResizeHandle. May need CSS inspection to check for style overrides."
 
     - agent: "main"
       message: "RESIZABLE PANELS COMPLETE: Implemented drag-to-resize panels in the teacher Review Papers page. Desktop view now uses react-resizable-panels with Left Panel (55% default) for answer sheets and Right Panel (45% default) for questions/feedback. Teachers can drag the resize handle to adjust panel sizes (30%-70% range). Mobile view remains unchanged with stacked layout. Need testing with teacher auth to verify: 1) Resize handle appears and is draggable 2) Panel sizes adjust smoothly 3) Content scrolls correctly in both panels 4) Mobile view doesn't show resize handle"
