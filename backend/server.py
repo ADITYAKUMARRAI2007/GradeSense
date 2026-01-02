@@ -2507,6 +2507,98 @@ async def get_study_materials(subject_id: Optional[str] = None, user: User = Dep
         "recommended_materials": materials
     }
 
+# ============== FEEDBACK ROUTES ==============
+
+@api_router.post("/feedback/submit")
+async def submit_grading_feedback(feedback: FeedbackSubmit, user: User = Depends(get_current_user)):
+    """Submit feedback to improve AI grading"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can submit feedback")
+    
+    feedback_id = f"feedback_{uuid.uuid4().hex[:8]}"
+    
+    # Get additional context if submission_id provided
+    exam_id = None
+    grading_mode = None
+    student_answer_summary = None
+    
+    if feedback.submission_id:
+        submission = await db.submissions.find_one(
+            {"submission_id": feedback.submission_id},
+            {"_id": 0, "exam_id": 1, "question_scores": 1}
+        )
+        if submission:
+            exam_id = submission.get("exam_id")
+            # Get question context
+            if feedback.question_number:
+                qs = next((q for q in submission.get("question_scores", []) 
+                          if q["question_number"] == feedback.question_number), None)
+                if qs:
+                    student_answer_summary = qs.get("ai_feedback", "")[:200]
+            
+            # Get grading mode
+            exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "grading_mode": 1})
+            if exam:
+                grading_mode = exam.get("grading_mode")
+    
+    feedback_doc = {
+        "feedback_id": feedback_id,
+        "teacher_id": user.user_id,
+        "submission_id": feedback.submission_id,
+        "question_number": feedback.question_number,
+        "feedback_type": feedback.feedback_type,
+        "question_text": feedback.question_text,
+        "student_answer_summary": student_answer_summary,
+        "ai_grade": feedback.ai_grade,
+        "ai_feedback": feedback.ai_feedback,
+        "teacher_expected_grade": feedback.teacher_expected_grade,
+        "teacher_correction": feedback.teacher_correction,
+        "grading_mode": grading_mode,
+        "exam_id": exam_id,
+        "is_common": False,
+        "upvote_count": 0,
+        "created_at": datetime.now(timezone.utc)
+    }
+    
+    await db.grading_feedback.insert_one(feedback_doc)
+    
+    return {"message": "Feedback submitted successfully", "feedback_id": feedback_id}
+
+@api_router.get("/feedback/my-feedback")
+async def get_my_feedback(user: User = Depends(get_current_user)):
+    """Get teacher's own feedback submissions"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view feedback")
+    
+    feedback = await db.grading_feedback.find(
+        {"teacher_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {"feedback": feedback, "count": len(feedback)}
+
+@api_router.get("/feedback/teacher-patterns/{teacher_id}")
+async def get_teacher_feedback_patterns(teacher_id: str):
+    """Get feedback patterns for a specific teacher to personalize grading"""
+    # Get recent feedback for this teacher
+    feedback = await db.grading_feedback.find(
+        {"teacher_id": teacher_id, "feedback_type": {"$in": ["question_grading", "correction"]}},
+        {"_id": 0, "teacher_correction": 1, "grading_mode": 1, "question_text": 1, "ai_feedback": 1}
+    ).sort("created_at", -1).to_list(10)
+    
+    return feedback
+
+@api_router.get("/feedback/common-patterns")
+async def get_common_feedback_patterns():
+    """Get common feedback patterns across all teachers"""
+    # Get feedback marked as common or with high upvotes
+    common_feedback = await db.grading_feedback.find(
+        {"$or": [{"is_common": True}, {"upvote_count": {"$gte": 3}}]},
+        {"_id": 0, "teacher_correction": 1, "grading_mode": 1, "feedback_type": 1}
+    ).to_list(20)
+    
+    return common_feedback
+
 # ============== HEALTH CHECK ==============
 
 @api_router.get("/health")
