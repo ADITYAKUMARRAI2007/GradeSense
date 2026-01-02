@@ -2523,7 +2523,7 @@ async def get_topic_mastery(
     
     exams = await db.exams.find(exam_query, {"_id": 0}).to_list(50)
     if not exams:
-        return {"topics": [], "students_by_topic": {}}
+        return {"topics": [], "students_by_topic": {}, "questions_by_topic": {}}
     
     exam_ids = [e["exam_id"] for e in exams]
     
@@ -2535,24 +2535,39 @@ async def get_topic_mastery(
     
     # Build topic performance data
     topic_data = {}
-    student_topic_scores = {}
+    questions_by_topic = {}
     
     for exam in exams:
         for question in exam.get("questions", []):
             q_num = question.get("question_number", 0)
-            # Get topic tags (either manually set or use question number as fallback)
+            rubric = question.get("rubric", "")
+            
+            # Get topic tags - use AI-inferred or manually set topics
             topics = question.get("topic_tags", [])
+            
+            # If no topic tags, create a generic topic based on exam subject
             if not topics:
-                # Infer topic from rubric or use default
-                rubric = question.get("rubric", "")
-                if rubric:
-                    topics = [rubric[:50]]
-                else:
-                    topics = [f"Question {q_num}"]
+                subject = None
+                if exam.get("subject_id"):
+                    subject_doc = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+                    subject = subject_doc.get("name") if subject_doc else None
+                topics = [subject or "General"]
             
             for topic in topics:
                 if topic not in topic_data:
-                    topic_data[topic] = {"scores": [], "max_marks": 0, "students": {}}
+                    topic_data[topic] = {"scores": [], "max_marks": 0, "students": {}, "questions": []}
+                    questions_by_topic[topic] = []
+                
+                # Add question info to topic
+                q_info = {
+                    "exam_id": exam["exam_id"],
+                    "exam_name": exam.get("exam_name", "Unknown"),
+                    "question_number": q_num,
+                    "rubric": rubric[:100] if rubric else f"Question {q_num}",
+                    "max_marks": question.get("max_marks", 0)
+                }
+                if q_info not in topic_data[topic]["questions"]:
+                    topic_data[topic]["questions"].append(q_info)
                 
                 # Find scores for this question
                 for sub in submissions:
