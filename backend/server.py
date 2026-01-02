@@ -2703,7 +2703,7 @@ Keep response concise (under 200 words). Format as JSON:
                     if cleaned.startswith("json"):
                         cleaned = cleaned[4:]
                 ai_analysis = json.loads(cleaned)
-            except:
+            except (json.JSONDecodeError, IndexError, ValueError):
                 ai_analysis = {"summary": ai_response[:300]}
         except Exception as e:
             logger.error(f"AI student analysis error: {e}")
