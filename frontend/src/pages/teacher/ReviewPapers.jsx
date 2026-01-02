@@ -666,8 +666,8 @@ export default function ReviewPapers({ user }) {
           </Panel>
 
           {/* Resize Handle */}
-          <PanelResizeHandle className="w-2 bg-border hover:bg-primary/20 transition-colors cursor-col-resize flex items-center justify-center">
-            <div className="w-1 h-8 bg-muted-foreground/30 rounded-full" />
+          <PanelResizeHandle className="w-3 bg-border hover:bg-orange-300 transition-colors cursor-col-resize flex items-center justify-center group">
+            <div className="w-1 h-12 bg-muted-foreground/40 group-hover:bg-orange-500 rounded-full transition-colors" />
           </PanelResizeHandle>
 
           {/* Right Panel - Questions Breakdown */}
