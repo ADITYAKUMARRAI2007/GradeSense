@@ -84,9 +84,6 @@ export default function ClassReports({ user }) {
   
   // Question insight modal
   const [selectedQuestionInsight, setSelectedQuestionInsight] = useState(null);
-  
-  // Topic hover state
-  const [hoveredTopic, setHoveredTopic] = useState(null);
 
   useEffect(() => {
     fetchFiltersData();
