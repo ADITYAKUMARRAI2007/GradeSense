@@ -2452,6 +2452,17 @@ print('Test data cleaned up');
         self.test_llm_feedback_get_my_feedback()
         self.test_llm_feedback_comprehensive_workflow()
         
+        # ADVANCED ANALYTICS TESTS: New Analytics Features
+        print("\n📊 Testing Advanced Analytics Features")
+        print("-" * 50)
+        self.test_analytics_misconceptions()
+        self.test_analytics_topic_mastery()
+        self.test_analytics_student_deep_dive()
+        self.test_analytics_generate_review_packet()
+        self.test_exams_infer_topics()
+        self.test_exams_update_question_topics()
+        self.test_comprehensive_analytics_workflow()
+        
         # Cleanup
         self.cleanup_test_data()
         
