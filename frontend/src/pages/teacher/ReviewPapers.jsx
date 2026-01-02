@@ -386,7 +386,7 @@ export default function ReviewPapers({ user }) {
                 {/* Student Answer */}
                 <div className="space-y-2">
                   {showModelAnswer && (
-                    <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student's Answer</h3>
+                    <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student&apos;s Answer</h3>
                   )}
                   <div className="space-y-4">
                     {selectedSubmission.file_images.map((img, idx) => (
