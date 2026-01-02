@@ -54,6 +54,14 @@ export default function ReviewPapers({ user }) {
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
   const [zoomedImage, setZoomedImage] = useState(null);
   const [imageZoom, setImageZoom] = useState(100);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackQuestion, setFeedbackQuestion] = useState(null);
+  const [feedbackForm, setFeedbackForm] = useState({
+    feedback_type: "question_grading",
+    teacher_expected_grade: "",
+    teacher_correction: ""
+  });
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   useEffect(() => {
     fetchData();
