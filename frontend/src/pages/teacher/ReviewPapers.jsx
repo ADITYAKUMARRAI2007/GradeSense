@@ -495,6 +495,21 @@ export default function ReviewPapers({ user }) {
                   <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10 gap-2 flex-wrap">
                     <span className="text-sm font-medium">Answer Sheet</span>
                     <div className="flex items-center gap-3">
+                      {/* Question Paper Toggle */}
+                      {questionPaperImages.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id="show-question-paper"
+                            checked={showQuestionPaper}
+                            onCheckedChange={setShowQuestionPaper}
+                          />
+                          <Label htmlFor="show-question-paper" className="text-xs cursor-pointer flex items-center gap-1">
+                            <FileText className="w-3 h-3 text-blue-600" />
+                            Questions
+                          </Label>
+                        </div>
+                      )}
+                      
                       {/* Model Answer Toggle */}
                       {modelAnswerImages.length > 0 && (
                         <div className="flex items-center gap-2">
