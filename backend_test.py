@@ -2019,6 +2019,16 @@ print('Test data cleaned up');
         self.test_p1_sub_questions_support()
         self.test_p1_file_images_preservation()
         
+        # LLM FEEDBACK LOOP TESTS: Phase 2 Frontend Integration
+        print("\n🤖 Testing LLM Feedback Loop Feature (Phase 2)")
+        print("-" * 50)
+        self.test_llm_feedback_submit_question_specific()
+        self.test_llm_feedback_submit_general()
+        self.test_llm_feedback_authentication()
+        self.test_llm_feedback_validation()
+        self.test_llm_feedback_get_my_feedback()
+        self.test_llm_feedback_comprehensive_workflow()
+        
         # Cleanup
         self.cleanup_test_data()
         
