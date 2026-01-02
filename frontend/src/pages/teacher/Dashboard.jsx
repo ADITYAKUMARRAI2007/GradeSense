@@ -45,6 +45,31 @@ export default function TeacherDashboard({ user }) {
     }
   };
 
+  const handleSubmitGeneralFeedback = async () => {
+    if (!generalFeedback.trim()) return;
+    
+    setSubmittingFeedback(true);
+    try {
+      await axios.post(`${API}/feedback/submit`, {
+        feedback_type: "general_suggestion",
+        teacher_correction: generalFeedback
+      });
+      setGeneralFeedback("");
+      setFeedbackDialogOpen(false);
+      // Show success toast using sonner if available
+      if (window.toast) {
+        window.toast.success("Feedback submitted! Thank you for helping improve the AI.");
+      } else {
+        alert("Feedback submitted successfully!");
+      }
+    } catch (error) {
+      console.error("Feedback error:", error);
+      alert("Failed to submit feedback");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
   const stats = analytics?.stats || {};
   const recentSubmissions = analytics?.recent_submissions || [];
 
