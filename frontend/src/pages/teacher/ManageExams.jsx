@@ -418,6 +418,53 @@ export default function ManageExams({ user }) {
                     </div>
                   </div>
 
+                  {/* AI Tools Section */}
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-purple-800">
+                      <Brain className="w-4 h-4" />
+                      AI Tools
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedExam.model_answer_images?.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleExtractQuestions(selectedExam)}
+                          disabled={extractingQuestions}
+                          className="text-purple-600 border-purple-200 hover:bg-purple-100"
+                        >
+                          {extractingQuestions ? (
+                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 mr-1" />
+                          )}
+                          Extract Questions from Model Answer
+                        </Button>
+                      )}
+                      {selectedExam.questions?.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleInferTopics(selectedExam)}
+                          disabled={inferringTopics}
+                          className="text-purple-600 border-purple-200 hover:bg-purple-100"
+                        >
+                          {inferringTopics ? (
+                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <Tag className="w-4 h-4 mr-1" />
+                          )}
+                          Auto-Infer Topic Tags
+                        </Button>
+                      )}
+                    </div>
+                    {!selectedExam.model_answer_images?.length && (
+                      <p className="text-xs text-purple-600 mt-2">
+                        Upload a model answer to enable question extraction
+                      </p>
+                    )}
+                  </div>
+
                   {/* Questions */}
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -425,24 +472,43 @@ export default function ManageExams({ user }) {
                       Questions ({selectedExam.questions?.length || 0})
                     </h3>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {selectedExam.questions?.map((question, idx) => (
-                        <div key={idx} className="p-3 bg-muted/50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">Question {question.question_number}</span>
-                            <Badge variant="outline">{question.max_marks} marks</Badge>
-                          </div>
-                          {question.sub_questions?.length > 0 && (
-                            <div className="mt-2 ml-4 space-y-1">
-                              {question.sub_questions.map((sq, sqIdx) => (
-                                <div key={sqIdx} className="flex items-center justify-between text-xs">
-                                  <span className="text-muted-foreground">Part {sq.sub_id}</span>
-                                  <span className="text-muted-foreground">{sq.max_marks} marks</span>
-                                </div>
-                              ))}
+                      {selectedExam.questions?.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No questions configured. Use &quot;Extract Questions&quot; if you have a model answer.
+                        </p>
+                      ) : (
+                        selectedExam.questions?.map((question, idx) => (
+                          <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-sm">Question {question.question_number}</span>
+                              <Badge variant="outline">{question.max_marks} marks</Badge>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {question.rubric && (
+                              <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{question.rubric}</p>
+                            )}
+                            {question.topic_tags?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {question.topic_tags.map((tag, tagIdx) => (
+                                  <Badge key={tagIdx} variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                                    <Tag className="w-3 h-3 mr-1" />
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            {question.sub_questions?.length > 0 && (
+                              <div className="mt-2 ml-4 space-y-1">
+                                {question.sub_questions.map((sq, sqIdx) => (
+                                  <div key={sqIdx} className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">Part {sq.sub_id}</span>
+                                    <span className="text-muted-foreground">{sq.max_marks} marks</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
