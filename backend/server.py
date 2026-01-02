@@ -1664,7 +1664,7 @@ Return valid JSON only."""
     )
     
     try:
-        response = await chat.send_message(user_message)
+        ai_response = await chat.send_message(user_message)
         
         # Parse the response
         import json
@@ -2452,7 +2452,7 @@ Only return the JSON array, no other text."""
             ).with_model("openai", "gpt-4o")
             
             user_message = UserMessage(text=analysis_prompt)
-            response = await chat.send_message(user_message)
+            ai_response = await chat.send_message(user_message)
             ai_response = response
             
             import json
@@ -2694,7 +2694,7 @@ Keep response concise (under 200 words). Format as JSON:
             ).with_model("openai", "gpt-4o")
             
             user_message = UserMessage(text=analysis_prompt)
-            response = await chat.send_message(user_message)
+            ai_response = await chat.send_message(user_message)
             ai_response = response
             
             import json
@@ -2819,7 +2819,7 @@ Only return the JSON array."""
         ).with_model("openai", "gpt-4o")
         
         user_message = UserMessage(text=generation_prompt)
-        response = await chat.send_message(user_message)
+        ai_response = await chat.send_message(user_message)
         ai_response = response
         
         import json
@@ -2907,7 +2907,7 @@ Only return the JSON object."""
         ).with_model("openai", "gpt-4o")
         
         user_message = UserMessage(text=inference_prompt)
-        ai_response = await chat.send_message(user_message)
+        ai_ai_response = await chat.send_message(user_message)
         
         import json
         try:
