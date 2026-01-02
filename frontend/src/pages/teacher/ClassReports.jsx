@@ -75,6 +75,9 @@ export default function ClassReports({ user }) {
   const [studentDeepDive, setStudentDeepDive] = useState(null);
   const [loadingDeepDive, setLoadingDeepDive] = useState(false);
   
+  // Topic detail modal
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  
   // Review packet generation
   const [generatingReviewPacket, setGeneratingReviewPacket] = useState(false);
   const [reviewPacket, setReviewPacket] = useState(null);
