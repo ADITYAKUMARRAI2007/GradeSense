@@ -1331,7 +1331,7 @@ async def extract_student_info_from_paper(file_images: List[str], filename: str)
     Extract student ID/roll number and name from the answer paper using AI
     Returns: (student_id, student_name) or (None, None) if extraction fails
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
     
     api_key = os.environ.get('EMERGENT_LLM_KEY')
     if not api_key:
@@ -1353,22 +1353,22 @@ Return ONLY a JSON object in this exact format:
 
 Important:
 - Student ID can be just numbers (e.g., "123", "2024001") or alphanumeric (e.g., "STU001", "CS-2024-001")
-- Look for labels like "Roll No", "Roll Number", "Student ID", "ID No", "Reg No", etc.
-- Student name is usually written at the top of the page
+- Look for labels like "Roll No", "Roll Number", "Student ID", "ID No", "Reg No", "ID", etc.
+- Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
         ).with_model("openai", "gpt-4o")
         
-        # Use first page (usually has student info)
-        image_content = ImageContent(image_base64=file_images[0])
+        # Use first page only (usually has student info)
+        first_page = [file_images[0]]
         
         user_message = UserMessage(
             text="Extract the student ID/roll number and name from this answer sheet.",
-            images=[image_content]
+            file_contents=first_page
         )
         
-        response = await asyncio.to_thread(chat.send_message, user_message)
-        response_text = response.text.strip()
+        response = await chat.send_message(user_message)
+        response_text = response.strip()
         
         # Parse JSON response
         if "```json" in response_text:
