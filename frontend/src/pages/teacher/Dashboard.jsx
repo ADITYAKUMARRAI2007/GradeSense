@@ -295,6 +295,14 @@ export default function TeacherDashboard({ user }) {
                   <TrendingUp className="w-4 h-4 mr-2" />
                   View Reports
                 </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-sm text-orange-600 border-orange-200 hover:bg-orange-50"
+                  onClick={() => setFeedbackDialogOpen(true)}
+                >
+                  <MessageSquarePlus className="w-4 h-4 mr-2" />
+                  Improve AI Grading
+                </Button>
               </CardContent>
             </Card>
 
@@ -316,6 +324,61 @@ export default function TeacherDashboard({ user }) {
             </Card>
           </div>
         </div>
+
+        {/* General AI Feedback Dialog */}
+        <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-orange-500" />
+                Help Improve AI Grading
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Share general feedback or suggestions to help improve how the AI grades papers. 
+                Your input helps make grading more accurate for everyone.
+              </p>
+              
+              <div>
+                <Textarea 
+                  value={generalFeedback}
+                  onChange={(e) => setGeneralFeedback(e.target.value)}
+                  placeholder="Examples:
+• The AI is too strict on partial credit
+• It should give more weight to conceptual understanding
+• Handwritten diagrams are often misinterpreted
+• Spelling errors shouldn't affect science answers..."
+                  rows={5}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setFeedbackDialogOpen(false)}
+                  disabled={submittingFeedback}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmitGeneralFeedback}
+                  disabled={submittingFeedback || !generalFeedback.trim()}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  {submittingFeedback ? (
+                    <Clock className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Submit Feedback
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
