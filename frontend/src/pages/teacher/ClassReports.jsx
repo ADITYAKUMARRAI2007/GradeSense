@@ -990,6 +990,134 @@ export default function ClassReports({ user }) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Topic Detail Modal */}
+      <Dialog open={!!selectedTopic} onOpenChange={() => setSelectedTopic(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className={`w-5 h-5 ${
+                selectedTopic?.color === "green" ? "text-green-600" :
+                selectedTopic?.color === "amber" ? "text-amber-600" :
+                "text-red-600"
+              }`} />
+              {selectedTopic?.topic}
+            </DialogTitle>
+            <DialogDescription>
+              Topic performance details and action items
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedTopic && (
+            <div className="overflow-y-auto max-h-[60vh] space-y-4">
+              {/* Topic Stats */}
+              <div className={`p-4 rounded-lg ${getScoreBg(selectedTopic.avg_percentage)}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-3xl font-bold ${getScoreColor(selectedTopic.avg_percentage)}`}>
+                      {selectedTopic.avg_percentage}%
+                    </p>
+                    <p className="text-sm text-muted-foreground">Class Average</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold">{selectedTopic.sample_count} responses</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedTopic.struggling_count} students need help
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Questions in this topic */}
+              {topicMastery?.questions_by_topic?.[selectedTopic.topic]?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Questions in this Topic
+                  </h4>
+                  <div className="space-y-2">
+                    {topicMastery.questions_by_topic[selectedTopic.topic].map((q, idx) => (
+                      <div key={idx} className="p-3 border rounded-lg bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">{q.exam_name} - Q{q.question_number}</span>
+                          <Badge variant="outline">{q.max_marks} marks</Badge>
+                        </div>
+                        {q.rubric && (
+                          <p className="text-xs text-muted-foreground mt-1">{q.rubric}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Students needing help */}
+              {topicMastery?.students_by_topic?.[selectedTopic.topic]?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-red-700">
+                    <AlertTriangle className="w-4 h-4" />
+                    Students Needing Attention
+                  </h4>
+                  <div className="space-y-2">
+                    {topicMastery.students_by_topic[selectedTopic.topic].map((student, idx) => (
+                      <div 
+                        key={idx} 
+                        className="flex items-center justify-between p-3 border rounded-lg bg-red-50/50 cursor-pointer hover:bg-red-100/50"
+                        onClick={() => {
+                          setSelectedTopic(null);
+                          fetchStudentDeepDive(student.student_id, student.name);
+                        }}
+                      >
+                        <span className="font-medium">{student.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive">{student.avg_score}%</Badge>
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Items */}
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <h4 className="font-semibold mb-2 text-orange-800">Recommended Actions</h4>
+                <ul className="text-sm text-orange-700 space-y-1">
+                  {selectedTopic.color === "red" && (
+                    <>
+                      <li>• Schedule a review session focused on this topic</li>
+                      <li>• Create additional practice materials</li>
+                      <li>• Consider one-on-one help for struggling students</li>
+                    </>
+                  )}
+                  {selectedTopic.color === "amber" && (
+                    <>
+                      <li>• Provide extra practice problems</li>
+                      <li>• Review common mistakes in class</li>
+                    </>
+                  )}
+                  {selectedTopic.color === "green" && (
+                    <li>• Great job! Students have mastered this topic.</li>
+                  )}
+                </ul>
+              </div>
+
+              {filters.exam_id && (
+                <Button 
+                  className="w-full bg-orange-500 hover:bg-orange-600"
+                  onClick={() => {
+                    setSelectedTopic(null);
+                    generateReviewPacket();
+                  }}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate Practice Questions for Weak Topics
+                </Button>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
