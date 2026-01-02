@@ -2827,7 +2827,7 @@ Only return the JSON array."""
                 if cleaned.startswith("json"):
                     cleaned = cleaned[4:]
             practice_questions = json.loads(cleaned)
-        except:
+        except (json.JSONDecodeError, IndexError, ValueError):
             practice_questions = []
         
         return {
