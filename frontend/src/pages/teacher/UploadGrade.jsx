@@ -83,6 +83,7 @@ export default function UploadGrade({ user }) {
   });
 
   const [modelAnswerFile, setModelAnswerFile] = useState(null);
+  const [questionPaperFile, setQuestionPaperFile] = useState(null);
   const [studentFiles, setStudentFiles] = useState([]);
   const [examId, setExamId] = useState(null);
   const [results, setResults] = useState(null);
