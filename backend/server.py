@@ -1571,7 +1571,7 @@ Important:
 - Maintain original question numbering if visible
 - If you can't find all questions, return what you find
 """
-        ).with_model("openai", "gpt-4o")
+        ).with_model("gemini", "gemini-2.5-pro")
         
         # Create image contents
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images[:5]]
