@@ -2914,7 +2914,7 @@ Only return the JSON object."""
                 if cleaned.startswith("json"):
                     cleaned = cleaned[4:]
             topic_mapping = json.loads(cleaned)
-        except:
+        except (json.JSONDecodeError, IndexError, ValueError):
             raise HTTPException(status_code=500, detail="Failed to parse AI response")
         
         # Update questions with topic tags
