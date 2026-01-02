@@ -25,6 +25,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 export default function TeacherDashboard({ user }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [generalFeedback, setGeneralFeedback] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
