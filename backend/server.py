@@ -2230,13 +2230,13 @@ async def get_class_report(
     # Top performers
     sorted_subs = sorted(submissions, key=lambda x: x["percentage"], reverse=True)
     top_performers = [
-        {"name": s["student_name"], "score": s["total_score"], "percentage": s["percentage"]}
+        {"name": s["student_name"], "student_id": s["student_id"], "score": s["total_score"], "percentage": s["percentage"]}
         for s in sorted_subs[:5]
     ]
     
     # Needs attention (below 40%)
     needs_attention = [
-        {"name": s["student_name"], "score": s["total_score"], "percentage": s["percentage"]}
+        {"name": s["student_name"], "student_id": s["student_id"], "score": s["total_score"], "percentage": s["percentage"]}
         for s in submissions if s["percentage"] < 40
     ][:10]
     
