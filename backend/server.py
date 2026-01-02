@@ -2663,7 +2663,7 @@ async def get_student_deep_dive(
     ai_analysis = None
     if worst_questions:
         try:
-            from emergentintegrations.llm.chat import get_text_simple
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
             llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
             
             analysis_prompt = f"""Analyze this student's performance and provide specific improvement guidance:
@@ -2687,14 +2687,15 @@ Provide:
 Keep response concise (under 200 words). Format as JSON:
 {{"summary": "...", "recommendations": ["...", "..."], "concepts_to_review": ["...", "..."]}}"""
 
-            ai_response = await asyncio.to_thread(
-                get_text_simple,
-                emergent_api_key=llm_key,
-                llm_type="openai",
-                model_id="gpt-4o",
-                prompt=analysis_prompt,
-                temperature=0.3
-            )
+            chat = LlmChat(
+                api_key=llm_key,
+                session_id=f"student_analysis_{uuid.uuid4().hex[:8]}",
+                system_message="You are an expert educational analyst providing personalized student guidance."
+            ).with_model("openai", "gpt-4o")
+            
+            user_message = UserMessage(text=analysis_prompt)
+            response = await asyncio.to_thread(chat.send_message, user_message)
+            ai_response = response.text.strip()
             
             import json
             try:
