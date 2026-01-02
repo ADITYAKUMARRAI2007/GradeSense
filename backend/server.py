@@ -2777,7 +2777,7 @@ async def generate_review_packet(
     
     # Generate practice questions using AI
     try:
-        from emergentintegrations.llm.chat import get_text_simple
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
         
         subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
@@ -2812,14 +2812,15 @@ Return as JSON array:
 
 Only return the JSON array."""
 
-        ai_response = await asyncio.to_thread(
-            get_text_simple,
-            emergent_api_key=llm_key,
-            llm_type="openai",
-            model_id="gpt-4o",
-            prompt=generation_prompt,
-            temperature=0.7
-        )
+        chat = LlmChat(
+            api_key=llm_key,
+            session_id=f"review_packet_{uuid.uuid4().hex[:8]}",
+            system_message="You are an expert educator creating practice questions to help students improve."
+        ).with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(text=generation_prompt)
+        response = await asyncio.to_thread(chat.send_message, user_message)
+        ai_response = response.text.strip()
         
         import json
         try:
