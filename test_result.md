@@ -104,6 +104,33 @@
 
 user_problem_statement: "GradeSense AI-powered grading application with batch management, sub-questions support, grading modes, student analytics, and functional student portal"
 
+  - task: "Inconsistent Grading for Duplicate Papers"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main"
+          comment: "CRITICAL BUG REPORTED: User uploaded same answer paper twice and received different scores (46/50 vs 48/50). This undermines grading reliability. Root cause: 1) Random AI behavior with GPT-4o 2) No deterministic settings 3) Random session IDs causing inconsistent context."
+        - working: "NA"
+          agent: "main"
+          comment: "FIX IMPLEMENTED: Switched from GPT-4o to Gemini 2.5 Pro for ALL AI functions. Added deterministic grading mechanisms: 1) Content hashing - create hash from answer images + model answer + questions + grading mode to use as session ID for consistent context 2) Enhanced system prompt emphasizing CONSISTENCY and DETERMINISTIC behavior 3) Updated prompts to require EXACT same scores for identical answers 4) Added precise numerical scoring requirements 5) Switched model from 'openai/gpt-4o' to 'gemini/gemini-2.5-pro' in 7 functions: grade_with_ai, extract_student_info_from_paper, extract_questions_from_model_answer, analyze misconceptions, student deep dive, generate review packet, infer topics. Added hashlib import for content hashing. Need testing to verify same paper gets same grade consistently."
+
+  - task: "LLM Model Migration to Gemini 2.5 Pro"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "USER REQUEST: Change all LLM integrations from GPT-4o to Gemini 2.5 Pro. Updated 7 functions using .with_model() to switch from openai/gpt-4o to gemini/gemini-2.5-pro: 1) grade_with_ai (main grading function) 2) extract_student_info_from_paper 3) extract_questions_from_model_answer 4) Common misconceptions analysis 5) Student deep-dive analysis 6) Generate review packet 7) Infer topics from questions. All using EMERGENT_LLM_KEY which supports Gemini. Backend restarted successfully without errors. Need testing to verify all AI features work correctly with Gemini 2.5 Pro."
+
 backend:
   - task: "Upload More Papers to Existing Exam"
     implemented: true
