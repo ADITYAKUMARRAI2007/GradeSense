@@ -2655,7 +2655,7 @@ async def get_student_deep_dive(
         performance_trend.append({
             "exam_name": exam.get("exam_name", "Unknown") if exam else "Unknown",
             "percentage": sub["percentage"],
-            "date": sub.get("created_at", "").isoformat() if sub.get("created_at") else ""
+            "date": sub.get("created_at", "")
         })
     
     # Generate AI analysis
