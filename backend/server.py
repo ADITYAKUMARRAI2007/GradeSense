@@ -1589,6 +1589,15 @@ Return your response in this exact JSON format:
       "question_number": 1,
       "obtained_marks": 8.5,
       "ai_feedback": "Detailed feedback explaining the grade",
+      "error_annotations": [
+        {{
+          "error_type": "calculation_error|conceptual_error|incomplete|spelling|formatting",
+          "description": "Brief description of the error",
+          "severity": "minor|moderate|major",
+          "page": 1,
+          "region": "top|middle|bottom"
+        }}
+      ],
       "sub_scores": [
         {{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Feedback for part a"}},
         {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b"}}
@@ -1597,7 +1606,15 @@ Return your response in this exact JSON format:
   ]
 }}
 
+For error_annotations:
+- error_type: Type of mistake (calculation_error, conceptual_error, incomplete, spelling, formatting)
+- description: Brief explanation of what went wrong
+- severity: How serious the error is (minor=small deduction, moderate=significant, major=most marks lost)
+- page: Which page of the answer sheet (1-indexed)
+- region: Where on the page (top, middle, bottom third)
+
 If a question has no sub-questions, leave sub_scores as an empty array.
+If there are no errors, leave error_annotations as an empty array.
 """
     ).with_model("openai", "gpt-4o")
     
