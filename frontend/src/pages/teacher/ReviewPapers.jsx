@@ -557,84 +557,86 @@ export default function ReviewPapers({ user }) {
             <ScrollArea className="h-full">
               <div className="p-4 space-y-3">
                 {selectedSubmission.question_scores?.map((qs, index) => (
-              <div 
-                key={index}
-                className={`p-3 lg:p-4 rounded-lg border question-card ${
-                  qs.is_reviewed ? "reviewed" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2 lg:mb-3">
-                  <h4 className="font-semibold text-sm lg:text-base">Question {qs.question_number}</h4>
-                  <div className="flex items-center gap-1 lg:gap-2">
-                    <Input 
-                      type="number"
-                      value={qs.obtained_marks}
-                      onChange={(e) => updateQuestionScore(index, "obtained_marks", parseFloat(e.target.value) || 0)}
-                      className="w-16 lg:w-20 text-center text-sm"
-                      data-testid={`score-q${qs.question_number}`}
-                    />
-                    <span className="text-muted-foreground text-sm">/ {qs.max_marks}</span>
-                  </div>
-                </div>
-
-                {/* Full Question Text */}
-                {qs.question_text && (
-                  <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary">
-                    <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">
-                      <strong>Q{qs.question_number}.</strong> {qs.question_text}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2 lg:space-y-3">
-                  <div>
-                    <Label className="text-xs lg:text-sm text-muted-foreground">AI Feedback</Label>
-                    <Textarea 
-                      value={qs.ai_feedback}
-                      onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                      className="mt-1 text-xs lg:text-sm"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-xs lg:text-sm text-muted-foreground">Teacher Comment</Label>
-                    <Textarea 
-                      value={qs.teacher_comment || ""}
-                      onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
-                      placeholder="Add your comments..."
-                      className="mt-1 text-xs lg:text-sm"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Checkbox 
-                        id={`reviewed-${index}`}
-                        checked={qs.is_reviewed}
-                        onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
-                      />
-                      <Label htmlFor={`reviewed-${index}`} className="text-xs lg:text-sm cursor-pointer">
-                        Mark as reviewed
-                      </Label>
+                  <div 
+                    key={index}
+                    className={`p-3 lg:p-4 rounded-lg border question-card ${
+                      qs.is_reviewed ? "reviewed" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2 lg:mb-3">
+                      <h4 className="font-semibold text-sm lg:text-base">Question {qs.question_number}</h4>
+                      <div className="flex items-center gap-1 lg:gap-2">
+                        <Input 
+                          type="number"
+                          value={qs.obtained_marks}
+                          onChange={(e) => updateQuestionScore(index, "obtained_marks", parseFloat(e.target.value) || 0)}
+                          className="w-16 lg:w-20 text-center text-sm"
+                          data-testid={`score-q${qs.question_number}`}
+                        />
+                        <span className="text-muted-foreground text-sm">/ {qs.max_marks}</span>
+                      </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openFeedbackDialog(qs)}
-                      className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                      title="Submit feedback to improve AI grading"
-                    >
-                      <MessageSquarePlus className="w-3 h-3 mr-1" />
-                      Improve AI
-                    </Button>
+
+                    {/* Full Question Text */}
+                    {qs.question_text && (
+                      <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary">
+                        <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">
+                          <strong>Q{qs.question_number}.</strong> {qs.question_text}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 lg:space-y-3">
+                      <div>
+                        <Label className="text-xs lg:text-sm text-muted-foreground">AI Feedback</Label>
+                        <Textarea 
+                          value={qs.ai_feedback}
+                          onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                          className="mt-1 text-xs lg:text-sm"
+                          rows={2}
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs lg:text-sm text-muted-foreground">Teacher Comment</Label>
+                        <Textarea 
+                          value={qs.teacher_comment || ""}
+                          onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
+                          placeholder="Add your comments..."
+                          className="mt-1 text-xs lg:text-sm"
+                          rows={2}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id={`reviewed-desktop-${index}`}
+                            checked={qs.is_reviewed}
+                            onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
+                          />
+                          <Label htmlFor={`reviewed-desktop-${index}`} className="text-xs lg:text-sm cursor-pointer">
+                            Mark as reviewed
+                          </Label>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openFeedbackDialog(qs)}
+                          className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          title="Submit feedback to improve AI grading"
+                        >
+                          <MessageSquarePlus className="w-3 h-3 mr-1" />
+                          Improve AI
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ScrollArea>
+            </ScrollArea>
+          </Panel>
+        </PanelGroup>
       </div>
 
       {/* Footer Actions */}
