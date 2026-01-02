@@ -57,15 +57,10 @@ export default function TeacherDashboard({ user }) {
       });
       setGeneralFeedback("");
       setFeedbackDialogOpen(false);
-      // Show success toast using sonner if available
-      if (window.toast) {
-        window.toast.success("Feedback submitted! Thank you for helping improve the AI.");
-      } else {
-        alert("Feedback submitted successfully!");
-      }
+      toast.success("Feedback submitted! Thank you for helping improve the AI.");
     } catch (error) {
       console.error("Feedback error:", error);
-      alert("Failed to submit feedback");
+      toast.error("Failed to submit feedback");
     } finally {
       setSubmittingFeedback(false);
     }
