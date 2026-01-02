@@ -761,8 +761,8 @@ export default function ClassReports({ user }) {
               <RefreshCw className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : studentDeepDive ? (
-            <ScrollArea className="flex-1 max-h-[65vh]">
-              <div className="space-y-6 pb-4 pr-4">
+            <div className="overflow-y-auto max-h-[60vh] pr-2">
+              <div className="space-y-6 pb-4">
                 {/* Overview */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className={`p-3 rounded-lg text-center ${studentDeepDive.overall_average >= 70 ? 'bg-green-50' : studentDeepDive.overall_average >= 50 ? 'bg-amber-50' : 'bg-red-50'}`}>
