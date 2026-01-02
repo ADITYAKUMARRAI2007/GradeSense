@@ -1727,7 +1727,7 @@ Return valid JSON only."""
         
         # Parse the response
         import json
-        response_text = response.strip()
+        response_text = ai_response.strip()
         if response_text.startswith("```"):
             response_text = response_text.split("```")[1]
             if response_text.startswith("json"):
