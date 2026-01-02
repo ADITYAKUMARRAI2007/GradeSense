@@ -46,7 +46,8 @@ import {
   User,
   HelpCircle,
   Layers,
-  Zap
+  Zap,
+  CheckCircle
 } from "lucide-react";
 
 const COLORS = ['#F97316', '#3B82F6', '#22C55E', '#EAB308', '#EF4444'];
