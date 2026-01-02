@@ -1679,6 +1679,254 @@ print('Test data cleaned up');
         except Exception as e:
             print(f"⚠️  Cleanup error: {str(e)}")
 
+    def test_llm_feedback_submit_question_specific(self):
+        """Test LLM Feedback Loop - Submit question-specific feedback"""
+        print("\n🤖 Testing LLM Feedback Loop - Question-Specific Feedback...")
+        
+        # First create test data if needed
+        if not hasattr(self, 'p1_submission_id') or not hasattr(self, 'p1_exam_id'):
+            print("⚠️  Creating test submission for feedback testing...")
+            self.test_p1_submission_enrichment()
+        
+        if not hasattr(self, 'p1_submission_id'):
+            print("⚠️  Skipping feedback test - no test submission available")
+            return None
+        
+        # Test question-specific feedback submission
+        feedback_data = {
+            "submission_id": self.p1_submission_id,
+            "question_number": 1,
+            "feedback_type": "question_grading",
+            "question_text": "Solve the following algebraic equation step by step: 2x + 5 = 15",
+            "ai_grade": 45.0,
+            "ai_feedback": "Good algebraic manipulation",
+            "teacher_expected_grade": 48.0,
+            "teacher_correction": "The AI should give more credit for showing work steps clearly. Student demonstrated understanding of inverse operations."
+        }
+        
+        result = self.run_api_test(
+            "Submit Question-Specific Feedback",
+            "POST",
+            "feedback/submit",
+            200,
+            data=feedback_data
+        )
+        
+        if result:
+            feedback_id = result.get('feedback_id')
+            if feedback_id:
+                self.log_test("Feedback ID Generation", True, f"Generated feedback_id: {feedback_id}")
+                self.test_feedback_id = feedback_id
+            else:
+                self.log_test("Feedback ID Generation", False, "No feedback_id in response")
+        
+        return result
+
+    def test_llm_feedback_submit_general(self):
+        """Test LLM Feedback Loop - Submit general feedback"""
+        print("\n💡 Testing LLM Feedback Loop - General Feedback...")
+        
+        # Test general feedback submission (without submission_id)
+        general_feedback_data = {
+            "feedback_type": "general_suggestion",
+            "teacher_correction": "The AI grading system should be more lenient with partial credit for mathematical reasoning, even when the final answer is incorrect."
+        }
+        
+        result = self.run_api_test(
+            "Submit General Feedback",
+            "POST",
+            "feedback/submit",
+            200,
+            data=general_feedback_data
+        )
+        
+        if result:
+            feedback_id = result.get('feedback_id')
+            if feedback_id:
+                self.log_test("General Feedback ID Generation", True, f"Generated feedback_id: {feedback_id}")
+            else:
+                self.log_test("General Feedback ID Generation", False, "No feedback_id in response")
+        
+        return result
+
+    def test_llm_feedback_authentication(self):
+        """Test LLM Feedback Loop - Authentication required"""
+        print("\n🔒 Testing LLM Feedback Loop - Authentication...")
+        
+        # Store original token
+        original_token = self.session_token
+        
+        # Test without authentication
+        self.session_token = None
+        
+        feedback_data = {
+            "feedback_type": "general_suggestion",
+            "teacher_correction": "Test feedback without auth"
+        }
+        
+        result = self.run_api_test(
+            "Submit Feedback Without Auth (should fail)",
+            "POST",
+            "feedback/submit",
+            401,  # Should fail with 401
+            data=feedback_data
+        )
+        
+        # Restore token
+        self.session_token = original_token
+        
+        return result
+
+    def test_llm_feedback_validation(self):
+        """Test LLM Feedback Loop - Input validation"""
+        print("\n✅ Testing LLM Feedback Loop - Input Validation...")
+        
+        # Test missing required fields
+        invalid_feedback_data = {
+            "feedback_type": "question_grading"
+            # Missing teacher_correction
+        }
+        
+        result = self.run_api_test(
+            "Submit Feedback Missing Required Fields (should fail)",
+            "POST",
+            "feedback/submit",
+            422,  # Should fail with validation error
+            data=invalid_feedback_data
+        )
+        
+        # Test invalid feedback type
+        invalid_type_data = {
+            "feedback_type": "invalid_type",
+            "teacher_correction": "Test correction"
+        }
+        
+        result2 = self.run_api_test(
+            "Submit Feedback Invalid Type",
+            "POST",
+            "feedback/submit",
+            200,  # Should still work, just store the invalid type
+            data=invalid_type_data
+        )
+        
+        return result
+
+    def test_llm_feedback_get_my_feedback(self):
+        """Test LLM Feedback Loop - Get teacher's feedback"""
+        print("\n📋 Testing LLM Feedback Loop - Get My Feedback...")
+        
+        result = self.run_api_test(
+            "Get My Feedback Submissions",
+            "GET",
+            "feedback/my-feedback",
+            200
+        )
+        
+        if result:
+            feedback_list = result.get('feedback', [])
+            count = result.get('count', 0)
+            
+            self.log_test("Feedback Response Structure", True, 
+                f"Retrieved {count} feedback submissions")
+            
+            # Verify structure if feedback exists
+            if feedback_list:
+                first_feedback = feedback_list[0]
+                required_fields = ["feedback_id", "teacher_id", "feedback_type", "teacher_correction", "created_at"]
+                has_all_fields = all(field in first_feedback for field in required_fields)
+                
+                if has_all_fields:
+                    self.log_test("Feedback Structure Validation", True, "All required fields present")
+                else:
+                    missing_fields = [field for field in required_fields if field not in first_feedback]
+                    self.log_test("Feedback Structure Validation", False, f"Missing fields: {missing_fields}")
+            else:
+                self.log_test("Feedback Structure Validation", True, "No feedback to validate (empty list)")
+        
+        return result
+
+    def test_llm_feedback_comprehensive_workflow(self):
+        """Test LLM Feedback Loop - Complete workflow"""
+        print("\n🔄 Testing LLM Feedback Loop - Complete Workflow...")
+        
+        # Test different feedback types
+        feedback_scenarios = [
+            {
+                "name": "Grading Issue",
+                "data": {
+                    "submission_id": getattr(self, 'p1_submission_id', None),
+                    "question_number": 2,
+                    "feedback_type": "question_grading",
+                    "question_text": "Analyze the quadratic function f(x) = x² - 4x + 3",
+                    "ai_grade": 40.0,
+                    "ai_feedback": "Good analysis of quadratic function",
+                    "teacher_expected_grade": 45.0,
+                    "teacher_correction": "Student showed good understanding of vertex form but AI missed partial credit for graph sketching attempt."
+                }
+            },
+            {
+                "name": "AI Mistake",
+                "data": {
+                    "submission_id": getattr(self, 'p1_submission_id', None),
+                    "question_number": 1,
+                    "feedback_type": "correction",
+                    "question_text": "Solve algebraic equation",
+                    "ai_grade": 20.0,
+                    "ai_feedback": "Incorrect solution",
+                    "teacher_expected_grade": 35.0,
+                    "teacher_correction": "AI incorrectly penalized student for using alternative but valid solution method. The approach was mathematically sound."
+                }
+            },
+            {
+                "name": "General Suggestion",
+                "data": {
+                    "feedback_type": "general_suggestion",
+                    "teacher_correction": "The AI should be more flexible with mathematical notation variations. Students often use different but equivalent ways to express the same concept."
+                }
+            }
+        ]
+        
+        submitted_feedback_ids = []
+        
+        for scenario in feedback_scenarios:
+            result = self.run_api_test(
+                f"Submit {scenario['name']} Feedback",
+                "POST",
+                "feedback/submit",
+                200,
+                data=scenario['data']
+            )
+            
+            if result and result.get('feedback_id'):
+                submitted_feedback_ids.append(result['feedback_id'])
+        
+        # Verify all feedback was submitted
+        if len(submitted_feedback_ids) == len(feedback_scenarios):
+            self.log_test("Complete Workflow - All Feedback Types", True, 
+                f"Successfully submitted {len(submitted_feedback_ids)} different feedback types")
+        else:
+            self.log_test("Complete Workflow - All Feedback Types", False, 
+                f"Only {len(submitted_feedback_ids)} of {len(feedback_scenarios)} feedback submissions succeeded")
+        
+        # Get feedback to verify storage
+        my_feedback_result = self.run_api_test(
+            "Verify Feedback Storage",
+            "GET",
+            "feedback/my-feedback",
+            200
+        )
+        
+        if my_feedback_result:
+            stored_count = my_feedback_result.get('count', 0)
+            if stored_count >= len(submitted_feedback_ids):
+                self.log_test("Feedback Storage Verification", True, 
+                    f"All {len(submitted_feedback_ids)} feedback submissions stored correctly")
+            else:
+                self.log_test("Feedback Storage Verification", False, 
+                    f"Expected {len(submitted_feedback_ids)} feedback, found {stored_count}")
+        
+        return submitted_feedback_ids
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting GradeSense API Testing")
