@@ -29,7 +29,10 @@ import {
   EyeOff,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  MessageSquarePlus,
+  Send,
+  Lightbulb
 } from "lucide-react";
 
 export default function ReviewPapers({ user }) {
