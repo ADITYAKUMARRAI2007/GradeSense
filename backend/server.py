@@ -2904,7 +2904,7 @@ Only return the JSON object."""
         ).with_model("openai", "gpt-4o")
         
         user_message = UserMessage(text=inference_prompt)
-        ai_ai_response = await chat.send_message(user_message)
+        ai_response = await chat.send_message(user_message)
         
         import json
         try:
