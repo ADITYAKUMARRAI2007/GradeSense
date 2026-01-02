@@ -2349,6 +2349,627 @@ async def get_class_insights(
         "recommendations": recommendations
     }
 
+# ============== ADVANCED ANALYTICS ==============
+
+@api_router.get("/analytics/misconceptions")
+async def get_misconceptions_analysis(
+    exam_id: str,
+    user: User = Depends(get_current_user)
+):
+    """AI-powered analysis of common misconceptions and why students fail"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get exam and submissions
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "submission_id": 1, "student_name": 1, "question_scores": 1, "file_images": 1}
+    ).to_list(100)
+    
+    if not submissions:
+        return {"misconceptions": [], "question_insights": []}
+    
+    # Analyze each question for misconceptions
+    question_insights = []
+    misconceptions = []
+    
+    for q_idx, question in enumerate(exam.get("questions", [])):
+        q_num = question.get("question_number", q_idx + 1)
+        q_scores = []
+        wrong_answers = []
+        
+        for sub in submissions:
+            for qs in sub.get("question_scores", []):
+                if qs.get("question_number") == q_num:
+                    pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+                    q_scores.append(pct)
+                    if pct < 60:
+                        wrong_answers.append({
+                            "student_name": sub["student_name"],
+                            "submission_id": sub["submission_id"],
+                            "obtained": qs["obtained_marks"],
+                            "max": qs["max_marks"],
+                            "feedback": qs.get("ai_feedback", ""),
+                            "question_text": qs.get("question_text", "")
+                        })
+        
+        if q_scores:
+            avg_pct = sum(q_scores) / len(q_scores)
+            fail_rate = len([s for s in q_scores if s < 60]) / len(q_scores) * 100
+            
+            question_insights.append({
+                "question_number": q_num,
+                "question_text": question.get("rubric", f"Question {q_num}"),
+                "avg_percentage": round(avg_pct, 1),
+                "fail_rate": round(fail_rate, 1),
+                "total_students": len(q_scores),
+                "failing_students": len(wrong_answers),
+                "wrong_answers": wrong_answers[:5]  # Limit to 5 examples
+            })
+            
+            # If significant failure rate, add to misconceptions
+            if fail_rate >= 30 and wrong_answers:
+                misconceptions.append({
+                    "question_number": q_num,
+                    "fail_percentage": round(fail_rate, 1),
+                    "affected_students": len(wrong_answers),
+                    "sample_feedbacks": [wa["feedback"][:200] for wa in wrong_answers[:3] if wa["feedback"]]
+                })
+    
+    # Use AI to analyze misconceptions if we have significant data
+    ai_analysis = None
+    if misconceptions:
+        try:
+            from emergentintegrations.llm.chat import get_text_simple
+            llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+            
+            analysis_prompt = f"""Analyze these student misconceptions from exam "{exam.get('exam_name', 'Unknown')}":
+
+{[{
+    'question': m['question_number'],
+    'fail_rate': f"{m['fail_percentage']}%",
+    'sample_feedback': m['sample_feedbacks']
+} for m in misconceptions[:5]]}
+
+For each question with high failure rate, identify:
+1. The likely conceptual confusion or mistake pattern
+2. What concept students confused with another concept
+3. A brief explanation of why this confusion happens
+
+Return as JSON array with format:
+[{{"question": 1, "confusion": "Students confused X with Y", "reason": "brief explanation", "recommendation": "teaching suggestion"}}]
+
+Only return the JSON array, no other text."""
+
+            ai_response = await asyncio.to_thread(
+                get_text_simple,
+                emergent_api_key=llm_key,
+                llm_type="openai",
+                model_id="gpt-4o",
+                prompt=analysis_prompt,
+                temperature=0.3
+            )
+            
+            import json
+            try:
+                # Clean response and parse JSON
+                cleaned = ai_response.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                ai_analysis = json.loads(cleaned)
+            except:
+                ai_analysis = None
+        except Exception as e:
+            logger.error(f"AI misconception analysis error: {e}")
+    
+    return {
+        "exam_name": exam.get("exam_name"),
+        "total_submissions": len(submissions),
+        "misconceptions": misconceptions,
+        "question_insights": sorted(question_insights, key=lambda x: x["fail_rate"], reverse=True),
+        "ai_analysis": ai_analysis or []
+    }
+
+
+@api_router.get("/analytics/topic-mastery")
+async def get_topic_mastery(
+    exam_id: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """Get topic-based mastery heatmap data"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Build query
+    exam_query = {"teacher_id": user.user_id}
+    if exam_id:
+        exam_query["exam_id"] = exam_id
+    if batch_id:
+        exam_query["batch_id"] = batch_id
+    
+    exams = await db.exams.find(exam_query, {"_id": 0}).to_list(50)
+    if not exams:
+        return {"topics": [], "students_by_topic": {}}
+    
+    exam_ids = [e["exam_id"] for e in exams]
+    
+    # Get all submissions
+    submissions = await db.submissions.find(
+        {"exam_id": {"$in": exam_ids}},
+        {"_id": 0, "student_id": 1, "student_name": 1, "exam_id": 1, "question_scores": 1}
+    ).to_list(500)
+    
+    # Build topic performance data
+    topic_data = {}
+    student_topic_scores = {}
+    
+    for exam in exams:
+        for question in exam.get("questions", []):
+            q_num = question.get("question_number", 0)
+            # Get topic tags (either manually set or use question number as fallback)
+            topics = question.get("topic_tags", [])
+            if not topics:
+                # Infer topic from rubric or use default
+                rubric = question.get("rubric", "")
+                if rubric:
+                    topics = [rubric[:50]]
+                else:
+                    topics = [f"Question {q_num}"]
+            
+            for topic in topics:
+                if topic not in topic_data:
+                    topic_data[topic] = {"scores": [], "max_marks": 0, "students": {}}
+                
+                # Find scores for this question
+                for sub in submissions:
+                    if sub["exam_id"] != exam["exam_id"]:
+                        continue
+                    for qs in sub.get("question_scores", []):
+                        if qs.get("question_number") == q_num:
+                            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+                            topic_data[topic]["scores"].append(pct)
+                            topic_data[topic]["max_marks"] = max(topic_data[topic]["max_marks"], qs["max_marks"])
+                            
+                            # Track per-student performance
+                            student_id = sub["student_id"]
+                            student_name = sub["student_name"]
+                            if student_id not in topic_data[topic]["students"]:
+                                topic_data[topic]["students"][student_id] = {
+                                    "name": student_name,
+                                    "scores": []
+                                }
+                            topic_data[topic]["students"][student_id]["scores"].append(pct)
+    
+    # Calculate topic mastery levels
+    topics = []
+    students_by_topic = {}
+    
+    for topic, data in topic_data.items():
+        if not data["scores"]:
+            continue
+        
+        avg = sum(data["scores"]) / len(data["scores"])
+        
+        # Determine mastery level
+        if avg >= 70:
+            level = "mastered"
+            color = "green"
+        elif avg >= 50:
+            level = "developing"
+            color = "amber"
+        else:
+            level = "critical"
+            color = "red"
+        
+        # Find struggling students for this topic
+        struggling_students = []
+        for student_id, student_data in data["students"].items():
+            student_avg = sum(student_data["scores"]) / len(student_data["scores"])
+            if student_avg < 50:
+                struggling_students.append({
+                    "student_id": student_id,
+                    "name": student_data["name"],
+                    "avg_score": round(student_avg, 1)
+                })
+        
+        topics.append({
+            "topic": topic,
+            "avg_percentage": round(avg, 1),
+            "level": level,
+            "color": color,
+            "sample_count": len(data["scores"]),
+            "struggling_count": len(struggling_students)
+        })
+        
+        students_by_topic[topic] = sorted(struggling_students, key=lambda x: x["avg_score"])[:10]
+    
+    return {
+        "topics": sorted(topics, key=lambda x: x["avg_percentage"]),
+        "students_by_topic": students_by_topic
+    }
+
+
+@api_router.get("/analytics/student-deep-dive/{student_id}")
+async def get_student_deep_dive(
+    student_id: str,
+    exam_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """Get detailed student analysis with AI-generated insights"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get student info
+    student = await db.users.find_one({"user_id": student_id}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Get submissions
+    sub_query = {"student_id": student_id}
+    if exam_id:
+        sub_query["exam_id"] = exam_id
+    
+    submissions = await db.submissions.find(sub_query, {"_id": 0}).to_list(20)
+    
+    if not submissions:
+        return {
+            "student": {"name": student.get("name", "Unknown"), "email": student.get("email", "")},
+            "worst_questions": [],
+            "performance_trend": [],
+            "ai_analysis": None
+        }
+    
+    # Find worst performing questions
+    all_question_scores = []
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "exam_name": 1, "model_answer_images": 1})
+        for qs in sub.get("question_scores", []):
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+            all_question_scores.append({
+                "exam_name": exam.get("exam_name", "Unknown") if exam else "Unknown",
+                "exam_id": sub["exam_id"],
+                "submission_id": sub["submission_id"],
+                "question_number": qs["question_number"],
+                "question_text": qs.get("question_text", ""),
+                "obtained_marks": qs["obtained_marks"],
+                "max_marks": qs["max_marks"],
+                "percentage": round(pct, 1),
+                "ai_feedback": qs.get("ai_feedback", ""),
+                "has_model_answer": bool(exam.get("model_answer_images") if exam else False)
+            })
+    
+    # Sort by percentage (worst first)
+    worst_questions = sorted(all_question_scores, key=lambda x: x["percentage"])[:5]
+    
+    # Performance trend
+    performance_trend = []
+    for sub in sorted(submissions, key=lambda x: x.get("created_at", "")):
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "exam_name": 1})
+        performance_trend.append({
+            "exam_name": exam.get("exam_name", "Unknown") if exam else "Unknown",
+            "percentage": sub["percentage"],
+            "date": sub.get("created_at", "").isoformat() if sub.get("created_at") else ""
+        })
+    
+    # Generate AI analysis
+    ai_analysis = None
+    if worst_questions:
+        try:
+            from emergentintegrations.llm.chat import get_text_simple
+            llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+            
+            analysis_prompt = f"""Analyze this student's performance and provide specific improvement guidance:
+
+Student: {student.get('name', 'Unknown')}
+Overall Average: {sum(s['percentage'] for s in submissions)/len(submissions):.1f}%
+
+Worst Performing Questions:
+{[{
+    'exam': q['exam_name'],
+    'question': q['question_number'],
+    'score': f"{q['obtained_marks']}/{q['max_marks']} ({q['percentage']}%)",
+    'feedback': q['ai_feedback'][:150]
+} for q in worst_questions]}
+
+Provide:
+1. A brief summary of the student's main weaknesses
+2. Specific study recommendations (2-3 points)
+3. What concepts need review
+
+Keep response concise (under 200 words). Format as JSON:
+{{"summary": "...", "recommendations": ["...", "..."], "concepts_to_review": ["...", "..."]}}"""
+
+            ai_response = await asyncio.to_thread(
+                get_text_simple,
+                emergent_api_key=llm_key,
+                llm_type="openai",
+                model_id="gpt-4o",
+                prompt=analysis_prompt,
+                temperature=0.3
+            )
+            
+            import json
+            try:
+                cleaned = ai_response.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                ai_analysis = json.loads(cleaned)
+            except:
+                ai_analysis = {"summary": ai_response[:300]}
+        except Exception as e:
+            logger.error(f"AI student analysis error: {e}")
+    
+    return {
+        "student": {
+            "name": student.get("name", "Unknown"),
+            "email": student.get("email", ""),
+            "student_id": student_id
+        },
+        "overall_average": round(sum(s["percentage"] for s in submissions)/len(submissions), 1) if submissions else 0,
+        "total_exams": len(submissions),
+        "worst_questions": worst_questions,
+        "performance_trend": performance_trend,
+        "ai_analysis": ai_analysis
+    }
+
+
+@api_router.post("/analytics/generate-review-packet")
+async def generate_review_packet(
+    exam_id: str,
+    user: User = Depends(get_current_user)
+):
+    """Generate AI-powered practice questions based on weak topics"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get exam info
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get submissions to identify weak areas
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "question_scores": 1}
+    ).to_list(100)
+    
+    if not submissions:
+        raise HTTPException(status_code=400, detail="No submissions found for this exam")
+    
+    # Analyze weak questions
+    question_performance = {}
+    for sub in submissions:
+        for qs in sub.get("question_scores", []):
+            q_num = qs["question_number"]
+            if q_num not in question_performance:
+                question_performance[q_num] = {"scores": [], "max": qs["max_marks"], "text": qs.get("question_text", "")}
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
+            question_performance[q_num]["scores"].append(pct)
+    
+    # Find weak questions (avg < 60%)
+    weak_questions = []
+    for q_num, data in question_performance.items():
+        avg = sum(data["scores"]) / len(data["scores"])
+        if avg < 60:
+            weak_questions.append({
+                "question_number": q_num,
+                "avg_percentage": round(avg, 1),
+                "question_text": data["text"],
+                "max_marks": data["max"]
+            })
+    
+    if not weak_questions:
+        return {
+            "message": "No weak areas identified - all questions have good performance!",
+            "practice_questions": []
+        }
+    
+    # Generate practice questions using AI
+    try:
+        from emergentintegrations.llm.chat import get_text_simple
+        llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        
+        subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
+        subject_name = subject.get("name", "General") if subject else "General"
+        
+        generation_prompt = f"""Generate 5 practice questions for students based on these weak areas from a {subject_name} exam:
+
+Exam: {exam.get('exam_name', 'Unknown')}
+Weak Questions:
+{[{
+    'question': q['question_number'],
+    'topic': q['question_text'][:100] if q['question_text'] else f"Question {q['question_number']}",
+    'avg_score': f"{q['avg_percentage']}%",
+    'max_marks': q['max_marks']
+} for q in weak_questions[:5]]}
+
+Generate 5 practice questions that:
+1. Target the same concepts as the weak questions
+2. Have varying difficulty levels
+3. Include a mix of question types
+4. Help students understand the underlying concepts
+
+Return as JSON array:
+[{{
+    "question_number": 1,
+    "question": "question text",
+    "marks": 5,
+    "topic": "topic being tested",
+    "difficulty": "easy/medium/hard",
+    "hint": "optional hint for students"
+}}]
+
+Only return the JSON array."""
+
+        ai_response = await asyncio.to_thread(
+            get_text_simple,
+            emergent_api_key=llm_key,
+            llm_type="openai",
+            model_id="gpt-4o",
+            prompt=generation_prompt,
+            temperature=0.7
+        )
+        
+        import json
+        try:
+            cleaned = ai_response.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+            practice_questions = json.loads(cleaned)
+        except:
+            practice_questions = []
+        
+        return {
+            "exam_name": exam.get("exam_name"),
+            "subject": subject_name,
+            "weak_areas_identified": len(weak_questions),
+            "practice_questions": practice_questions,
+            "generated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating review packet: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate practice questions")
+
+
+@api_router.post("/exams/{exam_id}/infer-topics")
+async def infer_question_topics(
+    exam_id: str,
+    user: User = Depends(get_current_user)
+):
+    """Use AI to automatically infer topic tags for exam questions"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    questions = exam.get("questions", [])
+    if not questions:
+        raise HTTPException(status_code=400, detail="No questions found in exam")
+    
+    # Get subject info for context
+    subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
+    subject_name = subject.get("name", "General") if subject else "General"
+    
+    try:
+        from emergentintegrations.llm.chat import get_text_simple
+        llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        
+        # Build question data
+        question_data = []
+        for q in questions:
+            question_data.append({
+                "number": q.get("question_number"),
+                "rubric": q.get("rubric", ""),
+                "marks": q.get("max_marks")
+            })
+        
+        inference_prompt = f"""Analyze these exam questions from a {subject_name} exam and assign topic tags:
+
+Exam: {exam.get('exam_name', 'Unknown')}
+Subject: {subject_name}
+
+Questions:
+{question_data}
+
+For each question, provide 1-3 topic tags that describe what concept/skill is being tested.
+Topics should be specific but not too narrow (e.g., "Grammar - Tenses", "Algebra - Quadratic Equations", "Reading Comprehension").
+
+Return as JSON:
+{{
+    "1": ["Topic A", "Topic B"],
+    "2": ["Topic C"],
+    ...
+}}
+
+Only return the JSON object."""
+
+        ai_response = await asyncio.to_thread(
+            get_text_simple,
+            emergent_api_key=llm_key,
+            llm_type="openai",
+            model_id="gpt-4o",
+            prompt=inference_prompt,
+            temperature=0.3
+        )
+        
+        import json
+        try:
+            cleaned = ai_response.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+            topic_mapping = json.loads(cleaned)
+        except:
+            raise HTTPException(status_code=500, detail="Failed to parse AI response")
+        
+        # Update questions with topic tags
+        updated_questions = []
+        for q in questions:
+            q_num = str(q.get("question_number"))
+            q["topic_tags"] = topic_mapping.get(q_num, [])
+            updated_questions.append(q)
+        
+        # Save to database
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {"questions": updated_questions}}
+        )
+        
+        return {
+            "message": "Topic tags inferred successfully",
+            "topics": topic_mapping
+        }
+        
+    except Exception as e:
+        logger.error(f"Error inferring topics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to infer topic tags")
+
+
+@api_router.put("/exams/{exam_id}/question-topics")
+async def update_question_topics(
+    exam_id: str,
+    topics: Dict[str, List[str]],
+    user: User = Depends(get_current_user)
+):
+    """Manually update topic tags for exam questions"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Update questions with new topic tags
+    updated_questions = []
+    for q in exam.get("questions", []):
+        q_num = str(q.get("question_number"))
+        if q_num in topics:
+            q["topic_tags"] = topics[q_num]
+        updated_questions.append(q)
+    
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {"questions": updated_questions}}
+    )
+    
+    return {"message": "Topic tags updated successfully"}
+
+
 @api_router.get("/analytics/student-dashboard")
 async def get_student_dashboard(user: User = Depends(get_current_user)):
     """Get student's personal dashboard analytics"""
