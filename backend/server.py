@@ -16,6 +16,7 @@ import fitz
 import io
 from PIL import Image
 import asyncio
+import hashlib
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
