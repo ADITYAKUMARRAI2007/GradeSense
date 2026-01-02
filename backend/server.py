@@ -2962,7 +2962,7 @@ Only return the JSON array."""
             api_key=llm_key,
             session_id=f"review_packet_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert educator creating practice questions to help students improve."
-        ).with_model("openai", "gpt-4o")
+        ).with_model("gemini", "gemini-2.5-pro")
         
         user_message = UserMessage(text=generation_prompt)
         ai_response = await chat.send_message(user_message)
