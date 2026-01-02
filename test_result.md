@@ -697,6 +697,96 @@ test_plan:
           agent: "testing"
           comment: "✅ P1 ENHANCEMENTS COMPREHENSIVE VERIFICATION COMPLETE! Successfully verified both Question Number Prefix and Annotation Toggle features through code analysis and partial UI testing. ✅ QUESTION NUMBER PREFIX VERIFIED: 1) Teacher ReviewPapers.jsx: Lines 276-282 implement Q{number}. prefix with bold styling in highlighted question text boxes (bg-muted/50, border-l-2 border-primary) 2) Student Results.jsx: Lines 290-296 implement Q{number}. prefix in blue highlighted boxes (bg-blue-50, border-l-4 border-blue-400) 3) Backend Support: GET /api/submissions/{submission_id} endpoint (lines 1693-1721) correctly enriches response with question_text field from exam.questions.rubric. ✅ ANNOTATION TOGGLE VERIFIED: 1) Teacher Implementation: Checkbox with id='show-annotations', 'Show Mistakes' label with Eye/EyeOff icons (lines 188-202), red overlay system for questions scoring < 60% with positioning and labels (lines 213-239) 2) Student Implementation: Checkbox with id='show-annotations-student', same label and icon system (lines 217-231), identical red overlay system (lines 242-268) 3) Visual Styling: Semi-transparent red background (bg-red-500/20), 2px red border, positioned at calculated percentages, Q{number}: {score}/{max} labels. ✅ TECHNICAL VERIFICATION: Both features properly implemented with correct data-testid attributes, responsive design, proper state management with showAnnotations state variable, Eye/EyeOff icon toggling, overlay positioning logic, and score percentage calculations. OAuth authentication prevented full E2E testing but code implementation is production-ready and fully functional. All P1 enhancement requirements successfully implemented."
 
+  - task: "Advanced Analytics - Misconceptions Analysis"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Advanced Analytics misconceptions analysis endpoint implemented at lines 2354-2477. GET /api/analytics/misconceptions provides AI-powered analysis of common student misconceptions with question insights, failure rates, and AI-generated analysis of confusion patterns."
+        - working: true
+          agent: "testing"
+          comment: "✅ MISCONCEPTIONS ANALYSIS VERIFIED: Successfully tested GET /api/analytics/misconceptions endpoint. API returns 200 status with proper response structure including misconceptions array, question_insights with avg_percentage/fail_rate/failing_students/wrong_answers, and AI analysis. Authentication required (401 without auth). Core functionality working correctly."
+
+  - task: "Advanced Analytics - Topic Mastery Heatmap"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Advanced Analytics topic mastery endpoint implemented at lines 2480-2596. GET /api/analytics/topic-mastery provides topic-based performance analysis with color-coded mastery levels (green >=70%, amber 50-69%, red <50%) and struggling students identification."
+        - working: true
+          agent: "testing"
+          comment: "✅ TOPIC MASTERY VERIFIED: Successfully tested GET /api/analytics/topic-mastery endpoint with exam_id and batch_id filters. API returns 200 status with topics array containing topic/avg_percentage/level/color/sample_count/struggling_count and students_by_topic object. Color coding working correctly (green/amber/red based on performance thresholds). All filter combinations functional."
+
+  - task: "Advanced Analytics - Student Deep Dive"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Advanced Analytics student deep dive endpoint implemented at lines 2599-2722. GET /api/analytics/student-deep-dive/{student_id} provides detailed student analysis with worst questions, performance trends, and AI-generated improvement recommendations."
+        - working: true
+          agent: "testing"
+          comment: "✅ STUDENT DEEP DIVE VERIFIED: Successfully tested GET /api/analytics/student-deep-dive/{student_id} endpoint. API returns 200 status with student info, overall_average, worst_questions, performance_trend, and ai_analysis containing summary/recommendations/concepts_to_review. Authentication required and student data access working correctly."
+
+  - task: "Advanced Analytics - Generate Review Packet"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Advanced Analytics review packet generation endpoint implemented at lines 2725-2843. POST /api/analytics/generate-review-packet analyzes weak areas and generates AI-powered practice questions with varying difficulty levels and hints."
+        - working: true
+          agent: "testing"
+          comment: "✅ REVIEW PACKET GENERATION VERIFIED: Successfully tested POST /api/analytics/generate-review-packet endpoint. API correctly handles exams with no submissions (400 - No submissions found) and exams with weak areas. Response structure includes exam_name, practice_questions array with question_number/question/marks/topic/difficulty/hint, and weak_areas_identified count. AI integration working correctly."
+
+  - task: "Advanced Analytics - Auto-Infer Topic Tags"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Advanced Analytics auto-infer topic tags endpoint implemented at lines 2846-2940. POST /api/exams/{exam_id}/infer-topics uses AI to automatically analyze exam questions and assign relevant topic tags based on content and subject context."
+        - working: true
+          agent: "testing"
+          comment: "✅ AUTO-INFER TOPICS VERIFIED: Successfully tested POST /api/exams/{exam_id}/infer-topics endpoint. API returns 200 status with message and topics object mapping question numbers to topic arrays. AI correctly identifies topics like 'Algebra - Quadratic Equations', 'Calculus - Derivatives' based on question content. Authentication required (401 without auth) and topics are saved to database."
+
+  - task: "Advanced Analytics - Manual Topic Updates"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Advanced Analytics manual topic update endpoint implemented at lines 2943-2970. PUT /api/exams/{exam_id}/question-topics allows teachers to manually update topic tags for exam questions with custom topic assignments."
+        - working: true
+          agent: "testing"
+          comment: "✅ MANUAL TOPIC UPDATES VERIFIED: Successfully tested PUT /api/exams/{exam_id}/question-topics endpoint. API returns 200 status with success message. Topics are correctly saved to database and persist across requests. Verified by retrieving exam and confirming topic_tags field contains assigned topics. Empty topics arrays also handled correctly."
+
 agent_communication:
     - agent: "main"
       message: "P1 BUG FIX IMPLEMENTED: Student Results dialog layout has been completely redesigned to fix the critical layout issue. The new horizontal two-panel layout ensures both answer sheets and questions/feedback are visible simultaneously. Left panel shows answer sheet images (50% width) with independent scroll, right panel shows questions with full text and feedback (50% width) with independent scroll. Dialog size increased to max-w-6xl and max-h-[90vh] for better visibility. Summary moved to top as banner. Need comprehensive testing with student credentials (ayushpoojary037@gmail.com) to verify: 1) Side-by-side layout working 2) Both panels independently scrollable 3) All content visible and accessible 4) Submissions with no answer sheets show right panel full width 5) Edge cases with multiple pages and long content."
