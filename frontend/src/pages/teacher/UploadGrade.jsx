@@ -236,8 +236,8 @@ export default function UploadGrade({ user }) {
   const handleUploadModelAnswer = async () => {
     if (!examId) return;
     
-    // If no model answer, just move to next step
-    if (!modelAnswerFile) {
+    // If no model answer and no question paper, just move to next step
+    if (!modelAnswerFile && !questionPaperFile) {
       setStep(5);
       toast.info("Proceeding without model answer. AI will grade based on question rubrics.");
       return;
@@ -245,18 +245,30 @@ export default function UploadGrade({ user }) {
     
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", modelAnswerFile);
+      // Upload question paper if provided
+      if (questionPaperFile) {
+        const qpFormData = new FormData();
+        qpFormData.append("file", questionPaperFile);
+        await axios.post(`${API}/exams/${examId}/upload-question-paper`, qpFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        toast.success("Question paper uploaded");
+      }
       
-      await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      // Upload model answer if provided
+      if (modelAnswerFile) {
+        const formData = new FormData();
+        formData.append("file", modelAnswerFile);
+        await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        toast.success("Model answer uploaded");
+      }
       
-      toast.success("Model answer uploaded successfully");
       setStep(5);
     } catch (error) {
       console.error("Error:", error);
-      toast.error(error.response?.data?.detail || "Failed to upload model answer");
+      toast.error(error.response?.data?.detail || "Failed to upload files");
     } finally {
       setLoading(false);
     }
