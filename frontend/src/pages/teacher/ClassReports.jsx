@@ -744,7 +744,7 @@ export default function ClassReports({ user }) {
 
       {/* Student Deep-Dive Modal */}
       <Dialog open={!!selectedStudent} onOpenChange={() => { setSelectedStudent(null); setStudentDeepDive(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="w-5 h-5 text-primary" />
@@ -760,12 +760,14 @@ export default function ClassReports({ user }) {
               <RefreshCw className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : studentDeepDive ? (
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-6 pb-4">
+            <ScrollArea className="flex-1 max-h-[65vh]">
+              <div className="space-y-6 pb-4 pr-4">
                 {/* Overview */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="p-3 bg-muted rounded-lg text-center">
-                    <p className="text-2xl font-bold">{studentDeepDive.overall_average}%</p>
+                  <div className={`p-3 rounded-lg text-center ${studentDeepDive.overall_average >= 70 ? 'bg-green-50' : studentDeepDive.overall_average >= 50 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                    <p className={`text-2xl font-bold ${studentDeepDive.overall_average >= 70 ? 'text-green-600' : studentDeepDive.overall_average >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {studentDeepDive.overall_average}%
+                    </p>
                     <p className="text-xs text-muted-foreground">Overall Average</p>
                   </div>
                   <div className="p-3 bg-muted rounded-lg text-center">
@@ -773,8 +775,10 @@ export default function ClassReports({ user }) {
                     <p className="text-xs text-muted-foreground">Total Exams</p>
                   </div>
                   <div className="p-3 bg-muted rounded-lg text-center">
-                    <p className="text-2xl font-bold">{studentDeepDive.worst_questions?.length || 0}</p>
-                    <p className="text-xs text-muted-foreground">Weak Areas</p>
+                    <p className="text-2xl font-bold">
+                      {studentDeepDive.worst_questions?.filter(q => q.percentage < 50).length || 0}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Areas to Improve</p>
                   </div>
                 </div>
                 
