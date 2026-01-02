@@ -432,7 +432,7 @@ export default function ClassReports({ user }) {
                   <Layers className="w-5 h-5 text-primary" />
                   Topic Mastery Heatmap
                 </CardTitle>
-                <CardDescription>Color-coded performance by topic area</CardDescription>
+                <CardDescription>Click on a topic to see details and take action</CardDescription>
               </div>
               {loadingTopicMastery && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
             </div>
@@ -466,13 +466,12 @@ export default function ClassReports({ user }) {
                   {topicMastery.topics.map((topic, idx) => (
                     <div
                       key={idx}
-                      className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 ${
+                      className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${
                         topic.color === "green" ? "bg-green-50 border-green-300 hover:border-green-500" :
                         topic.color === "amber" ? "bg-amber-50 border-amber-300 hover:border-amber-500" :
                         "bg-red-50 border-red-300 hover:border-red-500"
                       }`}
-                      onMouseEnter={() => setHoveredTopic(topic.topic)}
-                      onMouseLeave={() => setHoveredTopic(null)}
+                      onClick={() => setSelectedTopic(topic)}
                     >
                       <p className="font-medium text-sm truncate mb-1" title={topic.topic}>
                         {topic.topic}
@@ -484,20 +483,26 @@ export default function ClassReports({ user }) {
                       }`}>
                         {topic.avg_percentage}%
                       </p>
-                      {topic.struggling_count > 0 && (
-                        <Badge variant="outline" className="mt-2 text-xs">
-                          {topic.struggling_count} struggling
-                        </Badge>
-                      )}
-                      
-                      {/* Hover tooltip showing struggling students */}
-                      {hoveredTopic === topic.topic && topicMastery.students_by_topic[topic.topic]?.length > 0 && (
-                        <div className="absolute z-10 left-full ml-2 top-0 bg-white border shadow-lg rounded-lg p-3 min-w-[200px]">
-                          <p className="text-xs font-semibold mb-2 text-red-600">Struggling Students:</p>
-                          <div className="space-y-1">
-                            {topicMastery.students_by_topic[topic.topic].slice(0, 5).map((s, i) => (
-                              <div key={i} className="flex items-center justify-between text-xs">
-                                <span className="truncate">{s.name}</span>
+                      <div className="flex items-center gap-2 mt-2">
+                        {topic.question_count > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {topic.question_count} Q
+                          </Badge>
+                        )}
+                        {topic.struggling_count > 0 && (
+                          <Badge variant="outline" className="text-xs text-red-600 border-red-300">
+                            {topic.struggling_count} need help
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">Click to view details →</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
                                 <span className="text-red-600 font-medium">{s.avg_score}%</span>
                               </div>
                             ))}
