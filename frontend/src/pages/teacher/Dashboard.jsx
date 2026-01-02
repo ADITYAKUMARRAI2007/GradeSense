@@ -13,9 +13,14 @@ import {
   TrendingUp,
   AlertCircle,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  MessageSquarePlus,
+  Send,
+  Lightbulb
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Textarea } from "../../components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 
 export default function TeacherDashboard({ user }) {
   const [analytics, setAnalytics] = useState(null);
