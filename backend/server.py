@@ -1400,18 +1400,41 @@ Important:
 
 def parse_student_from_filename(filename: str) -> tuple:
     """
-    Parse student name from filename (student ID is now extracted from paper)
-    Optional format: StudentName.pdf or any filename
-    Returns: (None, student_name) - ID will be extracted from paper
+    Parse student ID and name from filename
+    Expected formats: 
+    - STU003_Sagar_Maths.pdf -> (STU003, Sagar)
+    - 123_John_Doe.pdf -> (123, John Doe)
+    - StudentName.pdf -> (None, StudentName)
+    Returns: (student_id, student_name)
     """
     try:
         # Remove .pdf extension
         name_part = filename.replace(".pdf", "").replace(".PDF", "")
         
-        # Clean up the filename to get potential name
+        # Split by underscore
+        parts = name_part.split("_")
+        
+        if len(parts) >= 2:
+            # First part is likely student ID
+            potential_id = parts[0].strip()
+            # Second part is likely student name (may have more parts for full name)
+            # Exclude common suffixes like subject names at the end
+            name_parts = []
+            for part in parts[1:]:
+                # Skip if it looks like a subject name (very rough heuristic)
+                if part.lower() in ['maths', 'math', 'english', 'science', 'physics', 'chemistry', 'biology', 'history', 'geography']:
+                    break
+                name_parts.append(part)
+            
+            potential_name = " ".join(name_parts).strip().title()
+            
+            # Validate ID (should be alphanumeric, not too long)
+            if potential_id and len(potential_id) <= 20:
+                return (potential_id, potential_name if potential_name else None)
+        
+        # Fallback: try to clean up the filename as a name
         student_name = name_part.replace("_", " ").replace("-", " ").strip().title()
         
-        # Return None for ID (will be extracted from paper), and cleaned name
         if student_name and len(student_name) >= 2:
             return (None, student_name)
         
