@@ -138,6 +138,48 @@ export default function ManageExams({ user }) {
     }
   };
 
+  const handleExtractQuestions = async (exam) => {
+    if (!exam.model_answer_images?.length) {
+      toast.error("No model answer uploaded for this exam");
+      return;
+    }
+
+    setExtractingQuestions(true);
+    try {
+      const response = await axios.post(`${API}/exams/${exam.exam_id}/extract-questions`);
+      toast.success(`Extracted ${response.data.questions?.length || 0} questions from model answer`);
+      fetchData();
+      // Refresh selected exam
+      const updatedExam = await axios.get(`${API}/exams/${exam.exam_id}`);
+      setSelectedExam(updatedExam.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to extract questions");
+    } finally {
+      setExtractingQuestions(false);
+    }
+  };
+
+  const handleInferTopics = async (exam) => {
+    if (!exam.questions?.length) {
+      toast.error("No questions found. Extract questions first.");
+      return;
+    }
+
+    setInferringTopics(true);
+    try {
+      const response = await axios.post(`${API}/exams/${exam.exam_id}/infer-topics`);
+      toast.success("Topic tags inferred successfully!");
+      fetchData();
+      // Refresh selected exam
+      const updatedExam = await axios.get(`${API}/exams/${exam.exam_id}`);
+      setSelectedExam(updatedExam.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to infer topics");
+    } finally {
+      setInferringTopics(false);
+    }
+  };
+
   const handleDelete = async (exam) => {
     if (!confirm(`Are you sure you want to delete "${exam.exam_name}"? This will also delete all submissions and re-evaluation requests associated with this exam.`)) {
       return;
