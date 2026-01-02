@@ -100,10 +100,11 @@ export default function ReviewPapers({ user }) {
       setSelectedSubmission(response.data);
       setDialogOpen(true);
       
-      // Fetch exam to get model answer
+      // Fetch exam to get model answer and question paper
       if (response.data.exam_id) {
         const examResponse = await axios.get(`${API}/exams/${response.data.exam_id}`);
         setModelAnswerImages(examResponse.data.model_answer_images || []);
+        setQuestionPaperImages(examResponse.data.question_paper_images || []);
       }
     } catch (error) {
       toast.error("Failed to load submission details");
