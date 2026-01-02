@@ -867,7 +867,7 @@ export default function ClassReports({ user }) {
                   </div>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           ) : (
             <p className="text-center text-muted-foreground py-8">No data available</p>
           )}
