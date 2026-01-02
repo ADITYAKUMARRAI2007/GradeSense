@@ -341,10 +341,10 @@ export default function ReviewPapers({ user }) {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-        {/* Student Answer + Model Answer Panels */}
-        <div className="h-48 lg:h-auto lg:flex-1 border-b lg:border-b-0 lg:border-r overflow-auto bg-muted/30 p-2 lg:p-4">
+      {/* Content - Resizable Panels for Desktop */}
+      <div className="flex-1 overflow-hidden flex flex-col lg:hidden">
+        {/* Mobile: Stack vertically without resize */}
+        <div className="h-48 border-b overflow-auto bg-muted/30 p-2">
           {selectedSubmission.file_images?.length > 0 ? (
             <div className="space-y-3">
               {/* Toggle Controls */}
@@ -355,13 +355,13 @@ export default function ReviewPapers({ user }) {
                   {modelAnswerImages.length > 0 && (
                     <div className="flex items-center gap-2">
                       <Checkbox 
-                        id="show-model-answer"
+                        id="show-model-answer-mobile"
                         checked={showModelAnswer}
                         onCheckedChange={setShowModelAnswer}
                       />
-                      <Label htmlFor="show-model-answer" className="text-xs cursor-pointer flex items-center gap-1">
+                      <Label htmlFor="show-model-answer-mobile" className="text-xs cursor-pointer flex items-center gap-1">
                         <FileText className="w-3 h-3" />
-                        Model Answer
+                        Model
                       </Label>
                     </div>
                   )}
@@ -369,102 +369,29 @@ export default function ReviewPapers({ user }) {
                   {/* Mistakes Toggle */}
                   <div className="flex items-center gap-2">
                     <Checkbox 
-                      id="show-annotations"
+                      id="show-annotations-mobile"
                       checked={showAnnotations}
                       onCheckedChange={setShowAnnotations}
                     />
-                    <Label htmlFor="show-annotations" className="text-xs cursor-pointer flex items-center gap-1">
+                    <Label htmlFor="show-annotations-mobile" className="text-xs cursor-pointer flex items-center gap-1">
                       {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      Show Mistakes
+                      Mistakes
                     </Label>
                   </div>
                 </div>
               </div>
               
-              {/* Answer Sheets Display */}
-              <div className={showModelAnswer ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : ""}>
-                {/* Student Answer */}
-                <div className="space-y-2">
-                  {showModelAnswer && (
-                    <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student&apos;s Answer</h3>
-                  )}
-                  <div className="space-y-4">
-                    {selectedSubmission.file_images.map((img, idx) => (
-                      <div key={idx} className="relative group">
-                        <div 
-                          className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                          onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
-                        >
-                          <img 
-                            src={`data:image/jpeg;base64,${img}`}
-                            alt={`Page ${idx + 1}`}
-                            className="w-full rounded-lg shadow-md"
-                            style={{ minHeight: '400px', objectFit: 'contain' }}
-                          />
-                          {/* Zoom Overlay */}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
-                              <Maximize2 className="w-4 h-4" />
-                              <span className="text-sm font-medium">Click to enlarge</span>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Annotation Indicator */}
-                        {showAnnotations && (
-                          <div className="absolute right-2 top-2 bottom-2 w-10 flex flex-col justify-around py-2 gap-2">
-                            {selectedSubmission.question_scores?.map((qs) => {
-                              const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
-                              if (scorePercentage < 60) {
-                                return (
-                                  <div 
-                                    key={qs.question_number}
-                                    className="bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
-                                    title={`Q${qs.question_number}: Needs Review`}
-                                  >
-                                    <span className="font-bold">Q{qs.question_number}</span>
-                                    <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Model Answer */}
-                {showModelAnswer && modelAnswerImages.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-green-700 sticky top-0 bg-muted/30 py-1">Model Answer (Correct)</h3>
-                    <div className="space-y-4">
-                      {modelAnswerImages.map((img, idx) => (
-                        <div key={idx} className="relative group">
-                          <div 
-                            className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                            onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Model Answer - Page ${idx + 1}` })}
-                          >
-                            <img 
-                              src={`data:image/jpeg;base64,${img}`}
-                              alt={`Model Page ${idx + 1}`}
-                              className="w-full rounded-lg shadow-md border-2 border-green-200"
-                              style={{ minHeight: '400px', objectFit: 'contain' }}
-                            />
-                            {/* Zoom Overlay */}
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                              <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
-                                <Maximize2 className="w-4 h-4" />
-                                <span className="text-sm font-medium">Click to enlarge</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              {/* Answer Sheets */}
+              <div className="space-y-4">
+                {selectedSubmission.file_images.map((img, idx) => (
+                  <img 
+                    key={idx}
+                    src={`data:image/jpeg;base64,${img}`}
+                    alt={`Page ${idx + 1}`}
+                    className="w-full rounded-lg shadow-md cursor-zoom-in"
+                    onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
+                  />
+                ))}
               </div>
             </div>
           ) : (
@@ -473,11 +400,163 @@ export default function ReviewPapers({ user }) {
             </div>
           )}
         </div>
-
-        {/* Question Breakdown */}
-        <ScrollArea className="flex-1 lg:w-[45%]">
+        
+        {/* Mobile: Questions Section */}
+        <ScrollArea className="flex-1">
           <div className="p-4 space-y-3">
             {selectedSubmission.question_scores?.map((qs, index) => (
+              <MobileQuestionCard key={index} qs={qs} index={index} />
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Desktop: Resizable Panels */}
+      <div className="hidden lg:flex flex-1 overflow-hidden">
+        <PanelGroup direction="horizontal" className="w-full">
+          {/* Left Panel - Answer Sheets */}
+          <Panel defaultSize={55} minSize={30} maxSize={70}>
+            <div className="h-full overflow-auto bg-muted/30 p-4">
+              {selectedSubmission.file_images?.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Toggle Controls */}
+                  <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10 gap-2 flex-wrap">
+                    <span className="text-sm font-medium">Answer Sheet</span>
+                    <div className="flex items-center gap-3">
+                      {/* Model Answer Toggle */}
+                      {modelAnswerImages.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id="show-model-answer"
+                            checked={showModelAnswer}
+                            onCheckedChange={setShowModelAnswer}
+                          />
+                          <Label htmlFor="show-model-answer" className="text-xs cursor-pointer flex items-center gap-1">
+                            <FileText className="w-3 h-3" />
+                            Model Answer
+                          </Label>
+                        </div>
+                      )}
+                      
+                      {/* Mistakes Toggle */}
+                      <div className="flex items-center gap-2">
+                        <Checkbox 
+                          id="show-annotations"
+                          checked={showAnnotations}
+                          onCheckedChange={setShowAnnotations}
+                        />
+                        <Label htmlFor="show-annotations" className="text-xs cursor-pointer flex items-center gap-1">
+                          {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          Show Mistakes
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Answer Sheets Display */}
+                  <div className={showModelAnswer ? "grid grid-cols-2 gap-4" : ""}>
+                    {/* Student Answer */}
+                    <div className="space-y-2">
+                      {showModelAnswer && (
+                        <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student&apos;s Answer</h3>
+                      )}
+                      <div className="space-y-4">
+                        {selectedSubmission.file_images.map((img, idx) => (
+                          <div key={idx} className="relative group">
+                            <div 
+                              className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
+                              onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
+                            >
+                              <img 
+                                src={`data:image/jpeg;base64,${img}`}
+                                alt={`Page ${idx + 1}`}
+                                className="w-full rounded-lg shadow-md"
+                                style={{ minHeight: '400px', objectFit: 'contain' }}
+                              />
+                              {/* Zoom Overlay */}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
+                                  <Maximize2 className="w-4 h-4" />
+                                  <span className="text-sm font-medium">Click to enlarge</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Annotation Indicator */}
+                            {showAnnotations && (
+                              <div className="absolute right-2 top-2 bottom-2 w-10 flex flex-col justify-around py-2 gap-2">
+                                {selectedSubmission.question_scores?.map((qs) => {
+                                  const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
+                                  if (scorePercentage < 60) {
+                                    return (
+                                      <div 
+                                        key={qs.question_number}
+                                        className="bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
+                                        title={`Q${qs.question_number}: Needs Review`}
+                                      >
+                                        <span className="font-bold">Q{qs.question_number}</span>
+                                        <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Model Answer */}
+                    {showModelAnswer && modelAnswerImages.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-semibold text-green-700 sticky top-0 bg-muted/30 py-1">Model Answer (Correct)</h3>
+                        <div className="space-y-4">
+                          {modelAnswerImages.map((img, idx) => (
+                            <div key={idx} className="relative group">
+                              <div 
+                                className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
+                                onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Model Answer - Page ${idx + 1}` })}
+                              >
+                                <img 
+                                  src={`data:image/jpeg;base64,${img}`}
+                                  alt={`Model Page ${idx + 1}`}
+                                  className="w-full rounded-lg shadow-md border-2 border-green-200"
+                                  style={{ minHeight: '400px', objectFit: 'contain' }}
+                                />
+                                {/* Zoom Overlay */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
+                                    <Maximize2 className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Click to enlarge</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground text-sm">No preview available</p>
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* Resize Handle */}
+          <PanelResizeHandle className="w-2 bg-border hover:bg-primary/20 transition-colors cursor-col-resize flex items-center justify-center">
+            <div className="w-1 h-8 bg-muted-foreground/30 rounded-full" />
+          </PanelResizeHandle>
+
+          {/* Right Panel - Questions Breakdown */}
+          <Panel defaultSize={45} minSize={30} maxSize={70}>
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-3">
+                {selectedSubmission.question_scores?.map((qs, index) => (
               <div 
                 key={index}
                 className={`p-3 lg:p-4 rounded-lg border question-card ${
