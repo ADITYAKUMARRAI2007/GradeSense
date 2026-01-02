@@ -695,3 +695,19 @@ agent_communication:
 
     - agent: "main"
       message: "LLM FEEDBACK LOOP PHASE 2 COMPLETE: Implemented frontend integration for the LLM Feedback system. 1) ReviewPapers.jsx: Added 'Improve AI' button next to each question's reviewed checkbox. Opens a dialog showing AI grade vs expected grade, feedback type selection, and correction textarea. Calls POST /api/feedback/submit endpoint. 2) Dashboard.jsx: Added 'Improve AI Grading' button in Quick Actions. Opens a dialog for submitting general suggestions about AI grading. Both features use orange color scheme for consistency. Need testing with teacher authentication to verify: a) Feedback dialog opens correctly b) Grade comparison displays properly c) Feedback submission works d) Toast notifications appear e) General feedback from dashboard works. Test credentials: gradingtoolaibased@gmail.com (teacher)"
+
+  - task: "Resizable Panels in Teacher Review Page"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "RESIZABLE PANELS IMPLEMENTED: Added react-resizable-panels to the teacher Review Papers dialog. Features: 1) Desktop view uses PanelGroup with horizontal direction 2) Left Panel (default 55%, min 30%, max 70%) shows answer sheets with model answer toggle and mistake annotations 3) Right Panel (default 45%, min 30%, max 70%) shows questions breakdown with scoring and feedback 4) PanelResizeHandle between panels with visual indicator (vertical line) and hover effect 5) Mobile view remains stacked (non-resizable) for better UX on small screens 6) Drag handle is styled with bg-border hover:bg-primary/20 and cursor-col-resize. The library react-resizable-panels was already installed in previous fork. Need testing to verify drag-to-resize works correctly on desktop."
+
+    - agent: "main"
+      message: "RESIZABLE PANELS COMPLETE: Implemented drag-to-resize panels in the teacher Review Papers page. Desktop view now uses react-resizable-panels with Left Panel (55% default) for answer sheets and Right Panel (45% default) for questions/feedback. Teachers can drag the resize handle to adjust panel sizes (30%-70% range). Mobile view remains unchanged with stacked layout. Need testing with teacher auth to verify: 1) Resize handle appears and is draggable 2) Panel sizes adjust smoothly 3) Content scrolls correctly in both panels 4) Mobile view doesn't show resize handle"
