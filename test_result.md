@@ -105,6 +105,19 @@
 user_problem_statement: "GradeSense AI-powered grading application with batch management, sub-questions support, grading modes, student analytics, and functional student portal"
 
 backend:
+  - task: "Upload More Papers to Existing Exam"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P0 CRITICAL BUG from previous fork: User reported uploading additional papers from ManageExams page failing with 'Student ID could not be extracted' error. Investigated endpoint /api/exams/{exam_id}/upload-more-papers (lines 930-1050). Code review shows correct implementation: uses parse_student_from_filename at line 970 to extract both filename_id and filename_name, logic matches main /upload-papers endpoint. Need testing to verify if issue is resolved or if there's another underlying problem with filename parsing or AI extraction."
+
+backend:
   - task: "Auto-Student Creation from Filename"
     implemented: true
     working: true
