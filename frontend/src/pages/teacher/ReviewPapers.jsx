@@ -224,6 +224,51 @@ export default function ReviewPapers({ user }) {
     }
   };
 
+  const openFeedbackDialog = (questionScore) => {
+    setFeedbackQuestion(questionScore);
+    setFeedbackForm({
+      feedback_type: "question_grading",
+      teacher_expected_grade: questionScore.obtained_marks.toString(),
+      teacher_correction: ""
+    });
+    setFeedbackDialogOpen(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackQuestion || !feedbackForm.teacher_correction.trim()) {
+      toast.error("Please provide your feedback");
+      return;
+    }
+
+    setSubmittingFeedback(true);
+    try {
+      await axios.post(`${API}/feedback/submit`, {
+        submission_id: selectedSubmission?.submission_id,
+        question_number: feedbackQuestion.question_number,
+        feedback_type: feedbackForm.feedback_type,
+        question_text: feedbackQuestion.question_text || "",
+        ai_grade: feedbackQuestion.obtained_marks,
+        ai_feedback: feedbackQuestion.ai_feedback,
+        teacher_expected_grade: parseFloat(feedbackForm.teacher_expected_grade) || feedbackQuestion.obtained_marks,
+        teacher_correction: feedbackForm.teacher_correction
+      });
+      
+      toast.success("Feedback submitted successfully! This will help improve AI grading.");
+      setFeedbackDialogOpen(false);
+      setFeedbackQuestion(null);
+      setFeedbackForm({
+        feedback_type: "question_grading",
+        teacher_expected_grade: "",
+        teacher_correction: ""
+      });
+    } catch (error) {
+      console.error("Feedback submission error:", error);
+      toast.error(error.response?.data?.detail || "Failed to submit feedback");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
   const DetailContent = () => (
     <>
       {/* Header */}
