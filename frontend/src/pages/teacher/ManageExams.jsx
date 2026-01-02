@@ -23,7 +23,11 @@ import {
   Upload,
   Lock,
   LockOpen,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles,
+  RefreshCw,
+  Tag,
+  Brain
 } from "lucide-react";
 
 export default function ManageExams({ user }) {
