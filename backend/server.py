@@ -2452,7 +2452,7 @@ Only return the JSON array, no other text."""
             ).with_model("openai", "gpt-4o")
             
             user_message = UserMessage(text=analysis_prompt)
-            response = await asyncio.to_thread(chat.send_message, user_message)
+            response = await chat.send_message(user_message)
             ai_response = response.text.strip()
             
             import json
