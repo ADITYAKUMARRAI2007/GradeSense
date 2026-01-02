@@ -482,8 +482,19 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
-  run_ui: true
+  test_sequence: 3
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Upload More Papers to Existing Exam"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: "NEW FORK STARTED - Continuing from previous job. PRIORITY P0: Testing upload-more-papers endpoint. Code review shows the fix from previous fork appears to be already implemented (parse_student_from_filename correctly extracts both ID and name at line 970). Need to verify if upload functionality actually works with properly formatted filenames like 'STU003_Sagar_Maths.pdf'. Test credentials: Teacher - gradingtoolaibased@gmail.com. Please test: 1) Create a test exam with batch 2) Upload papers via /upload-more-papers with filename format STU001_TestStudent_Subject.pdf 3) Verify student creation and grading works 4) Check if any errors occur."
 
   - task: "Manage Exams Page"
     implemented: true
