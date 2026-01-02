@@ -1730,7 +1730,8 @@ Return valid JSON only."""
                     max_marks=q["max_marks"],
                     obtained_marks=min(score_data["obtained_marks"], q["max_marks"]),
                     ai_feedback=score_data["ai_feedback"],
-                    sub_scores=[s.model_dump() for s in sub_scores]
+                    sub_scores=[s.model_dump() for s in sub_scores],
+                    error_annotations=score_data.get("error_annotations", [])
                 ))
             else:
                 scores.append(QuestionScore(
