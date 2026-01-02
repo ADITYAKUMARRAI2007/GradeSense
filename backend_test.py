@@ -2463,6 +2463,13 @@ print('Test data cleaned up');
         self.test_exams_update_question_topics()
         self.test_comprehensive_analytics_workflow()
         
+        # P0 CRITICAL TEST: Upload More Papers to Existing Exam
+        print("\n🚨 P0 CRITICAL TEST: Upload More Papers to Existing Exam")
+        print("-" * 60)
+        self.test_upload_more_papers_endpoint()
+        self.test_filename_parsing_edge_cases()
+        self.test_upload_more_papers_with_existing_students()
+        
         # Cleanup
         self.cleanup_test_data()
         
