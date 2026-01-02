@@ -624,6 +624,37 @@ export default function ReviewPapers({ user }) {
                         </div>
                       </div>
                     )}
+                    
+                    {/* Question Paper */}
+                    {showQuestionPaper && questionPaperImages.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Question Paper</h3>
+                        <div className="space-y-4">
+                          {questionPaperImages.map((img, idx) => (
+                            <div key={idx} className="relative group">
+                              <div 
+                                className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
+                                onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Question Paper - Page ${idx + 1}` })}
+                              >
+                                <img 
+                                  src={`data:image/jpeg;base64,${img}`}
+                                  alt={`Question Paper Page ${idx + 1}`}
+                                  className="w-full rounded-lg shadow-md border-2 border-blue-200"
+                                  style={{ minHeight: '400px', objectFit: 'contain' }}
+                                />
+                                {/* Zoom Overlay */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
+                                    <Maximize2 className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Click to enlarge</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
