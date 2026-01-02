@@ -1411,20 +1411,26 @@ def parse_student_from_filename(filename: str) -> tuple:
         # Remove .pdf extension
         name_part = filename.replace(".pdf", "").replace(".PDF", "")
         
-        # Split by underscore
-        parts = name_part.split("_")
+        # Common subject names to filter out
+        subject_names = [
+            'maths', 'math', 'mathematics', 'english', 'science', 'physics', 
+            'chemistry', 'biology', 'history', 'geography', 'hindi', 'sanskrit',
+            'social', 'economics', 'commerce', 'accounts', 'computer', 'it',
+            'arts', 'music', 'pe', 'physical', 'education', 'exam', 'test'
+        ]
+        
+        # Split by underscore or hyphen
+        parts = name_part.replace("-", "_").split("_")
         
         if len(parts) >= 2:
             # First part is likely student ID
             potential_id = parts[0].strip()
-            # Second part is likely student name (may have more parts for full name)
-            # Exclude common suffixes like subject names at the end
+            
+            # Remaining parts form the name, excluding subject names
             name_parts = []
             for part in parts[1:]:
-                # Skip if it looks like a subject name (very rough heuristic)
-                if part.lower() in ['maths', 'math', 'english', 'science', 'physics', 'chemistry', 'biology', 'history', 'geography']:
-                    break
-                name_parts.append(part)
+                if part.lower() not in subject_names:
+                    name_parts.append(part)
             
             potential_name = " ".join(name_parts).strip().title()
             
@@ -1441,6 +1447,7 @@ def parse_student_from_filename(filename: str) -> tuple:
         return (None, None)
     except Exception as e:
         logger.error(f"Error parsing filename {filename}: {e}")
+        return (None, None)
         return (None, None)
 
 async def get_or_create_student(
