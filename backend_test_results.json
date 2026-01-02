@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-01-02T07:08:21.680393",
-  "total_tests": 144,
-  "passed_tests": 137,
-  "success_rate": 95.13888888888889,
+  "timestamp": "2026-01-02T14:56:42.151279",
+  "total_tests": 159,
+  "passed_tests": 157,
+  "success_rate": 98.74213836477988,
   "test_details": [
     {
       "test": "Health Check",
@@ -175,7 +175,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU070814)",
+      "test": "Create Student with Valid ID (STU145613)",
       "success": true,
       "details": ""
     },
@@ -217,20 +217,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_38f3c5d9f67e found in batch batch_4c2bef50"
+      "details": "Student user_77a4e60e84b4 found in batch batch_d88b1053"
     },
     {
-      "test": "Create Student with Format STU0708151 (John Doe)",
+      "test": "Create Student with Format STU1456131 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL070815 (Alice Smith)",
+      "test": "Create Student with Format ROLL145613 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A070815 (Bob Jones)",
+      "test": "Create Student with Format A145613 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -417,7 +417,7 @@
     {
       "test": "Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_77d08b4a"
+      "details": "Generated feedback_id: feedback_20944501"
     },
     {
       "test": "Submit General Feedback",
@@ -427,7 +427,7 @@
     {
       "test": "General Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_8b4abbd6"
+      "details": "Generated feedback_id: feedback_552f999d"
     },
     {
       "test": "Submit Feedback Without Auth (should fail)",
@@ -542,12 +542,12 @@
     {
       "test": "Student Deep Dive: Basic Analysis",
       "success": false,
-      "details": "Expected 200, got 520 - Response: Internal Server Error"
+      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
-      "success": false,
-      "details": "Expected 200, got 520 - Response: Internal Server Error"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Generate Review Packet",
@@ -566,8 +566,18 @@
     },
     {
       "test": "Auto-Infer Topic Tags",
-      "success": false,
-      "details": "Expected 200, got 520 - Failed to infer topic tags"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Infer Topics Response Structure",
+      "success": true,
+      "details": "All required fields present"
+    },
+    {
+      "test": "Topics Mapping Structure",
+      "success": true,
+      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations']"
     },
     {
       "test": "Infer Topics: Authentication Required",
@@ -606,8 +616,18 @@
     },
     {
       "test": "Auto-Infer Topic Tags",
-      "success": false,
-      "details": "Expected 200, got 520 - Failed to infer topic tags"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Infer Topics Response Structure",
+      "success": true,
+      "details": "All required fields present"
+    },
+    {
+      "test": "Topics Mapping Structure",
+      "success": true,
+      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations']"
     },
     {
       "test": "Infer Topics: Authentication Required",
@@ -671,13 +691,28 @@
     },
     {
       "test": "Student Deep Dive: Basic Analysis",
-      "success": false,
-      "details": "Expected 200, got 520 - Response: Internal Server Error"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Student Deep Dive Response Structure",
+      "success": true,
+      "details": "All required fields present"
+    },
+    {
+      "test": "Student Info Structure",
+      "success": true,
+      "details": "Student info has correct structure"
+    },
+    {
+      "test": "AI Analysis Structure",
+      "success": true,
+      "details": "AI analysis has correct structure"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
-      "success": false,
-      "details": "Expected 200, got 520 - Response: Internal Server Error"
+      "success": true,
+      "details": ""
     },
     {
       "test": "Generate Review Packet",
@@ -721,8 +756,48 @@
     },
     {
       "test": "Comprehensive Analytics Workflow",
+      "success": true,
+      "details": "All 6 analytics endpoints working correctly"
+    },
+    {
+      "test": "Upload More Papers: No Files (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Upload More Papers: Non-existent Exam (should fail)",
       "success": false,
-      "details": "4/6 steps successful. Failed: ['infer_topics', 'student_deep_dive']"
+      "details": "Expected 404, got 422 - [{'type': 'missing', 'loc': ['body', 'files'], 'msg': 'Field required', 'input': None, 'url': 'https://errors.pydantic.dev/2.12/v/missing'}]"
+    },
+    {
+      "test": "Upload More Papers: Authentication Required",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Upload More Papers Endpoint Structure",
+      "success": true,
+      "details": "Endpoint properly configured with authentication and validation"
+    },
+    {
+      "test": "Filename Parsing Logic",
+      "success": true,
+      "details": "parse_student_from_filename function handles 6 different filename formats"
+    },
+    {
+      "test": "Subject Name Filtering",
+      "success": true,
+      "details": "Function filters out common subject names from student names"
+    },
+    {
+      "test": "Create Existing Student for Upload Test",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Existing Student Handling",
+      "success": true,
+      "details": "Created test student EXIST145641 for upload-more-papers testing"
     }
   ]
 }
