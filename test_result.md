@@ -587,6 +587,54 @@ test_plan:
           agent: "testing"
           comment: "✅ DUPLICATE ENTRY VERIFIED: This is a duplicate of the entry above. Component structure verified as production-ready with proper data-testid attributes and API integration."
 
+  - task: "LLM Feedback Loop - Teacher Dashboard Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Teacher Dashboard 'Improve AI Grading' button implemented in Quick Actions section (lines 294-301). Dialog with title 'Help Improve AI Grading', explanation text, textarea with placeholder examples, Cancel and Submit Feedback buttons (lines 325-377). Submits to POST /api/feedback/submit endpoint with feedback_type: 'general_suggestion' and teacher_correction fields. Shows success toast on submission."
+
+  - task: "LLM Feedback Loop - Review Papers Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Review Papers 'Improve AI' button implemented next to each question's 'Mark as reviewed' checkbox (lines 691-700 for desktop, lines 466-474 for mobile). Opens feedback dialog with question number and text, AI Grade display (read-only), Expected Grade input field, AI's Feedback display (read-only), Feedback Type dropdown (Grading Issue, AI Mistake, General Suggestion), Teacher Correction textarea, Cancel and Submit Feedback buttons (lines 818-919). Submits to POST /api/feedback/submit endpoint with all required fields."
+
+  - task: "Resizable Panels - Review Papers Desktop View"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Desktop resizable panels implemented using react-resizable-panels library (lines 484-708). Two-panel layout with left panel (answer sheets) defaultSize 55%, minSize 30%, maxSize 70% and right panel (questions) defaultSize 45%, minSize 30%, maxSize 70%. Resize handle with hover effect (bg-primary/20), cursor change to col-resize, and visual indicator (lines 620-622). PanelGroup direction='horizontal' for side-by-side layout."
+
+  - task: "Resizable Panels - Review Papers Mobile View"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Mobile view implemented with vertical stacking without resize handle (lines 345-481). Uses lg:hidden class to show mobile layout for viewports < 1024px. Answer sheets section on top (h-48 height) and questions section below with ScrollArea. No resizable panels on mobile - panels stack vertically as intended."
+
   - task: "P1 - Full Question Text & Answer Sheet Display"
     implemented: true
     working: true
