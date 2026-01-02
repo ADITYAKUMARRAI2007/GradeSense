@@ -2463,7 +2463,7 @@ Only return the JSON array, no other text."""
                     if cleaned.startswith("json"):
                         cleaned = cleaned[4:]
                 ai_analysis = json.loads(cleaned)
-            except:
+            except (json.JSONDecodeError, IndexError, ValueError):
                 ai_analysis = None
         except Exception as e:
             logger.error(f"AI misconception analysis error: {e}")
