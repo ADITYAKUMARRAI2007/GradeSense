@@ -182,6 +182,19 @@ export default function UploadGrade({ user }) {
     maxFiles: 1
   });
 
+  // Question paper dropzone
+  const onQuestionPaperDrop = useCallback((acceptedFiles) => {
+    if (acceptedFiles.length > 0) {
+      setQuestionPaperFile(acceptedFiles[0]);
+    }
+  }, []);
+
+  const { getRootProps: getQuestionRootProps, getInputProps: getQuestionInputProps, isDragActive: isQuestionDragActive } = useDropzone({
+    onDrop: onQuestionPaperDrop,
+    accept: { 'application/pdf': ['.pdf'] },
+    maxFiles: 1
+  });
+
   // Student papers dropzone
   const onStudentPapersDrop = useCallback((acceptedFiles) => {
     setStudentFiles(prev => [...prev, ...acceptedFiles]);
