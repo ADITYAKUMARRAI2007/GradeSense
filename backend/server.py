@@ -1609,33 +1609,50 @@ async def grade_with_ai(
     grading_mode: str,
     total_marks: float
 ) -> List[QuestionScore]:
-    """Grade answer paper using Gemini Vision"""
+    """Grade answer paper using Gemini 2.5 Pro with deterministic grading"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    import hashlib
     
     api_key = os.environ.get('EMERGENT_LLM_KEY')
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
+    # Create content hash for duplicate detection
+    content_hash = hashlib.sha256(
+        "".join(images).encode() + 
+        "".join(model_answer_images).encode() + 
+        str(questions).encode() + 
+        grading_mode.encode()
+    ).hexdigest()[:16]
+    
     # Grading mode instructions
     mode_instructions = {
-        "strict": "Grade STRICTLY. Require exact match with model answer. Give minimal partial credit. Deduct marks for any deviation from expected answer.",
-        "balanced": "Grade FAIRLY. Consider both accuracy and conceptual understanding. Give reasonable partial credit for partially correct answers.",
-        "conceptual": "Grade for UNDERSTANDING. Focus on whether the student understands the concept, even if wording differs from model answer. Be generous with partial credit.",
-        "lenient": "Grade LENIENTLY. Reward any reasonable attempt. Give generous partial credit. Focus on what the student got right rather than wrong."
+        "strict": "Grade STRICTLY and CONSISTENTLY. Require exact match with model answer. Give minimal partial credit. Deduct marks for any deviation from expected answer. ALWAYS grade the same answer the same way.",
+        "balanced": "Grade FAIRLY and CONSISTENTLY. Consider both accuracy and conceptual understanding. Give reasonable partial credit for partially correct answers. ALWAYS grade the same answer the same way.",
+        "conceptual": "Grade for UNDERSTANDING and CONSISTENTLY. Focus on whether the student understands the concept, even if wording differs from model answer. Be generous with partial credit. ALWAYS grade the same answer the same way.",
+        "lenient": "Grade LENIENTLY and CONSISTENTLY. Reward any reasonable attempt. Give generous partial credit. Focus on what the student got right rather than wrong. ALWAYS grade the same answer the same way."
     }
     
     grading_instruction = mode_instructions.get(grading_mode, mode_instructions["balanced"])
     
     chat = LlmChat(
         api_key=api_key,
-        session_id=f"grading_{uuid.uuid4().hex[:8]}",
-        system_message=f"""You are an expert exam grader for handwritten answer papers.
+        session_id=f"grading_{content_hash}",
+        system_message=f"""You are an expert exam grader for handwritten answer papers. You MUST be CONSISTENT and DETERMINISTIC in your grading.
+
+CRITICAL: If you grade the same answer paper multiple times, you MUST give the EXACT SAME scores and feedback every time. Your grading must be reproducible and consistent.
 
 GRADING MODE: {grading_mode.upper()}
 {grading_instruction}
 
 You will receive student answer images {'and model answer images for reference' if model_answer_images else ''}.
 Grade each question based on the rubric and provide detailed feedback.
+
+CONSISTENCY RULES:
+1. Use the same evaluation criteria every time
+2. Apply the same marking scheme consistently
+3. Give identical scores for identical answers
+4. Provide similar feedback structure each time
 
 Return your response in this exact JSON format:
 {{
@@ -1671,7 +1688,7 @@ For error_annotations:
 If a question has no sub-questions, leave sub_scores as an empty array.
 If there are no errors, leave error_annotations as an empty array.
 """
-    ).with_model("openai", "gpt-4o")
+    ).with_model("gemini", "gemini-2.5-pro")
     
     # Prepare question details with sub-questions
     questions_text = ""
