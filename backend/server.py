@@ -1457,12 +1457,15 @@ async def get_or_create_student(
     existing = await db.users.find_one({"student_id": student_id, "role": "student"}, {"_id": 0})
     
     if existing:
-        # Student exists - verify name matches
-        if existing["name"].lower() != student_name.lower():
-            return (None, f"Student ID {student_id} already exists with different name: {existing['name']}")
-        
-        # Student exists with same name - add to batch if not already there
+        # Student exists - use existing student (allow re-grading)
         user_id = existing["user_id"]
+        
+        # Optionally update name if different (use the new one)
+        if existing["name"].lower() != student_name.lower():
+            # Log the name difference but don't treat as error - just use existing student
+            logger.info(f"Student ID {student_id}: name '{student_name}' differs from existing '{existing['name']}', using existing student")
+        
+        # Add to batch if not already there
         if batch_id not in existing.get("batches", []):
             await db.users.update_one(
                 {"user_id": user_id},
