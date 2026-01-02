@@ -2838,7 +2838,7 @@ Keep response concise (under 200 words). Format as JSON:
                 api_key=llm_key,
                 session_id=f"student_analysis_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert educational analyst providing personalized student guidance."
-            ).with_model("openai", "gpt-4o")
+            ).with_model("gemini", "gemini-2.5-pro")
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
