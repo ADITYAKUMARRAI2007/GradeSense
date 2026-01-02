@@ -534,11 +534,30 @@ export default function ReviewPapers({ user }) {
                         />
                         <Label htmlFor="show-annotations" className="text-xs cursor-pointer flex items-center gap-1">
                           {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                          Show Mistakes
+                          Show Errors
                         </Label>
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Error Legend */}
+                  {showAnnotations && (
+                    <div className="flex items-center gap-4 text-xs bg-muted/50 p-2 rounded-lg">
+                      <span className="font-medium">Error Severity:</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-red-500" />
+                        <span>Major</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-orange-500" />
+                        <span>Moderate</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-yellow-500" />
+                        <span>Minor</span>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Answer Sheets Display */}
                   <div className={showModelAnswer ? "grid grid-cols-2 gap-4" : ""}>
