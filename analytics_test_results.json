@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-01-02T07:11:51.674025",
-  "total_tests": 14,
-  "passed_tests": 10,
-  "success_rate": 71.42857142857143,
+  "timestamp": "2026-01-02T07:15:58.693558",
+  "total_tests": 15,
+  "passed_tests": 12,
+  "success_rate": 80.0,
   "test_details": [
     {
       "test": "Create Test Batch",
@@ -61,8 +61,13 @@
     },
     {
       "test": "Auto-Infer Topic Tags",
-      "success": false,
-      "details": "Expected 200, got 520 - Failed to infer topic tags"
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Infer Topics Response Structure",
+      "success": true,
+      "details": "All required fields present"
     },
     {
       "test": "Update Question Topics",
