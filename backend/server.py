@@ -2627,14 +2627,17 @@ async def get_topic_mastery(
             "level": level,
             "color": color,
             "sample_count": len(data["scores"]),
-            "struggling_count": len(struggling_students)
+            "struggling_count": len(struggling_students),
+            "question_count": len(data["questions"])
         })
         
         students_by_topic[topic] = sorted(struggling_students, key=lambda x: x["avg_score"])[:10]
+        questions_by_topic[topic] = data["questions"]
     
     return {
         "topics": sorted(topics, key=lambda x: x["avg_percentage"]),
-        "students_by_topic": students_by_topic
+        "students_by_topic": students_by_topic,
+        "questions_by_topic": questions_by_topic
     }
 
 
