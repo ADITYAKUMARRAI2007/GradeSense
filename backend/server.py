@@ -2424,7 +2424,7 @@ async def get_misconceptions_analysis(
     ai_analysis = None
     if misconceptions:
         try:
-            from emergentintegrations.llm.chat import get_text_simple
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
             llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
             
             analysis_prompt = f"""Analyze these student misconceptions from exam "{exam.get('exam_name', 'Unknown')}":
@@ -2445,14 +2445,15 @@ Return as JSON array with format:
 
 Only return the JSON array, no other text."""
 
-            ai_response = await asyncio.to_thread(
-                get_text_simple,
-                emergent_api_key=llm_key,
-                llm_type="openai",
-                model_id="gpt-4o",
-                prompt=analysis_prompt,
-                temperature=0.3
-            )
+            chat = LlmChat(
+                api_key=llm_key,
+                session_id=f"misconceptions_{uuid.uuid4().hex[:8]}",
+                system_message="You are an expert at analyzing student misconceptions and learning patterns."
+            ).with_model("openai", "gpt-4o")
+            
+            user_message = UserMessage(text=analysis_prompt)
+            response = await asyncio.to_thread(chat.send_message, user_message)
+            ai_response = response.text.strip()
             
             import json
             try:
