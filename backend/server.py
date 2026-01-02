@@ -1768,6 +1768,33 @@ async def upload_model_answer(
     
     return {"message": "Model answer uploaded", "pages": len(images)}
 
+@api_router.post("/exams/{exam_id}/upload-question-paper")
+async def upload_question_paper(
+    exam_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user)
+):
+    """Upload question paper PDF"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can upload question papers")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Read and convert PDF to images
+    pdf_bytes = await file.read()
+    images = pdf_to_images(pdf_bytes)
+    
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {
+            "question_paper_images": images
+        }}
+    )
+    
+    return {"message": "Question paper uploaded", "pages": len(images)}
+
 @api_router.post("/exams/{exam_id}/upload-papers")
 async def upload_student_papers(
     exam_id: str,
