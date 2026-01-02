@@ -40,6 +40,8 @@ export default function ManageExams({ user }) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadingPapers, setUploadingPapers] = useState(false);
   const [paperFiles, setPaperFiles] = useState([]);
+  const [extractingQuestions, setExtractingQuestions] = useState(false);
+  const [inferringTopics, setInferringTopics] = useState(false);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'application/pdf': ['.pdf'] },
