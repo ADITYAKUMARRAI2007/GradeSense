@@ -163,6 +163,38 @@ class ReEvaluationCreate(BaseModel):
     questions: List[int]
     reason: str
 
+# Feedback system schemas
+class GradingFeedback(BaseModel):
+    feedback_id: str
+    teacher_id: str
+    submission_id: Optional[str] = None
+    question_number: Optional[int] = None
+    feedback_type: str  # "question_grading", "general_suggestion", "correction"
+    
+    # Context for grading feedback
+    question_text: Optional[str] = None
+    student_answer_summary: Optional[str] = None
+    ai_grade: Optional[float] = None
+    ai_feedback: Optional[str] = None
+    teacher_expected_grade: Optional[float] = None
+    teacher_correction: str  # The actual feedback/correction
+    
+    # Metadata
+    grading_mode: Optional[str] = None
+    exam_id: Optional[str] = None
+    is_common: bool = False  # Marked if pattern appears across multiple teachers
+    upvote_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FeedbackSubmit(BaseModel):
+    submission_id: Optional[str] = None
+    question_number: Optional[int] = None
+    feedback_type: str
+    teacher_correction: str
+    question_text: Optional[str] = None
+    ai_grade: Optional[float] = None
+    ai_feedback: Optional[str] = None
+    teacher_expected_grade: Optional[float] = None
 # ============== AUTH HELPERS ==============
 
 async def get_current_user(request: Request) -> User:
