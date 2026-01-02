@@ -503,19 +503,6 @@ export default function ClassReports({ user }) {
             )}
           </CardContent>
         </Card>
-                                <span className="text-red-600 font-medium">{s.avg_score}%</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Common Misconceptions (The "Why" Engine) */}
         {filters.exam_id && (
