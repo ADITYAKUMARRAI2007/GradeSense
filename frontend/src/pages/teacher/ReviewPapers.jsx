@@ -705,7 +705,7 @@ export default function ReviewPapers({ user }) {
               </div>
 
               <div>
-                <Label className="text-xs">AI's Feedback</Label>
+                <Label className="text-xs">AI&apos;s Feedback</Label>
                 <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground max-h-20 overflow-y-auto">
                   {feedbackQuestion.ai_feedback || "No AI feedback available"}
                 </div>
