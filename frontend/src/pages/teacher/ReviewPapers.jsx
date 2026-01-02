@@ -51,7 +51,9 @@ export default function ReviewPapers({ user }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
+  const [showQuestionPaper, setShowQuestionPaper] = useState(false);
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
+  const [questionPaperImages, setQuestionPaperImages] = useState([]);
   const [zoomedImage, setZoomedImage] = useState(null);
   const [imageZoom, setImageZoom] = useState(100);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
