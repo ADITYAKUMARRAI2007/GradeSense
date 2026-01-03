@@ -563,6 +563,69 @@ export default function ManageExams({ user }) {
                     </p>
                   </div>
 
+                  {/* Submitted Papers List */}
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Submitted Papers ({submissions.length})
+                    </h3>
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                      {loadingSubmissions ? (
+                        <div className="space-y-2">
+                          {[1, 2, 3].map(i => (
+                            <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+                          ))}
+                        </div>
+                      ) : submissions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No papers submitted yet
+                        </p>
+                      ) : (
+                        submissions.map((submission) => (
+                          <div 
+                            key={submission.submission_id}
+                            className="p-3 bg-muted/50 rounded-lg flex items-center justify-between hover:bg-muted transition-colors"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-medium text-orange-700">
+                                  {submission.student_name?.charAt(0)?.toUpperCase() || "?"}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{submission.student_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Score: {submission.total_score}/{selectedExam.total_marks} • {submission.percentage}%
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {submission.status === "ai_graded" ? (
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Graded
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                  Reviewed
+                                </Badge>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteSubmission(submission)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                                title="Delete paper"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
                   {/* Warning */}
                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
