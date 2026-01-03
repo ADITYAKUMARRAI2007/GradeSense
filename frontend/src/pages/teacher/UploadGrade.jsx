@@ -697,96 +697,106 @@ export default function UploadGrade({ user }) {
               <CardDescription>Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Question Paper Upload */}
-              <div>
-                <Label className="text-sm font-medium mb-2 block">Question Paper (Optional)</Label>
-                <div 
-                  {...getQuestionRootProps()} 
-                  className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isQuestionDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"}`}
-                  data-testid="question-paper-dropzone"
-                >
-                  <input {...getQuestionInputProps()} />
-                  {questionPaperFile ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <FileText className="w-6 h-6 text-blue-600" />
-                      <div className="text-left">
-                        <p className="font-medium text-sm">{questionPaperFile.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(questionPaperFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
+              {formData.questions.map((question, index) => (
+                <div key={index} className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Question #{question.question_number}</Label>
+                        <Input value={`Q${question.question_number}`} disabled />
                       </div>
+                      <div className="space-y-2">
+                        <Label>Max Marks</Label>
+                        <Input 
+                          type="number"
+                          value={question.max_marks}
+                          onChange={(e) => updateQuestion(index, "max_marks", parseFloat(e.target.value))}
+                          data-testid={`question-${index}-marks`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Rubric (Optional)</Label>
+                        <Input 
+                          placeholder="Grading criteria..."
+                          value={question.rubric}
+                          onChange={(e) => updateQuestion(index, "rubric", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    {formData.questions.length > 1 && (
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        onClick={(e) => { e.stopPropagation(); setQuestionPaperFile(null); }}
+                        onClick={() => removeQuestion(index)}
+                        className="text-destructive hover:text-destructive"
                       >
-                        <X className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 mx-auto text-blue-400 mb-2" />
-                      <p className="font-medium text-sm">Drop your question paper PDF here</p>
-                      <p className="text-xs text-muted-foreground mt-1">Questions will be extracted and shown in review</p>
-                    </>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </div>
 
-              {/* Model Answer Upload */}
-              <div>
-                <Label className="text-sm font-medium mb-2 block">Model Answer (Optional)</Label>
-                <div 
-                  {...getModelRootProps()} 
-                  className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isModelDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
-                  data-testid="model-answer-dropzone"
-                >
-                  <input {...getModelInputProps()} />
-                  {modelAnswerFile ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <FileText className="w-6 h-6 text-primary" />
-                      <div className="text-left">
-                        <p className="font-medium text-sm">{modelAnswerFile.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(modelAnswerFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); setModelAnswerFile(null); }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                  {/* Sub-questions */}
+                  {question.sub_questions?.length > 0 && (
+                    <div className="pl-4 border-l-2 border-primary/30 space-y-2">
+                      <Label className="text-sm text-muted-foreground">Sub-questions:</Label>
+                      {question.sub_questions.map((subQ, subIndex) => (
+                        <div key={subIndex} className="flex items-center gap-2 bg-white p-2 rounded">
+                          <span className="text-sm font-medium w-12">{question.question_number}{subQ.sub_id})</span>
+                          <Input 
+                            type="number"
+                            placeholder="Marks"
+                            value={subQ.max_marks}
+                            onChange={(e) => updateSubQuestion(index, subIndex, "max_marks", parseFloat(e.target.value))}
+                            className="w-20 h-8 text-sm"
+                          />
+                          <Input 
+                            placeholder="Rubric (optional)"
+                            value={subQ.rubric || ""}
+                            onChange={(e) => updateSubQuestion(index, subIndex, "rubric", e.target.value)}
+                            className="flex-1 h-8 text-sm"
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => removeSubQuestion(index, subIndex)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="font-medium text-sm">Drop your model answer PDF here</p>
-                      <p className="text-xs text-muted-foreground mt-1">Used as reference for AI grading</p>
-                    </>
                   )}
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => addSubQuestion(index)}
+                    className="text-xs"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Sub-question ({question.question_number}a, {question.question_number}b...)
+                  </Button>
                 </div>
-              </div>
+              ))}
 
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>💡 Both are Optional:</strong> Upload a question paper to display questions in the review page. 
-                  Upload a model answer for more accurate AI grading. You can skip both if needed.
-                </p>
-              </div>
-              <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setStep(1)}>
+              <Button 
+                variant="outline" 
+                onClick={addQuestion}
+                data-testid="add-question-btn"
+                className="w-full"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Question
+              </Button>
+
+              <div className="flex justify-between pt-4 border-t">
+                <Button variant="outline" onClick={() => setStep(3)}>
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
-                <Button 
-                  onClick={handleUploadModelAnswer} 
-                  disabled={loading}
-                  data-testid="upload-model-btn"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  {(modelAnswerFile || questionPaperFile) ? "Upload & Continue" : "Skip & Continue"}
+                <Button onClick={() => setStep(5)} data-testid="next-to-upload-btn">
+                  Continue to Upload Papers
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
