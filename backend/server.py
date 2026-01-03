@@ -1981,11 +1981,11 @@ async def upload_model_answer(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload model answer PDF"""
+    """Upload model answer PDF and AUTO-EXTRACT questions"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload model answers")
     
-    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id})
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
@@ -2004,7 +2004,50 @@ async def upload_model_answer(
         }}
     )
     
-    return {"message": "Model answer uploaded", "pages": len(images)}
+    # AUTO-EXTRACT questions from model answer (if questions not already extracted)
+    questions = exam.get("questions", [])
+    needs_extraction = not any(q.get("rubric") or q.get("question_text") for q in questions)
+    
+    if needs_extraction:
+        logger.info(f"Auto-extracting questions from model answer for exam {exam_id}")
+        try:
+            extracted_questions = await extract_questions_from_model_answer(
+                images,
+                len(questions)
+            )
+            
+            if extracted_questions:
+                # Update question rubrics with extracted text
+                updated_count = 0
+                
+                for i, q in enumerate(questions):
+                    if i < len(extracted_questions):
+                        q["rubric"] = extracted_questions[i]
+                        q["question_text"] = extracted_questions[i]
+                        updated_count += 1
+                
+                # Save updated questions
+                await db.exams.update_one(
+                    {"exam_id": exam_id},
+                    {"$set": {"questions": questions}}
+                )
+                
+                logger.info(f"Auto-extracted {updated_count} questions from model answer")
+                return {
+                    "message": f"✨ Model answer uploaded & {updated_count} questions auto-extracted!",
+                    "pages": len(images),
+                    "auto_extracted": True,
+                    "extracted_count": updated_count,
+                    "source": "model_answer"
+                }
+        except Exception as e:
+            logger.error(f"Error during auto-extraction from model answer: {e}")
+    
+    return {
+        "message": "Model answer uploaded successfully",
+        "pages": len(images),
+        "auto_extracted": False
+    }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
 async def upload_question_paper(
