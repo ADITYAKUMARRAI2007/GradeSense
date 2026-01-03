@@ -2012,11 +2012,13 @@ async def upload_model_answer(
         }}
     )
     
-    # AUTO-EXTRACT questions from model answer (if questions not already extracted)
+    # AUTO-EXTRACT questions from model answer (only if questions don't have text yet)
     questions = exam.get("questions", [])
-    needs_extraction = not any(q.get("rubric") or q.get("question_text") for q in questions)
     
-    if needs_extraction:
+    # Check if questions already have text/rubric (manually configured by user)
+    has_manual_config = any(q.get("rubric") or q.get("question_text") for q in questions)
+    
+    if not has_manual_config and len(questions) > 0:
         logger.info(f"Auto-extracting questions from model answer for exam {exam_id}")
         try:
             extracted_questions = await extract_questions_from_model_answer(
@@ -2025,31 +2027,43 @@ async def upload_model_answer(
             )
             
             if extracted_questions:
-                # Update question rubrics with extracted text
-                updated_count = 0
-                
-                for i, q in enumerate(questions):
-                    if i < len(extracted_questions):
-                        q["rubric"] = extracted_questions[i]
-                        q["question_text"] = extracted_questions[i]
-                        updated_count += 1
-                
-                # Save updated questions
-                await db.exams.update_one(
-                    {"exam_id": exam_id},
-                    {"$set": {"questions": questions}}
-                )
-                
-                logger.info(f"Auto-extracted {updated_count} questions from model answer")
-                return {
-                    "message": f"✨ Model answer uploaded & {updated_count} questions auto-extracted!",
-                    "pages": len(images),
-                    "auto_extracted": True,
-                    "extracted_count": updated_count,
-                    "source": "model_answer"
-                }
+                # Only update if we extracted the same number or more
+                if len(extracted_questions) >= len(questions):
+                    # Update question rubrics with extracted text
+                    updated_count = 0
+                    
+                    for i, q in enumerate(questions):
+                        if i < len(extracted_questions):
+                            q["rubric"] = extracted_questions[i]
+                            q["question_text"] = extracted_questions[i]
+                            updated_count += 1
+                    
+                    # Save updated questions
+                    await db.exams.update_one(
+                        {"exam_id": exam_id},
+                        {"$set": {"questions": questions}}
+                    )
+                    
+                    logger.info(f"Auto-extracted {updated_count} questions from model answer")
+                    return {
+                        "message": f"✨ Model answer uploaded & {updated_count} questions auto-extracted!",
+                        "pages": len(images),
+                        "auto_extracted": True,
+                        "extracted_count": updated_count,
+                        "source": "model_answer"
+                    }
+                else:
+                    logger.warning(f"Extracted {len(extracted_questions)} questions but exam has {len(questions)} configured")
+                    return {
+                        "message": f"Model answer uploaded. Only {len(extracted_questions)} of {len(questions)} questions could be extracted. Please review in Step 4.",
+                        "pages": len(images),
+                        "auto_extracted": False,
+                        "partial_extract": True
+                    }
         except Exception as e:
             logger.error(f"Error during auto-extraction from model answer: {e}")
+    elif has_manual_config:
+        logger.info(f"Skipping auto-extraction for exam {exam_id} - questions already configured")
     
     return {
         "message": "Model answer uploaded successfully",
