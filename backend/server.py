@@ -1280,16 +1280,19 @@ async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create exams")
     
-    # Check for duplicate exam name within the same batch
+    # Check for duplicate exam name within the same batch (case-insensitive, trimmed)
+    exam_name_normalized = exam.exam_name.strip().lower()
+    
     existing = await db.exams.find_one({
-        "exam_name": exam.exam_name,
         "batch_id": exam.batch_id,
         "teacher_id": user.user_id
-    }, {"_id": 0})
+    }, {"_id": 0, "exam_name": 1})
     
     if existing:
-        logger.warning(f"Duplicate exam found: {exam.exam_name} in batch {exam.batch_id}")
-        raise HTTPException(status_code=400, detail="An exam with this name already exists in this batch")
+        existing_name_normalized = existing.get("exam_name", "").strip().lower()
+        if existing_name_normalized == exam_name_normalized:
+            logger.warning(f"Duplicate exam found: '{exam.exam_name}' matches existing '{existing.get('exam_name')}' in batch {exam.batch_id}")
+            raise HTTPException(status_code=400, detail=f"An exam with name '{exam.exam_name}' already exists in this batch")
     
     exam_id = f"exam_{uuid.uuid4().hex[:8]}"
     new_exam = {
