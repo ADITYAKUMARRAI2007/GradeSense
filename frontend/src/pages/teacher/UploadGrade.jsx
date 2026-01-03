@@ -493,8 +493,110 @@ export default function UploadGrade({ user }) {
           </Card>
         )}
 
-        {/* Step 2: Question Configuration with Sub-questions */}
+        {/* Step 2: Upload Question Paper & Model Answer */}
         {step === 2 && (
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle>Step 2: Upload Question Paper & Model Answer</CardTitle>
+              <CardDescription>Upload the question paper and/or model answer for better AI grading (Questions will be auto-extracted)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Question Paper Upload */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Question Paper (Recommended)</Label>
+                <div 
+                  {...getQuestionRootProps()} 
+                  className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isQuestionDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"}`}
+                  data-testid="question-paper-dropzone"
+                >
+                  <input {...getQuestionInputProps()} />
+                  {questionPaperFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <FileText className="w-6 h-6 text-blue-600" />
+                      <div className="text-left">
+                        <p className="font-medium text-sm">{questionPaperFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(questionPaperFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); setQuestionPaperFile(null); }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mx-auto text-blue-400 mb-2" />
+                      <p className="font-medium text-sm">Drop your question paper PDF here</p>
+                      <p className="text-xs text-muted-foreground mt-1">✨ Questions will be auto-extracted and shown in review</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Model Answer Upload */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Model Answer (Optional)</Label>
+                <div 
+                  {...getModelRootProps()} 
+                  className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isModelDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
+                  data-testid="model-answer-dropzone"
+                >
+                  <input {...getModelInputProps()} />
+                  {modelAnswerFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <FileText className="w-6 h-6 text-primary" />
+                      <div className="text-left">
+                        <p className="font-medium text-sm">{modelAnswerFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(modelAnswerFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); setModelAnswerFile(null); }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="font-medium text-sm">Drop your model answer PDF here</p>
+                      <p className="text-xs text-muted-foreground mt-1">Used as reference for AI grading</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>💡 Tip:</strong> Upload question paper to automatically extract and display questions in the review page. 
+                  Model answer helps improve AI grading accuracy. Both are optional.
+                </p>
+              </div>
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={() => setStep(1)}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+                <Button 
+                  onClick={handleUploadModelAnswer} 
+                  disabled={loading}
+                  data-testid="upload-model-btn"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  {(modelAnswerFile || questionPaperFile) ? "Upload & Continue" : "Skip & Continue"}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
           <Card className="animate-fade-in">
             <CardHeader>
               <CardTitle>Step 2: Question Configuration</CardTitle>
