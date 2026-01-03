@@ -776,14 +776,14 @@ export default function UploadGrade({ user }) {
           </Card>
         )}
 
-        {/* Step 4: Upload Question Paper & Model Answer */}
+        {/* Step 4: Question Configuration with Sub-questions */}
         {step === 4 && (
           <Card className="animate-fade-in">
             <CardHeader>
-              <CardTitle>Step 4: Upload Question Paper & Model Answer</CardTitle>
-              <CardDescription>Upload the question paper and/or model answer for better AI grading</CardDescription>
+              <CardTitle>Step 4: Question Configuration</CardTitle>
+              <CardDescription>Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               {/* Question Paper Upload */}
               <div>
                 <Label className="text-sm font-medium mb-2 block">Question Paper (Optional)</Label>
