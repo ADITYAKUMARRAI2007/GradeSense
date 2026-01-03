@@ -1342,7 +1342,7 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
 
 @api_router.post("/exams/{exam_id}/extract-questions")
 async def extract_and_update_questions(exam_id: str, user: User = Depends(get_current_user)):
-    """Extract question text from model answer and update exam rubrics"""
+    """Extract question text from question paper OR model answer and update exam"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can update exams")
     
@@ -1351,18 +1351,29 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Check if model answer exists
-    if not exam.get("model_answer_images"):
-        raise HTTPException(status_code=400, detail="No model answer found. Please upload model answer first.")
+    # Prioritize question paper over model answer
+    extracted_questions = []
+    source = ""
     
-    # Extract questions from model answer
-    extracted_questions = await extract_questions_from_model_answer(
-        exam["model_answer_images"],
-        len(exam.get("questions", []))
-    )
+    if exam.get("question_paper_images"):
+        # Extract from question paper (preferred)
+        source = "question paper"
+        extracted_questions = await extract_questions_from_question_paper(
+            exam["question_paper_images"],
+            len(exam.get("questions", []))
+        )
+    elif exam.get("model_answer_images"):
+        # Fallback to model answer
+        source = "model answer"
+        extracted_questions = await extract_questions_from_model_answer(
+            exam["model_answer_images"],
+            len(exam.get("questions", []))
+        )
+    else:
+        raise HTTPException(status_code=400, detail="No question paper or model answer found. Please upload one first.")
     
     if not extracted_questions:
-        raise HTTPException(status_code=500, detail="Failed to extract questions from model answer")
+        raise HTTPException(status_code=500, detail=f"Failed to extract questions from {source}")
     
     # Update question rubrics
     questions = exam.get("questions", [])
@@ -1371,9 +1382,20 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
     for i, q in enumerate(questions):
         if i < len(extracted_questions):
             q["rubric"] = extracted_questions[i]
+            q["question_text"] = extracted_questions[i]  # Also set question_text field
             updated_count += 1
     
     # Update exam in database
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {"questions": questions}}
+    )
+    
+    return {
+        "message": f"Successfully extracted {updated_count} questions from {source}",
+        "updated_count": updated_count,
+        "source": source
+    }
     result = await db.exams.update_one(
         {"exam_id": exam_id},
         {"$set": {"questions": questions}}
