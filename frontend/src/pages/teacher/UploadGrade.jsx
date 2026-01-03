@@ -233,6 +233,12 @@ export default function UploadGrade({ user }) {
   };
 
   const handleCreateExam = async () => {
+    // If exam already created, just move to next step
+    if (examId) {
+      setStep(2);
+      return;
+    }
+    
     setLoading(true);
     try {
       const response = await axios.post(`${API}/exams`, formData);
