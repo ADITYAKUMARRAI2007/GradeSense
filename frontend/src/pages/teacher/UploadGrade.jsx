@@ -676,9 +676,12 @@ export default function UploadGrade({ user }) {
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
-                <Button onClick={handleCreateExam} disabled={loading} data-testid="create-exam-btn">
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save & Continue
+                <Button 
+                  onClick={() => setStep(4)} 
+                  disabled={!formData.grading_mode}
+                  data-testid="continue-to-questions-btn"
+                >
+                  Continue to Questions
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
