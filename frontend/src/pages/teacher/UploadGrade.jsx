@@ -251,7 +251,7 @@ export default function UploadGrade({ user }) {
     
     // If no model answer and no question paper, just move to next step
     if (!modelAnswerFile && !questionPaperFile) {
-      setStep(5);
+      setStep(3);
       toast.info("Proceeding without model answer. AI will grade based on question rubrics.");
       return;
     }
@@ -262,23 +262,35 @@ export default function UploadGrade({ user }) {
       if (questionPaperFile) {
         const qpFormData = new FormData();
         qpFormData.append("file", questionPaperFile);
-        await axios.post(`${API}/exams/${examId}/upload-question-paper`, qpFormData, {
+        const qpResponse = await axios.post(`${API}/exams/${examId}/upload-question-paper`, qpFormData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
-        toast.success("Question paper uploaded");
+        
+        // Show auto-extraction result
+        if (qpResponse.data.auto_extracted) {
+          toast.success(`✨ Question paper uploaded & ${qpResponse.data.extracted_count} questions auto-extracted!`);
+        } else {
+          toast.success("Question paper uploaded");
+        }
       }
       
       // Upload model answer if provided
       if (modelAnswerFile) {
         const formData = new FormData();
         formData.append("file", modelAnswerFile);
-        await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
+        const maResponse = await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
-        toast.success("Model answer uploaded");
+        
+        // Show auto-extraction result
+        if (maResponse.data.auto_extracted) {
+          toast.success(`✨ Model answer uploaded & ${maResponse.data.extracted_count} questions auto-extracted!`);
+        } else {
+          toast.success("Model answer uploaded");
+        }
       }
       
-      setStep(5);
+      setStep(3);
     } catch (error) {
       console.error("Error:", error);
       toast.error(error.response?.data?.detail || "Failed to upload files");
