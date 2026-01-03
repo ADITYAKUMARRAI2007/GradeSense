@@ -1097,6 +1097,33 @@ async def unapprove_submission(submission_id: str, user: User = Depends(get_curr
     
     return {"message": "Submission reverted to pending review"}
 
+@api_router.delete("/submissions/{submission_id}")
+async def delete_submission(submission_id: str, user: User = Depends(get_current_user)):
+    """Delete a specific submission (student paper)"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can delete submissions")
+    
+    # Find the submission
+    submission = await db.submissions.find_one({"submission_id": submission_id}, {"_id": 0})
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Verify the exam belongs to the teacher
+    exam = await db.exams.find_one({
+        "exam_id": submission["exam_id"],
+        "teacher_id": user.user_id
+    }, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=403, detail="You don't have permission to delete this submission")
+    
+    # Delete the submission
+    await db.submissions.delete_one({"submission_id": submission_id})
+    
+    # Also delete any re-evaluation requests for this submission
+    await db.re_evaluations.delete_many({"submission_id": submission_id})
+    
+    return {"message": "Submission deleted successfully"}
+
 @api_router.put("/exams/{exam_id}/close")
 async def close_exam(exam_id: str, user: User = Depends(get_current_user)):
     """Close an exam (prevent further uploads/edits)"""
