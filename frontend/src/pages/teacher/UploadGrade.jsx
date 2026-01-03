@@ -247,7 +247,10 @@ export default function UploadGrade({ user }) {
   };
 
   const handleUploadModelAnswer = async () => {
-    if (!examId) return;
+    if (!examId) {
+      toast.error("Exam ID not found. Please go back to Step 1 and create the exam first.");
+      return;
+    }
     
     // If no model answer and no question paper, just move to next step
     if (!modelAnswerFile && !questionPaperFile) {
