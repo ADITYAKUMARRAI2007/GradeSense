@@ -1699,19 +1699,25 @@ async def extract_questions_from_model_answer(
 Extract ONLY the question text (not answers) from the provided images.
 Return a JSON array with the question text for each question.
 
+CRITICAL: You MUST extract ALL questions present in the document. Count carefully!
+
 Return this exact JSON format:
 {
   "questions": [
     "Full text of question 1 here",
-    "Full text of question 2 here"
+    "Full text of question 2 here",
+    "Full text of question 3 here",
+    ...
   ]
 }
 
 Important:
+- Extract ALL questions - don't stop at just one!
 - Extract the complete question text including any sub-parts (a, b, c)
-- Do NOT include answer content
+- Do NOT include answer content, only question text
 - Maintain original question numbering if visible
-- If you can't find all questions, return what you find
+- Look through ALL pages carefully
+- Return questions in order (Q1, Q2, Q3, etc.)
 """
         ).with_model("gemini", "gemini-2.5-pro")
         
@@ -1720,11 +1726,13 @@ Important:
         
         prompt = f"""Extract the question text from these model answer images.
         
-Expected number of questions: {num_questions}
+CRITICAL: There are {num_questions} questions in this exam. You MUST extract ALL {num_questions} questions!
+
+Look carefully through ALL images. Questions might be on different pages.
 
 Extract each question's complete text. Do NOT include answers, only the question text.
 
-Return ONLY the JSON, no other text."""
+Return ONLY the JSON with ALL {num_questions} questions, no other text."""
         
         user_message = UserMessage(
             text=prompt,
