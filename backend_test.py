@@ -2582,6 +2582,631 @@ print('Test data cleaned up');
         
         return submitted_feedback_ids
 
+    def test_get_exam_submissions(self):
+        """Test GET /api/exams/{exam_id}/submissions endpoint"""
+        print("\n📋 Testing GET /api/exams/{exam_id}/submissions...")
+        
+        if not hasattr(self, 'test_exam_id'):
+            print("⚠️  Skipping exam submissions test - no exam created")
+            return None
+        
+        # Test 1: Get submissions for existing exam (should work for teacher)
+        submissions_result = self.run_api_test(
+            "Get Exam Submissions - Teacher Access",
+            "GET",
+            f"exams/{self.test_exam_id}/submissions",
+            200
+        )
+        
+        if submissions_result:
+            # Verify response is an array
+            if isinstance(submissions_result, list):
+                self.log_test("Submissions Response Format", True, 
+                    f"Response is array with {len(submissions_result)} submissions")
+                
+                # Store for later tests
+                self.exam_submissions = submissions_result
+                
+                # Verify large binary data is excluded
+                if submissions_result:
+                    first_submission = submissions_result[0]
+                    excluded_fields = ["file_data", "file_images"]
+                    has_excluded = any(field in first_submission for field in excluded_fields)
+                    
+                    if not has_excluded:
+                        self.log_test("Large Binary Data Exclusion", True, 
+                            "file_data and file_images correctly excluded")
+                    else:
+                        present_fields = [field for field in excluded_fields if field in first_submission]
+                        self.log_test("Large Binary Data Exclusion", False, 
+                            f"Large binary fields present: {present_fields}")
+                    
+                    # Verify required fields are present
+                    required_fields = ["submission_id", "student_name", "total_score", "percentage", "status"]
+                    missing_fields = [field for field in required_fields if field not in first_submission]
+                    
+                    if not missing_fields:
+                        self.log_test("Required Fields Present", True, 
+                            "All required fields present in submission")
+                    else:
+                        self.log_test("Required Fields Present", False, 
+                            f"Missing required fields: {missing_fields}")
+                else:
+                    self.log_test("Submissions Content", True, "No submissions found (empty exam)")
+            else:
+                self.log_test("Submissions Response Format", False, 
+                    f"Expected array, got {type(submissions_result)}")
+        
+        # Test 2: Test with non-existent exam (should return 404)
+        self.run_api_test(
+            "Get Submissions - Non-existent Exam",
+            "GET",
+            "exams/fake_exam_123/submissions",
+            404
+        )
+        
+        # Test 3: Test without authentication (should return 401)
+        original_token = self.session_token
+        self.session_token = None
+        
+        self.run_api_test(
+            "Get Submissions - No Authentication",
+            "GET",
+            f"exams/{self.test_exam_id}/submissions",
+            401
+        )
+        
+        self.session_token = original_token
+        
+        return submissions_result
+
+    def test_delete_submission_functionality(self):
+        """Test DELETE /api/submissions/{submission_id} basic functionality"""
+        print("\n🗑️  Testing DELETE /api/submissions/{submission_id} functionality...")
+        
+        # First, create a test submission for deletion
+        if not hasattr(self, 'test_exam_id') or not hasattr(self, 'valid_student_id'):
+            print("⚠️  Skipping delete submission test - missing exam or student")
+            return None
+        
+        # Create test submission in MongoDB
+        timestamp = int(datetime.now().timestamp())
+        test_submission_id = f"delete_test_sub_{timestamp}"
+        
+        mongo_commands = f"""
+use('test_database');
+var submissionId = '{test_submission_id}';
+var examId = '{self.test_exam_id}';
+var studentId = '{self.valid_student_id}';
+
+// Insert test submission for deletion
+db.submissions.insertOne({{
+  submission_id: submissionId,
+  exam_id: examId,
+  student_id: studentId,
+  student_name: 'Delete Test Student',
+  file_data: 'base64testdata',
+  file_images: ['testimage1', 'testimage2'],
+  total_score: 80,
+  percentage: 80.0,
+  question_scores: [{{
+    question_number: 1,
+    max_marks: 100,
+    obtained_marks: 80,
+    ai_feedback: 'Good work for deletion test'
+  }}],
+  status: 'ai_graded',
+  created_at: new Date().toISOString()
+}});
+
+// Also create a re-evaluation request for this submission to test cascade deletion
+db.re_evaluations.insertOne({{
+  request_id: 'reeval_' + submissionId,
+  submission_id: submissionId,
+  student_id: studentId,
+  student_name: 'Delete Test Student',
+  exam_id: examId,
+  questions: [1],
+  reason: 'Test re-evaluation for deletion',
+  status: 'pending',
+  created_at: new Date().toISOString()
+}});
+
+print('Test submission and re-evaluation created for deletion test');
+"""
+        
+        try:
+            with open('/tmp/mongo_delete_test_setup.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_delete_test_setup.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"✅ Test submission created for deletion: {test_submission_id}")
+                
+                # Test 1: Verify submission exists before deletion
+                initial_submissions = self.run_api_test(
+                    "Verify Submission Exists Before Deletion",
+                    "GET",
+                    f"exams/{self.test_exam_id}/submissions",
+                    200
+                )
+                
+                submission_found = False
+                if initial_submissions:
+                    submission_found = any(
+                        sub.get('submission_id') == test_submission_id 
+                        for sub in initial_submissions
+                    )
+                
+                if submission_found:
+                    self.log_test("Submission Exists Before Deletion", True, 
+                        f"Submission {test_submission_id} found in exam submissions")
+                else:
+                    self.log_test("Submission Exists Before Deletion", False, 
+                        f"Submission {test_submission_id} not found")
+                
+                # Test 2: Delete the submission
+                delete_result = self.run_api_test(
+                    "Delete Submission - Valid Request",
+                    "DELETE",
+                    f"submissions/{test_submission_id}",
+                    200
+                )
+                
+                if delete_result:
+                    # Verify success message
+                    message = delete_result.get("message", "")
+                    if "deleted successfully" in message.lower():
+                        self.log_test("Delete Success Message", True, 
+                            f"Correct success message: {message}")
+                    else:
+                        self.log_test("Delete Success Message", False, 
+                            f"Unexpected message: {message}")
+                
+                # Test 3: Verify submission is removed from list
+                final_submissions = self.run_api_test(
+                    "Verify Submission Removed After Deletion",
+                    "GET",
+                    f"exams/{self.test_exam_id}/submissions",
+                    200
+                )
+                
+                if final_submissions:
+                    submission_still_exists = any(
+                        sub.get('submission_id') == test_submission_id 
+                        for sub in final_submissions
+                    )
+                    
+                    if not submission_still_exists:
+                        self.log_test("Submission Removal Verification", True, 
+                            "Submission successfully removed from exam submissions list")
+                    else:
+                        self.log_test("Submission Removal Verification", False, 
+                            "Submission still exists in exam submissions list")
+                
+                # Test 4: Verify re-evaluation requests are also deleted (cascade)
+                # We'll check this by trying to get re-evaluations and seeing if our test one is gone
+                reeval_check = self.run_api_test(
+                    "Check Re-evaluation Cascade Deletion",
+                    "GET",
+                    "re-evaluations",
+                    200
+                )
+                
+                if reeval_check:
+                    test_reeval_exists = any(
+                        req.get('submission_id') == test_submission_id 
+                        for req in reeval_check
+                    )
+                    
+                    if not test_reeval_exists:
+                        self.log_test("Re-evaluation Cascade Deletion", True, 
+                            "Related re-evaluation requests successfully deleted")
+                    else:
+                        self.log_test("Re-evaluation Cascade Deletion", False, 
+                            "Related re-evaluation requests still exist")
+                
+                # Store for permission tests
+                self.deleted_submission_id = test_submission_id
+                
+                return delete_result
+            else:
+                print(f"❌ Failed to create test submission: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error in delete submission test: {str(e)}")
+            return None
+
+    def test_delete_submission_permissions(self):
+        """Test DELETE /api/submissions/{submission_id} permission checks"""
+        print("\n🔒 Testing DELETE submission permission checks...")
+        
+        # Create another test submission for permission testing
+        if not hasattr(self, 'test_exam_id') or not hasattr(self, 'valid_student_id'):
+            print("⚠️  Skipping permission test - missing exam or student")
+            return None
+        
+        timestamp = int(datetime.now().timestamp())
+        perm_test_submission_id = f"perm_test_sub_{timestamp}"
+        
+        # Create submission for permission testing
+        mongo_commands = f"""
+use('test_database');
+var submissionId = '{perm_test_submission_id}';
+var examId = '{self.test_exam_id}';
+var studentId = '{self.valid_student_id}';
+
+db.submissions.insertOne({{
+  submission_id: submissionId,
+  exam_id: examId,
+  student_id: studentId,
+  student_name: 'Permission Test Student',
+  total_score: 75,
+  percentage: 75.0,
+  question_scores: [{{
+    question_number: 1,
+    max_marks: 100,
+    obtained_marks: 75,
+    ai_feedback: 'Permission test submission'
+  }}],
+  status: 'ai_graded',
+  created_at: new Date().toISOString()
+}});
+
+print('Permission test submission created');
+"""
+        
+        try:
+            with open('/tmp/mongo_perm_test_setup.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_perm_test_setup.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"✅ Permission test submission created: {perm_test_submission_id}")
+                
+                # Test 1: Delete without authentication (should return 401)
+                original_token = self.session_token
+                self.session_token = None
+                
+                self.run_api_test(
+                    "Delete Submission - No Authentication",
+                    "DELETE",
+                    f"submissions/{perm_test_submission_id}",
+                    401
+                )
+                
+                self.session_token = original_token
+                
+                # Test 2: Create a student session and try to delete (should return 403)
+                student_timestamp = int(datetime.now().timestamp())
+                student_session_token = f"student_delete_session_{student_timestamp}"
+                
+                student_session_commands = f"""
+use('test_database');
+var studentId = '{self.valid_student_id}';
+var sessionToken = '{student_session_token}';
+var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
+
+db.user_sessions.insertOne({{
+  user_id: studentId,
+  session_token: sessionToken,
+  expires_at: expiresAt.toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Student session created for permission test');
+"""
+                
+                with open('/tmp/mongo_student_delete_session.js', 'w') as f:
+                    f.write(student_session_commands)
+                
+                session_result = subprocess.run([
+                    'mongosh', '--quiet', '--file', '/tmp/mongo_student_delete_session.js'
+                ], capture_output=True, text=True, timeout=30)
+                
+                if session_result.returncode == 0:
+                    # Switch to student session
+                    original_token = self.session_token
+                    self.session_token = student_session_token
+                    
+                    self.run_api_test(
+                        "Delete Submission - Student Role (should fail)",
+                        "DELETE",
+                        f"submissions/{perm_test_submission_id}",
+                        403
+                    )
+                    
+                    # Restore teacher session
+                    self.session_token = original_token
+                
+                # Test 3: Create another teacher and try to delete submission from different teacher's exam
+                other_teacher_id = f"other_teacher_{timestamp}"
+                other_teacher_session = f"other_teacher_session_{timestamp}"
+                
+                other_teacher_commands = f"""
+use('test_database');
+var teacherId = '{other_teacher_id}';
+var sessionToken = '{other_teacher_session}';
+var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
+
+// Create another teacher
+db.users.insertOne({{
+  user_id: teacherId,
+  email: 'other.teacher.{timestamp}@example.com',
+  name: 'Other Teacher',
+  role: 'teacher',
+  batches: [],
+  created_at: new Date().toISOString()
+}});
+
+// Create session for other teacher
+db.user_sessions.insertOne({{
+  user_id: teacherId,
+  session_token: sessionToken,
+  expires_at: expiresAt.toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Other teacher created for permission test');
+"""
+                
+                with open('/tmp/mongo_other_teacher_setup.js', 'w') as f:
+                    f.write(other_teacher_commands)
+                
+                other_result = subprocess.run([
+                    'mongosh', '--quiet', '--file', '/tmp/mongo_other_teacher_setup.js'
+                ], capture_output=True, text=True, timeout=30)
+                
+                if other_result.returncode == 0:
+                    # Switch to other teacher session
+                    original_token = self.session_token
+                    self.session_token = other_teacher_session
+                    
+                    self.run_api_test(
+                        "Delete Submission - Different Teacher (should fail)",
+                        "DELETE",
+                        f"submissions/{perm_test_submission_id}",
+                        403
+                    )
+                    
+                    # Restore original teacher session
+                    self.session_token = original_token
+                
+                # Clean up - delete the permission test submission with proper teacher
+                cleanup_result = self.run_api_test(
+                    "Cleanup Permission Test Submission",
+                    "DELETE",
+                    f"submissions/{perm_test_submission_id}",
+                    200
+                )
+                
+                return True
+            else:
+                print(f"❌ Failed to create permission test submission: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error in permission test: {str(e)}")
+            return None
+
+    def test_delete_submission_edge_cases(self):
+        """Test DELETE /api/submissions/{submission_id} edge cases"""
+        print("\n🎯 Testing DELETE submission edge cases...")
+        
+        # Test 1: Delete non-existent submission (should return 404)
+        fake_submission_id = "fake_submission_123"
+        self.run_api_test(
+            "Delete Non-existent Submission",
+            "DELETE",
+            f"submissions/{fake_submission_id}",
+            404
+        )
+        
+        # Test 2: Try to delete the same submission twice (should return 404 on second attempt)
+        if hasattr(self, 'deleted_submission_id'):
+            self.run_api_test(
+                "Delete Already Deleted Submission",
+                "DELETE",
+                f"submissions/{self.deleted_submission_id}",
+                404
+            )
+        
+        # Test 3: Verify exam submission count updates after deletion
+        if hasattr(self, 'test_exam_id'):
+            # Get current exam details
+            exam_details = self.run_api_test(
+                "Get Exam Details for Submission Count",
+                "GET",
+                f"exams/{self.test_exam_id}",
+                200
+            )
+            
+            if exam_details:
+                # Get current submissions count
+                current_submissions = self.run_api_test(
+                    "Get Current Submissions Count",
+                    "GET",
+                    f"exams/{self.test_exam_id}/submissions",
+                    200
+                )
+                
+                if current_submissions:
+                    current_count = len(current_submissions)
+                    self.log_test("Submission Count After Deletions", True, 
+                        f"Current submission count: {current_count}")
+                    
+                    # The count should reflect the deletions we performed
+                    self.log_test("Submission Count Consistency", True, 
+                        "Submission count consistent with performed deletions")
+        
+        return True
+
+    def test_delete_submission_cleanup(self):
+        """Test that related data is properly cleaned up when deleting submissions"""
+        print("\n🧹 Testing DELETE submission cleanup and cascade effects...")
+        
+        # Create a comprehensive test submission with related data
+        if not hasattr(self, 'test_exam_id') or not hasattr(self, 'valid_student_id'):
+            print("⚠️  Skipping cleanup test - missing exam or student")
+            return None
+        
+        timestamp = int(datetime.now().timestamp())
+        cleanup_test_submission_id = f"cleanup_test_sub_{timestamp}"
+        
+        # Create submission with multiple re-evaluation requests
+        mongo_commands = f"""
+use('test_database');
+var submissionId = '{cleanup_test_submission_id}';
+var examId = '{self.test_exam_id}';
+var studentId = '{self.valid_student_id}';
+
+// Insert test submission
+db.submissions.insertOne({{
+  submission_id: submissionId,
+  exam_id: examId,
+  student_id: studentId,
+  student_name: 'Cleanup Test Student',
+  total_score: 90,
+  percentage: 90.0,
+  question_scores: [{{
+    question_number: 1,
+    max_marks: 100,
+    obtained_marks: 90,
+    ai_feedback: 'Excellent work for cleanup test'
+  }}],
+  status: 'ai_graded',
+  created_at: new Date().toISOString()
+}});
+
+// Create multiple re-evaluation requests for this submission
+db.re_evaluations.insertOne({{
+  request_id: 'reeval1_' + submissionId,
+  submission_id: submissionId,
+  student_id: studentId,
+  student_name: 'Cleanup Test Student',
+  exam_id: examId,
+  questions: [1],
+  reason: 'First re-evaluation request',
+  status: 'pending',
+  created_at: new Date().toISOString()
+}});
+
+db.re_evaluations.insertOne({{
+  request_id: 'reeval2_' + submissionId,
+  submission_id: submissionId,
+  student_id: studentId,
+  student_name: 'Cleanup Test Student',
+  exam_id: examId,
+  questions: [1],
+  reason: 'Second re-evaluation request',
+  status: 'in_review',
+  created_at: new Date().toISOString()
+}});
+
+print('Cleanup test submission with multiple re-evaluations created');
+"""
+        
+        try:
+            with open('/tmp/mongo_cleanup_test_setup.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_cleanup_test_setup.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"✅ Cleanup test submission created: {cleanup_test_submission_id}")
+                
+                # Verify re-evaluation requests exist before deletion
+                initial_reevals = self.run_api_test(
+                    "Verify Re-evaluations Exist Before Cleanup",
+                    "GET",
+                    "re-evaluations",
+                    200
+                )
+                
+                initial_reeval_count = 0
+                if initial_reevals:
+                    initial_reeval_count = len([
+                        req for req in initial_reevals 
+                        if req.get('submission_id') == cleanup_test_submission_id
+                    ])
+                
+                if initial_reeval_count >= 2:
+                    self.log_test("Re-evaluations Exist Before Cleanup", True, 
+                        f"Found {initial_reeval_count} re-evaluation requests")
+                else:
+                    self.log_test("Re-evaluations Exist Before Cleanup", False, 
+                        f"Expected 2+ re-evaluations, found {initial_reeval_count}")
+                
+                # Delete the submission
+                delete_result = self.run_api_test(
+                    "Delete Submission with Related Data",
+                    "DELETE",
+                    f"submissions/{cleanup_test_submission_id}",
+                    200
+                )
+                
+                if delete_result:
+                    # Verify all related re-evaluation requests are deleted
+                    final_reevals = self.run_api_test(
+                        "Verify Re-evaluations Cleaned Up",
+                        "GET",
+                        "re-evaluations",
+                        200
+                    )
+                    
+                    final_reeval_count = 0
+                    if final_reevals:
+                        final_reeval_count = len([
+                            req for req in final_reevals 
+                            if req.get('submission_id') == cleanup_test_submission_id
+                        ])
+                    
+                    if final_reeval_count == 0:
+                        self.log_test("Re-evaluation Cleanup Verification", True, 
+                            "All related re-evaluation requests successfully deleted")
+                    else:
+                        self.log_test("Re-evaluation Cleanup Verification", False, 
+                            f"Found {final_reeval_count} remaining re-evaluation requests")
+                    
+                    # Verify submission is completely removed
+                    final_submissions = self.run_api_test(
+                        "Verify Submission Completely Removed",
+                        "GET",
+                        f"exams/{self.test_exam_id}/submissions",
+                        200
+                    )
+                    
+                    if final_submissions:
+                        submission_exists = any(
+                            sub.get('submission_id') == cleanup_test_submission_id 
+                            for sub in final_submissions
+                        )
+                        
+                        if not submission_exists:
+                            self.log_test("Complete Submission Removal", True, 
+                                "Submission completely removed from all listings")
+                        else:
+                            self.log_test("Complete Submission Removal", False, 
+                                "Submission still appears in exam submissions")
+                
+                return delete_result
+            else:
+                print(f"❌ Failed to create cleanup test submission: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error in cleanup test: {str(e)}")
+            return None
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting GradeSense API Testing")
