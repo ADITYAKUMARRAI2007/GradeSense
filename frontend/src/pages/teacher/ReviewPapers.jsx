@@ -1033,6 +1033,22 @@ export default function ReviewPapers({ user }) {
       </Dialog>
     </>
   );
+  }, [
+    selectedSubmission, 
+    exams, 
+    modelAnswerImages, 
+    questionPaperImages,
+    showModelAnswer, 
+    showQuestionPaper,
+    showAnnotations,
+    examQuestions,
+    imageZoom,
+    zoomedImage,
+    feedbackDialogOpen,
+    feedbackQuestion,
+    feedbackForm,
+    submittingFeedback
+  ]);
 
   return (
     <Layout user={user}>
