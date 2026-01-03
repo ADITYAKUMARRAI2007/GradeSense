@@ -1209,7 +1209,7 @@ export default function ReviewPapers({ user }) {
           {/* Review Dialog - Full Screen */}
           <Dialog open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
             <DialogContent className="max-w-[98vw] w-full max-h-[95vh] h-[95vh] p-0 flex flex-col">
-              {selectedSubmission && <DetailContent />}
+              {selectedSubmission && DetailContent}
             </DialogContent>
           </Dialog>
         </div>
