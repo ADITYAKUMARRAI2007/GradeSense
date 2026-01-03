@@ -819,8 +819,13 @@ export default function UploadGrade({ user }) {
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
-                <Button onClick={() => setStep(5)} data-testid="next-to-upload-btn">
-                  Continue to Upload Papers
+                <Button 
+                  onClick={handleSaveQuestionsAndContinue} 
+                  disabled={loading}
+                  data-testid="save-questions-btn"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save & Continue to Upload Papers
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
