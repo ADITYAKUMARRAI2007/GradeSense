@@ -2702,6 +2702,15 @@ print('Test data cleaned up');
         self.test_filename_parsing_edge_cases()
         self.test_upload_more_papers_with_existing_students()
         
+        # NEW FEATURE TEST: Delete Individual Student Paper Feature
+        print("\n🗑️  NEW FEATURE TEST: Delete Individual Student Paper Feature")
+        print("-" * 60)
+        self.test_get_exam_submissions()
+        self.test_delete_submission_functionality()
+        self.test_delete_submission_permissions()
+        self.test_delete_submission_edge_cases()
+        self.test_delete_submission_cleanup()
+        
         # Cleanup
         self.cleanup_test_data()
         
