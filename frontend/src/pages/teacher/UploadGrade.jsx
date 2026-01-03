@@ -232,6 +232,30 @@ export default function UploadGrade({ user }) {
     }
   };
 
+  const handleSaveQuestionsAndContinue = async () => {
+    if (!examId) {
+      toast.error("Exam ID not found");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Update exam with configured questions and grading mode
+      await axios.put(`${API}/exams/${examId}`, {
+        questions: formData.questions,
+        grading_mode: formData.grading_mode
+      });
+      
+      toast.success("Questions saved successfully");
+      setStep(5);
+    } catch (error) {
+      console.error("Error saving questions:", error);
+      toast.error(error.response?.data?.detail || "Failed to save questions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateExam = async () => {
     // If exam already created, just move to next step
     if (examId) {
