@@ -1143,6 +1143,36 @@ async def delete_submission(submission_id: str, user: User = Depends(get_current
     
     return {"message": "Submission deleted successfully"}
 
+@api_router.put("/exams/{exam_id}")
+async def update_exam(exam_id: str, update_data: dict, user: User = Depends(get_current_user)):
+    """Update exam questions and grading mode"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can update exams")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Prepare update fields
+    update_fields = {}
+    
+    if "questions" in update_data:
+        update_fields["questions"] = update_data["questions"]
+        logger.info(f"Updating {len(update_data['questions'])} questions for exam {exam_id}")
+    
+    if "grading_mode" in update_data:
+        update_fields["grading_mode"] = update_data["grading_mode"]
+    
+    if update_fields:
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": update_fields}
+        )
+        logger.info(f"Updated exam {exam_id}: {list(update_fields.keys())}")
+    
+    return {"message": "Exam updated successfully", "updated_fields": list(update_fields.keys())}
+
 @api_router.put("/exams/{exam_id}/close")
 async def close_exam(exam_id: str, user: User = Depends(get_current_user)):
     """Close an exam (prevent further uploads/edits)"""
