@@ -1710,23 +1710,27 @@ Important:
         # Create image contents
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images[:5]]
         
-        user_message = UserMessage(
-            text=f"""Extract the question text from these model answer images.
-            
+        prompt = f"""Extract the question text from these model answer images.
+        
 Expected number of questions: {num_questions}
 
-Extract each question's complete text.""",
-            images=image_contents
+Extract each question's complete text. Do NOT include answers, only the question text.
+
+Return ONLY the JSON, no other text."""
+        
+        user_message = UserMessage(
+            text=prompt,
+            file_contents=image_contents
         )
         
-        response = await asyncio.to_thread(chat.send_message, user_message)
-        response_text = response.text.strip()
+        ai_response = await chat.send_message(user_message)
         
         # Parse JSON response
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0].strip()
+        response_text = ai_response.strip()
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
         
         import json
         result = json.loads(response_text)
