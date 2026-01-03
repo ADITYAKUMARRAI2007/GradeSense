@@ -57,6 +57,27 @@ export default function ManageExams({ user }) {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (selectedExam) {
+      fetchSubmissions(selectedExam.exam_id);
+    } else {
+      setSubmissions([]);
+    }
+  }, [selectedExam]);
+
+  const fetchSubmissions = async (examId) => {
+    try {
+      setLoadingSubmissions(true);
+      const response = await axios.get(`${API}/exams/${examId}/submissions`);
+      setSubmissions(response.data);
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+      toast.error("Failed to load submissions");
+    } finally {
+      setLoadingSubmissions(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const [examsRes, batchesRes, subjectsRes] = await Promise.all([
