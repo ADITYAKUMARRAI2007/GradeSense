@@ -493,11 +493,15 @@ export default function UploadGrade({ user }) {
 
               <div className="flex justify-end pt-4">
                 <Button 
-                  onClick={() => setStep(2)}
-                  disabled={!formData.batch_id || !formData.subject_id || !formData.exam_name}
-                  data-testid="next-step-btn"
+                  onClick={handleCreateExam}
+                  disabled={!formData.batch_id || !formData.subject_id || !formData.exam_name || loading}
+                  data-testid="create-exam-btn"
                 >
-                  Next: Configure Questions
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Continue to Upload Files
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
