@@ -274,7 +274,12 @@ export default function ReviewPapers({ user }) {
     }
   };
 
-  const DetailContent = () => (
+  // Memoize DetailContent to prevent recreation on every render
+  // This fixes the textarea editing issue
+  const DetailContent = useMemo(() => {
+    if (!selectedSubmission) return null;
+    
+    return (
     <>
       {/* Header */}
       <div className="p-3 md:p-4 border-b bg-gradient-to-r from-primary/5 to-transparent">
