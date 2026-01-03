@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-01-02T14:56:42.151279",
-  "total_tests": 159,
-  "passed_tests": 157,
-  "success_rate": 98.74213836477988,
+  "timestamp": "2026-01-03T05:52:27.275124",
+  "total_tests": 187,
+  "passed_tests": 181,
+  "success_rate": 96.79144385026738,
   "test_details": [
     {
       "test": "Health Check",
@@ -175,7 +175,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU145613)",
+      "test": "Create Student with Valid ID (STU055113)",
       "success": true,
       "details": ""
     },
@@ -217,20 +217,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_77a4e60e84b4 found in batch batch_d88b1053"
+      "details": "Student user_fa1ec1cb325f found in batch batch_3e731d29"
     },
     {
-      "test": "Create Student with Format STU1456131 (John Doe)",
+      "test": "Create Student with Format STU0551141 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL145613 (Alice Smith)",
+      "test": "Create Student with Format ROLL055114 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A145613 (Bob Jones)",
+      "test": "Create Student with Format A055114 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -417,7 +417,7 @@
     {
       "test": "Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_20944501"
+      "details": "Generated feedback_id: feedback_8bb544d1"
     },
     {
       "test": "Submit General Feedback",
@@ -427,7 +427,7 @@
     {
       "test": "General Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_552f999d"
+      "details": "Generated feedback_id: feedback_4a59e2ff"
     },
     {
       "test": "Submit Feedback Without Auth (should fail)",
@@ -546,8 +546,8 @@
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Generate Review Packet",
@@ -691,28 +691,13 @@
     },
     {
       "test": "Student Deep Dive: Basic Analysis",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Student Deep Dive Response Structure",
-      "success": true,
-      "details": "All required fields present"
-    },
-    {
-      "test": "Student Info Structure",
-      "success": true,
-      "details": "Student info has correct structure"
-    },
-    {
-      "test": "AI Analysis Structure",
-      "success": true,
-      "details": "AI analysis has correct structure"
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Generate Review Packet",
@@ -756,8 +741,8 @@
     },
     {
       "test": "Comprehensive Analytics Workflow",
-      "success": true,
-      "details": "All 6 analytics endpoints working correctly"
+      "success": false,
+      "details": "5/6 steps successful. Failed: ['student_deep_dive']"
     },
     {
       "test": "Upload More Papers: No Files (should fail)",
@@ -797,7 +782,162 @@
     {
       "test": "Existing Student Handling",
       "success": true,
-      "details": "Created test student EXIST145641 for upload-more-papers testing"
+      "details": "Created test student EXIST055223 for upload-more-papers testing"
+    },
+    {
+      "test": "Get Exam Submissions - Teacher Access",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submissions Response Format",
+      "success": true,
+      "details": "Response is array with 1 submissions"
+    },
+    {
+      "test": "Large Binary Data Exclusion",
+      "success": true,
+      "details": "file_data and file_images correctly excluded"
+    },
+    {
+      "test": "Required Fields Present",
+      "success": true,
+      "details": "All required fields present in submission"
+    },
+    {
+      "test": "Get Submissions - Non-existent Exam",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Submissions - No Authentication",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Submission Exists Before Deletion",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submission Exists Before Deletion",
+      "success": true,
+      "details": "Submission delete_test_sub_1767419543 found in exam submissions"
+    },
+    {
+      "test": "Delete Submission - Valid Request",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Success Message",
+      "success": true,
+      "details": "Correct success message: Submission deleted successfully"
+    },
+    {
+      "test": "Verify Submission Removed After Deletion",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submission Removal Verification",
+      "success": true,
+      "details": "Submission successfully removed from exam submissions list"
+    },
+    {
+      "test": "Check Re-evaluation Cascade Deletion",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Re-evaluation Cascade Deletion",
+      "success": true,
+      "details": "Related re-evaluation requests successfully deleted"
+    },
+    {
+      "test": "Delete Submission - No Authentication",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Submission - Student Role (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Submission - Different Teacher (should fail)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Cleanup Permission Test Submission",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Non-existent Submission",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Already Deleted Submission",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Exam Details for Submission Count",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Current Submissions Count",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Submission Count After Deletions",
+      "success": true,
+      "details": "Current submission count: 1"
+    },
+    {
+      "test": "Submission Count Consistency",
+      "success": true,
+      "details": "Submission count consistent with performed deletions"
+    },
+    {
+      "test": "Verify Re-evaluations Exist Before Cleanup",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Re-evaluations Exist Before Cleanup",
+      "success": true,
+      "details": "Found 2 re-evaluation requests"
+    },
+    {
+      "test": "Delete Submission with Related Data",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Re-evaluations Cleaned Up",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Re-evaluation Cleanup Verification",
+      "success": true,
+      "details": "All related re-evaluation requests successfully deleted"
+    },
+    {
+      "test": "Verify Submission Completely Removed",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Complete Submission Removal",
+      "success": true,
+      "details": "Submission completely removed from all listings"
     }
   ]
 }
