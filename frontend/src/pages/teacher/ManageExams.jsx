@@ -203,6 +203,23 @@ export default function ManageExams({ user }) {
     }
   };
 
+  const handleDeleteSubmission = async (submission) => {
+    if (!confirm(`Delete ${submission.student_name}'s paper? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API}/submissions/${submission.submission_id}`);
+      toast.success("Paper deleted successfully");
+      
+      // Refresh submissions and exam data
+      fetchSubmissions(selectedExam.exam_id);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete paper");
+    }
+  };
+
   const handleDelete = async (exam) => {
     if (!confirm(`Are you sure you want to delete "${exam.exam_name}"? This will also delete all submissions and re-evaluation requests associated with this exam.`)) {
       return;
