@@ -754,6 +754,20 @@ export default function ReviewPapers({ user }) {
                     {(() => {
                       const examQuestion = examQuestions.find(q => q.question_number === qs.question_number);
                       const questionText = qs.question_text || examQuestion?.rubric || examQuestion?.question_text;
+                      
+                      // If no question text, show AI's assessment as a fallback
+                      if (!questionText && qs.ai_feedback) {
+                        return (
+                          <div className="mb-3 p-3 bg-blue-50/50 rounded border-l-4 border-blue-300">
+                            <p className="text-xs font-medium text-blue-800 mb-1">Question {qs.question_number} (from AI assessment):</p>
+                            <p className="text-xs text-gray-700 line-clamp-3">{qs.ai_feedback.slice(0, 200)}...</p>
+                            <p className="text-xs text-muted-foreground italic mt-1">
+                              Note: View model answer or use "Extract Questions" in Manage Exams for full question text
+                            </p>
+                          </div>
+                        );
+                      }
+                      
                       return questionText ? (
                         <div className="mb-3 p-2 bg-blue-50 rounded border-l-4 border-blue-500">
                           <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">
@@ -761,10 +775,15 @@ export default function ReviewPapers({ user }) {
                           </p>
                         </div>
                       ) : (
-                        <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-muted-foreground">
-                          <p className="text-xs text-muted-foreground italic">
-                            Question text not available. Check question paper or model answer.
+                        <div className="mb-3 p-2 bg-amber-50 rounded border-l-2 border-amber-400">
+                          <p className="text-xs text-amber-800 font-medium">⚠️ Question {qs.question_number}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Question text not available. To see full questions:
                           </p>
+                          <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc">
+                            <li>View model answer (left panel)</li>
+                            <li>Or go to Manage Exams → Select exam → Click "Extract Questions"</li>
+                          </ul>
                         </div>
                       );
                     })()}
