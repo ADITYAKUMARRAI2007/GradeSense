@@ -508,12 +508,6 @@ export default function UploadGrade({ user }) {
             </CardContent>
           </Card>
         )}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Step 2: Upload Question Paper & Model Answer */}
         {step === 2 && (
