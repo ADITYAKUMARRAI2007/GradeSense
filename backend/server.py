@@ -1283,16 +1283,18 @@ async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
     # Check for duplicate exam name within the same batch (case-insensitive, trimmed)
     exam_name_normalized = exam.exam_name.strip().lower()
     
-    existing = await db.exams.find_one({
+    # Get all exams for this batch and teacher
+    existing_exams = await db.exams.find({
         "batch_id": exam.batch_id,
         "teacher_id": user.user_id
-    }, {"_id": 0, "exam_name": 1})
+    }, {"_id": 0, "exam_name": 1, "exam_id": 1}).to_list(1000)
     
-    if existing:
+    # Check if any existing exam has the same name (case-insensitive)
+    for existing in existing_exams:
         existing_name_normalized = existing.get("exam_name", "").strip().lower()
         if existing_name_normalized == exam_name_normalized:
-            logger.warning(f"Duplicate exam found: '{exam.exam_name}' matches existing '{existing.get('exam_name')}' in batch {exam.batch_id}")
-            raise HTTPException(status_code=400, detail=f"An exam with name '{exam.exam_name}' already exists in this batch")
+            logger.warning(f"Duplicate exam found: '{exam.exam_name}' matches existing '{existing.get('exam_name')}' (ID: {existing.get('exam_id')}) in batch {exam.batch_id}")
+            raise HTTPException(status_code=400, detail=f"An exam named '{exam.exam_name}' already exists in this batch")
     
     exam_id = f"exam_{uuid.uuid4().hex[:8]}"
     new_exam = {
@@ -1310,7 +1312,7 @@ async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.exams.insert_one(new_exam)
-    logger.info(f"Created new exam: {exam_id} - {exam.exam_name}")
+    logger.info(f"Created new exam: {exam_id} - '{exam.exam_name}' in batch {exam.batch_id}")
     return {"exam_id": exam_id, "status": "draft"}
 
 @api_router.get("/exams/{exam_id}")
