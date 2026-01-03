@@ -42,6 +42,8 @@ export default function ManageExams({ user }) {
   const [paperFiles, setPaperFiles] = useState([]);
   const [extractingQuestions, setExtractingQuestions] = useState(false);
   const [inferringTopics, setInferringTopics] = useState(false);
+  const [submissions, setSubmissions] = useState([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'application/pdf': ['.pdf'] },
