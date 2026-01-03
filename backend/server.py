@@ -1097,6 +1097,25 @@ async def unapprove_submission(submission_id: str, user: User = Depends(get_curr
     
     return {"message": "Submission reverted to pending review"}
 
+@api_router.get("/exams/{exam_id}/submissions")
+async def get_exam_submissions(exam_id: str, user: User = Depends(get_current_user)):
+    """Get all submissions for a specific exam"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view submissions")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get all submissions for this exam
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "file_data": 0, "file_images": 0}  # Exclude large binary data
+    ).to_list(1000)
+    
+    return submissions
+
 @api_router.delete("/submissions/{submission_id}")
 async def delete_submission(submission_id: str, user: User = Depends(get_current_user)):
     """Delete a specific submission (student paper)"""
