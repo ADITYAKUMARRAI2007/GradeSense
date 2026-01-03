@@ -773,7 +773,7 @@ export default function UploadGrade({ user }) {
                 </p>
               </div>
               <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setStep(3)}>
+                <Button variant="outline" onClick={() => setStep(1)}>
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
