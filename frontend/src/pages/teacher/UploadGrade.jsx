@@ -238,7 +238,7 @@ export default function UploadGrade({ user }) {
       const response = await axios.post(`${API}/exams`, formData);
       setExamId(response.data.exam_id);
       toast.success("Exam configuration saved");
-      setStep(4);
+      setStep(2);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to create exam");
     } finally {
