@@ -2012,11 +2012,11 @@ async def upload_question_paper(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload question paper PDF"""
+    """Upload question paper PDF and AUTO-EXTRACT questions"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload question papers")
     
-    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id})
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
@@ -2031,7 +2031,52 @@ async def upload_question_paper(
         }}
     )
     
-    return {"message": "Question paper uploaded", "pages": len(images)}
+    # AUTO-EXTRACT questions from question paper
+    logger.info(f"Auto-extracting questions from question paper for exam {exam_id}")
+    try:
+        extracted_questions = await extract_questions_from_question_paper(
+            images,
+            len(exam.get("questions", []))
+        )
+        
+        if extracted_questions:
+            # Update question rubrics with extracted text
+            questions = exam.get("questions", [])
+            updated_count = 0
+            
+            for i, q in enumerate(questions):
+                if i < len(extracted_questions):
+                    q["rubric"] = extracted_questions[i]
+                    q["question_text"] = extracted_questions[i]
+                    updated_count += 1
+            
+            # Save updated questions
+            await db.exams.update_one(
+                {"exam_id": exam_id},
+                {"$set": {"questions": questions}}
+            )
+            
+            logger.info(f"Auto-extracted {updated_count} questions from question paper")
+            return {
+                "message": f"✨ Question paper uploaded & {updated_count} questions auto-extracted!",
+                "pages": len(images),
+                "auto_extracted": True,
+                "extracted_count": updated_count
+            }
+        else:
+            logger.warning(f"Could not auto-extract questions from question paper for exam {exam_id}")
+            return {
+                "message": "Question paper uploaded, but questions could not be auto-extracted.",
+                "pages": len(images),
+                "auto_extracted": False
+            }
+    except Exception as e:
+        logger.error(f"Error during auto-extraction: {e}")
+        return {
+            "message": "Question paper uploaded, but auto-extraction failed.",
+            "pages": len(images),
+            "auto_extracted": False
+        }
 
 @api_router.post("/exams/{exam_id}/upload-papers")
 async def upload_student_papers(
