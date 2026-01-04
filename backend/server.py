@@ -1997,7 +1997,8 @@ Return valid JSON only."""
                     obtained_marks=min(score_data["obtained_marks"], q["max_marks"]),
                     ai_feedback=score_data["ai_feedback"],
                     sub_scores=[s.model_dump() for s in sub_scores],
-                    error_annotations=score_data.get("error_annotations", [])
+                    error_annotations=score_data.get("error_annotations", []),
+                    question_text=q.get("question_text") or q.get("rubric")  # Include question text from exam
                 ))
             else:
                 scores.append(QuestionScore(
