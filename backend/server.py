@@ -2050,64 +2050,69 @@ async def upload_model_answer(
         }}
     )
     
-    # AUTO-EXTRACT questions from model answer (only if questions don't have text yet)
-    questions = exam.get("questions", [])
+    # AUTO-EXTRACT questions (same logic as manual extract button)
+    logger.info(f"Auto-extracting questions from model answer for exam {exam_id}")
     
-    # Check if questions already have text/rubric (manually configured by user)
-    has_manual_config = any(q.get("rubric") or q.get("question_text") for q in questions)
+    # Refresh exam data after upload
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
     
-    if not has_manual_config and len(questions) > 0:
-        logger.info(f"Auto-extracting questions from model answer for exam {exam_id}")
+    extracted_questions = []
+    source = ""
+    
+    # Prioritize question paper over model answer (same as manual extract)
+    if exam.get("question_paper_images"):
+        source = "question paper"
+        logger.info(f"Extracting from question paper (priority)")
+        try:
+            extracted_questions = await extract_questions_from_question_paper(
+                exam["question_paper_images"],
+                len(exam.get("questions", []))
+            )
+        except Exception as e:
+            logger.error(f"Error extracting from question paper: {e}")
+    elif exam.get("model_answer_images"):
+        source = "model answer"
+        logger.info(f"Extracting from model answer")
         try:
             extracted_questions = await extract_questions_from_model_answer(
                 images,
-                len(questions)
+                len(exam.get("questions", []))
             )
-            
-            if extracted_questions:
-                # Only update if we extracted the same number or more
-                if len(extracted_questions) >= len(questions):
-                    # Update question rubrics with extracted text
-                    updated_count = 0
-                    
-                    for i, q in enumerate(questions):
-                        if i < len(extracted_questions):
-                            q["rubric"] = extracted_questions[i]
-                            q["question_text"] = extracted_questions[i]
-                            updated_count += 1
-                    
-                    # Save updated questions
-                    await db.exams.update_one(
-                        {"exam_id": exam_id},
-                        {"$set": {"questions": questions}}
-                    )
-                    
-                    logger.info(f"Auto-extracted {updated_count} questions from model answer")
-                    return {
-                        "message": f"✨ Model answer uploaded & {updated_count} questions auto-extracted!",
-                        "pages": len(images),
-                        "auto_extracted": True,
-                        "extracted_count": updated_count,
-                        "source": "model_answer"
-                    }
-                else:
-                    logger.warning(f"Extracted {len(extracted_questions)} questions but exam has {len(questions)} configured")
-                    return {
-                        "message": f"Model answer uploaded. Only {len(extracted_questions)} of {len(questions)} questions could be extracted. Please review in Step 4.",
-                        "pages": len(images),
-                        "auto_extracted": False,
-                        "partial_extract": True
-                    }
         except Exception as e:
-            logger.error(f"Error during auto-extraction from model answer: {e}")
-    elif has_manual_config:
-        logger.info(f"Skipping auto-extraction for exam {exam_id} - questions already configured")
+            logger.error(f"Error extracting from model answer: {e}")
     
-    return {
-        "message": "Model answer uploaded successfully",
-        "pages": len(images),
-        "auto_extracted": False
-    }
+    # Update exam questions if extraction succeeded
+    if extracted_questions and len(extracted_questions) > 0:
+        questions = exam.get("questions", [])
+        updated_count = 0
+        
+        for i, q in enumerate(questions):
+            if i < len(extracted_questions):
+                q["rubric"] = extracted_questions[i]
+                q["question_text"] = extracted_questions[i]
+                updated_count += 1
+        
+        # Save updated questions to database
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {"questions": questions}}
+        )
+        
+        logger.info(f"Auto-extracted {updated_count} questions from {source}")
+        return {
+            "message": f"✨ Model answer uploaded & {updated_count} questions auto-extracted from {source}!",
+            "pages": len(images),
+            "auto_extracted": True,
+            "extracted_count": updated_count,
+            "source": source
+        }
+    else:
+        logger.warning(f"Could not auto-extract questions for exam {exam_id}")
+        return {
+            "message": "Model answer uploaded successfully. Use 'Extract Questions' button in Manage Exams if needed.",
+            "pages": len(images),
+            "auto_extracted": False
+        }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
 async def upload_question_paper(
