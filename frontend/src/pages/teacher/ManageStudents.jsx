@@ -565,6 +565,23 @@ export default function ManageStudents({ user }) {
                   </div>
                 </div>
 
+                {/* Recommendations - Smart AI-generated */}
+                {studentDetails.recommendations?.length > 0 && (
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-100">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-purple-800">
+                      <Lightbulb className="w-4 h-4" />
+                      AI Recommendations
+                    </h3>
+                    <div className="space-y-2">
+                      {studentDetails.recommendations.map((rec, idx) => (
+                        <div key={idx} className="p-3 bg-white/70 rounded-lg text-sm text-purple-700 shadow-sm">
+                          {rec}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Recent Submissions */}
                 {studentDetails.recent_submissions?.length > 0 && (
                   <div>
@@ -583,20 +600,6 @@ export default function ManageStudents({ user }) {
                           >
                             {sub.percentage}%
                           </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Recommendations */}
-                {studentDetails.recommendations?.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Recommendations</h3>
-                    <div className="space-y-2">
-                      {studentDetails.recommendations.map((rec, idx) => (
-                        <div key={idx} className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm">
-                          {rec}
                         </div>
                       ))}
                     </div>
