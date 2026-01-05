@@ -2124,30 +2124,57 @@ Your measure of success: When the same paper graded by you and by an expert teac
     
     # Construct prompt based on whether model answer is available
     if model_answer_images:
-        prompt_text = f"""Grade this student's handwritten answer paper CONSISTENTLY and DETERMINISTICALLY.
+        prompt_text = f"""# GRADING TASK
 
-Questions to grade:
+## PHASE 1: PRE-GRADING ANALYSIS
+First, analyze the MODEL ANSWER thoroughly:
+- Identify key points for each question
+- Extract marking scheme from the model
+- Note expected keywords and structure
+- Understand acceptable variations
+
+## PHASE 2: STUDENT PAPER EVALUATION
+
+**Questions to Grade:**
 {questions_text}
 
-The first {min(len(model_answer_images), 3)} image(s) show the MODEL ANSWER (reference).
-The remaining images show the STUDENT'S ANSWER PAPER.
+**Image Layout:**
+- First {min(len(model_answer_images), 3)} image(s): MODEL ANSWER (your holy grail reference)
+- Remaining images: STUDENT'S ANSWER PAPER
 
-CRITICAL GRADING REQUIREMENTS:
-1. Apply {grading_mode.upper()} grading mode strictly
-2. Use EXACT same criteria for identical answers
-3. Be DETERMINISTIC - same answer = same score ALWAYS
-4. Give precise numerical scores (use decimals like 8.5, not ranges)
-5. Apply consistent partial credit rules
+## GRADING MODE: {grading_mode.upper()}
+Apply the {grading_mode} mode specifications strictly.
 
-Please grade each question and provide constructive feedback.
+## CRITICAL REQUIREMENTS:
+1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
+2. **MODEL ANSWER IS REFERENCE**: Compare against the model answer
+3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
+4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
+5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+6. **FEEDBACK QUALITY**: Provide constructive, specific feedback that helps learning
+
+## PHASE 3: OUTPUT
+Grade each question providing:
+- Exact marks with breakdown
+- What was done well
+- What needs improvement
+- Error annotations if applicable
+
 Return valid JSON only."""
     else:
-        prompt_text = f"""Grade this student's handwritten answer paper CONSISTENTLY and DETERMINISTICALLY WITHOUT a model answer.
+        prompt_text = f"""# GRADING TASK (WITHOUT MODEL ANSWER)
 
-Questions to grade:
+## IMPORTANT: No Model Answer Provided
+You must grade based on:
+- Question rubrics provided
+- Your subject knowledge
+- Standard academic expectations
+- Be more conservative - flag uncertain gradings
+
+**Questions to Grade:**
 {questions_text}
 
-The images show the STUDENT'S ANSWER PAPER.
+**Images:** STUDENT'S ANSWER PAPER
 
 CRITICAL GRADING REQUIREMENTS:
 1. Apply {grading_mode.upper()} grading mode strictly
