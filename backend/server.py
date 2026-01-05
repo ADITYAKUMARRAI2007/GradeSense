@@ -1231,6 +1231,74 @@ async def reopen_exam(exam_id: str, user: User = Depends(get_current_user)):
     
     return {"message": "Exam reopened successfully"}
 
+@api_router.post("/exams/{exam_id}/regrade-all")
+async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current_user)):
+    """Regrade all submissions for an exam with current settings"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can regrade exams")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get all submissions for this exam
+    submissions = await db.submissions.find({"exam_id": exam_id}, {"_id": 0}).to_list(1000)
+    
+    if not submissions:
+        return {"message": "No submissions to regrade", "regraded_count": 0}
+    
+    regraded_count = 0
+    errors = []
+    
+    for submission in submissions:
+        try:
+            # Get the student's answer images
+            if not submission.get("answer_images"):
+                logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
+                continue
+            
+            # Re-grade using the current exam settings
+            scores = await grade_with_ai(
+                images=submission["answer_images"],
+                model_answer_images=exam.get("model_answer_images", []),
+                questions=exam.get("questions", []),
+                grading_mode=exam.get("grading_mode", "balanced"),
+                total_marks=exam.get("total_marks", 100)
+            )
+            
+            # Calculate total score using exam's total_marks
+            total_score = sum(s.obtained_marks for s in scores)
+            exam_total_marks = exam.get("total_marks", 100)
+            percentage = round((total_score / exam_total_marks) * 100, 2) if exam_total_marks > 0 else 0
+            
+            # Update submission with new scores
+            await db.submissions.update_one(
+                {"submission_id": submission["submission_id"]},
+                {"$set": {
+                    "question_scores": [s.model_dump() for s in scores],
+                    "total_score": total_score,
+                    "percentage": percentage,
+                    "graded_at": datetime.now(timezone.utc).isoformat(),
+                    "regraded_at": datetime.now(timezone.utc).isoformat(),
+                    "grading_mode_used": exam.get("grading_mode", "balanced")
+                }}
+            )
+            
+            regraded_count += 1
+            logger.info(f"Regraded submission {submission['submission_id']}: {total_score}/{exam_total_marks}")
+            
+        except Exception as e:
+            logger.error(f"Error regrading submission {submission['submission_id']}: {str(e)}")
+            errors.append({"submission_id": submission["submission_id"], "error": str(e)})
+    
+    return {
+        "message": f"Regraded {regraded_count} submissions",
+        "regraded_count": regraded_count,
+        "total_submissions": len(submissions),
+        "errors": errors[:5] if errors else []  # Return first 5 errors only
+    }
+
 @api_router.put("/batches/{batch_id}/close")
 async def close_batch(batch_id: str, user: User = Depends(get_current_user)):
     """Close/archive a batch"""
