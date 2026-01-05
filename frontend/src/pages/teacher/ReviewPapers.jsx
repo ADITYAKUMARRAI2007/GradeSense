@@ -1184,6 +1184,40 @@ export default function ReviewPapers({ user }) {
                         ))}
                     </SelectContent>
                   </Select>
+
+                  {/* AI Tools - Extract Questions Button */}
+                  {filters.exam_id && (
+                    <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-purple-700 flex items-center gap-1">
+                          <Brain className="w-3 h-3" />
+                          AI Tools
+                        </span>
+                        {(() => {
+                          const selectedExam = exams.find(e => e.exam_id === filters.exam_id);
+                          const hasDocuments = selectedExam?.model_answer_images?.length > 0 || selectedExam?.question_paper_images?.length > 0;
+                          return hasDocuments ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleExtractQuestions}
+                              disabled={extractingQuestions}
+                              className="text-purple-600 border-purple-200 hover:bg-purple-100 h-7 text-xs"
+                            >
+                              {extractingQuestions ? (
+                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <Sparkles className="w-3 h-3 mr-1" />
+                              )}
+                              Extract Questions
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-purple-500">Upload model answer first</span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               
