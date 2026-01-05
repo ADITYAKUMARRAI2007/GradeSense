@@ -454,43 +454,113 @@ export default function ManageStudents({ user }) {
                   </div>
                 )}
 
-                {/* Weak & Strong Areas */}
+                {/* Topic-Based Performance Analysis */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Weak Areas */}
+                  {/* Needs Improvement - Topics */}
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2 text-red-700">
                       <AlertTriangle className="w-4 h-4" />
-                      Needs Improvement
+                      Topics Needing Improvement
                     </h3>
-                    {studentDetails.weak_areas?.length > 0 ? (
+                    {studentDetails.weak_topics?.length > 0 ? (
                       <div className="space-y-2">
-                        {studentDetails.weak_areas.map((area, idx) => (
-                          <div key={idx} className="p-2 bg-red-50 rounded text-sm text-red-700">
-                            {typeof area === 'string' ? area : `${area.question}: ${area.score}`}
+                        {studentDetails.weak_topics.map((topic, idx) => (
+                          <div key={idx} className="p-3 bg-red-50 rounded-lg border border-red-100">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-red-800">{topic.topic}</span>
+                              <div className="flex items-center gap-2">
+                                {topic.trend_text === "improving" && (
+                                  <Badge className="bg-green-100 text-green-700 text-xs">
+                                    <TrendingUp className="w-3 h-3 mr-1" />
+                                    Improving
+                                  </Badge>
+                                )}
+                                {topic.trend_text === "declining" && (
+                                  <Badge className="bg-red-100 text-red-700 text-xs">
+                                    <TrendingDown className="w-3 h-3 mr-1" />
+                                    Declining
+                                  </Badge>
+                                )}
+                                {topic.trend_text === "stable" && (
+                                  <Badge className="bg-gray-100 text-gray-700 text-xs">
+                                    <Minus className="w-3 h-3 mr-1" />
+                                    Stable
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Progress value={topic.avg_score} className="flex-1 h-2" />
+                              <span className="text-sm font-medium text-red-700 w-12">{topic.avg_score}%</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-red-600 mt-1">
+                              <span>First: {topic.first_score}%</span>
+                              <span>Latest: {topic.recent_score}%</span>
+                              <span>{topic.total_attempts} attempts</span>
+                            </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No weak areas identified</p>
+                      <div className="p-4 bg-green-50 rounded-lg text-center">
+                        <CheckCircle className="w-8 h-8 mx-auto text-green-500 mb-2" />
+                        <p className="text-sm text-green-700">No weak topics identified!</p>
+                        <p className="text-xs text-green-600">Student is performing well across all topics</p>
+                      </div>
                     )}
                   </div>
 
-                  {/* Strong Areas */}
+                  {/* Strengths - Topics */}
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2 text-green-700">
                       <CheckCircle className="w-4 h-4" />
-                      Strengths
+                      Strong Topics
                     </h3>
-                    {studentDetails.strong_areas?.length > 0 ? (
+                    {studentDetails.strong_topics?.length > 0 ? (
                       <div className="space-y-2">
-                        {studentDetails.strong_areas.map((area, idx) => (
-                          <div key={idx} className="p-2 bg-green-50 rounded text-sm text-green-700">
-                            {typeof area === 'string' ? area : `${area.question}: ${area.score}`}
+                        {studentDetails.strong_topics.map((topic, idx) => (
+                          <div key={idx} className="p-3 bg-green-50 rounded-lg border border-green-100">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-green-800">{topic.topic}</span>
+                              <div className="flex items-center gap-2">
+                                {topic.trend_text === "improving" && (
+                                  <Badge className="bg-green-100 text-green-700 text-xs">
+                                    <TrendingUp className="w-3 h-3 mr-1" />
+                                    Improving
+                                  </Badge>
+                                )}
+                                {topic.trend_text === "declining" && (
+                                  <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                                    <TrendingDown className="w-3 h-3 mr-1" />
+                                    Watch
+                                  </Badge>
+                                )}
+                                {topic.trend_text === "stable" && (
+                                  <Badge className="bg-blue-100 text-blue-700 text-xs">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Consistent
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Progress value={topic.avg_score} className="flex-1 h-2" />
+                              <span className="text-sm font-medium text-green-700 w-12">{topic.avg_score}%</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-green-600 mt-1">
+                              <span>First: {topic.first_score}%</span>
+                              <span>Latest: {topic.recent_score}%</span>
+                              <span>{topic.total_attempts} attempts</span>
+                            </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">Complete more exams to identify strengths</p>
+                      <div className="p-4 bg-blue-50 rounded-lg text-center">
+                        <Target className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+                        <p className="text-sm text-blue-700">Building strengths...</p>
+                        <p className="text-xs text-blue-600">Complete more exams to identify strong topics</p>
+                      </div>
                     )}
                   </div>
                 </div>
