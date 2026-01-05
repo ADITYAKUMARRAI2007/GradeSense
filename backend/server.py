@@ -3987,35 +3987,108 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
         for name, scores in subject_perf.items()
     ]
     
-    # Weak areas analysis
-    weak_areas = []
-    strong_areas = []
-    for sub in submissions[-3:]:
+    # ====== TOPIC-BASED PERFORMANCE ANALYSIS FOR STUDENTS ======
+    topic_performance = {}  # {topic: [{"score": pct, "exam_date": date}]}
+    
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0})
+        if not exam:
+            continue
+        
+        exam_date = sub.get("created_at", "")
+        exam_questions = exam.get("questions", [])
+        
+        # Create a map of question_number -> topics
+        question_topics = {}
+        for q in exam_questions:
+            q_num = q.get("question_number")
+            topics = q.get("topic_tags", [])
+            if not topics:
+                subj = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
+                topics = [subj.get("name", "General")] if subj else ["General"]
+            question_topics[q_num] = topics
+        
         for qs in sub.get("question_scores", []):
-            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs["max_marks"] > 0 else 0
-            if pct < 50:
-                weak_areas.append({
-                    "question": f"Q{qs['question_number']}",
-                    "score": f"{qs['obtained_marks']}/{qs['max_marks']}",
-                    "feedback": qs.get("ai_feedback", "")[:100]
-                })
-            elif pct >= 80:
-                strong_areas.append({
-                    "question": f"Q{qs['question_number']}",
-                    "score": f"{qs['obtained_marks']}/{qs['max_marks']}"
+            q_num = qs.get("question_number")
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+            topics = question_topics.get(q_num, ["General"])
+            
+            for topic in topics:
+                if topic not in topic_performance:
+                    topic_performance[topic] = []
+                topic_performance[topic].append({
+                    "score": pct,
+                    "exam_date": exam_date,
+                    "feedback": qs.get("ai_feedback", "")[:150]
                 })
     
-    # Recommendations
+    # Analyze topics
+    weak_topics = []
+    strong_topics = []
+    
+    for topic, performances in topic_performance.items():
+        if len(performances) == 0:
+            continue
+        
+        sorted_perfs = sorted(performances, key=lambda x: x.get("exam_date", ""))
+        avg_score = sum(p["score"] for p in sorted_perfs) / len(sorted_perfs)
+        
+        # Calculate trend
+        trend = 0
+        trend_text = "stable"
+        if len(sorted_perfs) >= 2:
+            mid = len(sorted_perfs) // 2
+            first_half_avg = sum(p["score"] for p in sorted_perfs[:mid]) / mid if mid > 0 else 0
+            second_half_avg = sum(p["score"] for p in sorted_perfs[mid:]) / (len(sorted_perfs) - mid)
+            trend = second_half_avg - first_half_avg
+            
+            if trend > 10:
+                trend_text = "improving"
+            elif trend < -10:
+                trend_text = "declining"
+        
+        topic_data = {
+            "topic": topic,
+            "avg_score": round(avg_score, 1),
+            "total_attempts": len(sorted_perfs),
+            "trend": round(trend, 1),
+            "trend_text": trend_text,
+            "recent_score": round(sorted_perfs[-1]["score"], 1) if sorted_perfs else 0,
+            "feedback": sorted_perfs[-1].get("feedback", "") if sorted_perfs else ""
+        }
+        
+        if avg_score < 50:
+            weak_topics.append(topic_data)
+        elif avg_score >= 75:
+            strong_topics.append(topic_data)
+    
+    weak_topics = sorted(weak_topics, key=lambda x: x["avg_score"])[:5]
+    strong_topics = sorted(strong_topics, key=lambda x: -x["avg_score"])[:5]
+    
+    # Smart recommendations
     recommendations = []
-    if weak_areas:
-        recommendations.append("Focus on improving accuracy in detailed answer questions")
-    avg_pct = sum(percentages) / len(percentages)
-    if avg_pct < 60:
-        recommendations.append("Consider regular revision sessions")
-        recommendations.append("Practice more problems from previous exam topics")
-    else:
-        recommendations.append("Great progress! Keep up the consistent effort")
-    recommendations.append("Review feedback on weak areas to understand mistakes")
+    
+    declining_topics = [t for t in weak_topics if t["trend_text"] == "declining"]
+    if declining_topics:
+        recommendations.append(f"⚠️ Focus on {declining_topics[0]['topic']} - your performance is declining")
+    
+    improving_weak = [t for t in weak_topics if t["trend_text"] == "improving"]
+    if improving_weak:
+        recommendations.append(f"📈 Great improvement in {improving_weak[0]['topic']}! Keep practicing")
+    
+    stable_weak = [t for t in weak_topics if t["trend_text"] == "stable"]
+    if stable_weak:
+        recommendations.append(f"💡 Review concepts in {stable_weak[0]['topic']} - needs more attention")
+    
+    if strong_topics:
+        recommendations.append(f"⭐ You're excelling in {strong_topics[0]['topic']}! Consider helping classmates")
+    
+    if not recommendations:
+        recommendations = [
+            "Complete more exams to get personalized insights",
+            "Review feedback on each question to improve",
+            "Practice regularly across all topics"
+        ]
     
     # Calculate improvement trend
     if len(percentages) >= 2:
@@ -4035,8 +4108,11 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
         "recent_results": recent_results,
         "subject_performance": subject_performance,
         "recommendations": recommendations,
-        "weak_areas": weak_areas[:5],
-        "strong_areas": strong_areas[:5]
+        "weak_topics": weak_topics,
+        "strong_topics": strong_topics,
+        # Keep backward compatibility
+        "weak_areas": [{"question": t["topic"], "score": f"{t['avg_score']}%", "feedback": t.get("feedback", "")} for t in weak_topics],
+        "strong_areas": [{"question": t["topic"], "score": f"{t['avg_score']}%"} for t in strong_topics]
     }
 
 # ============== STUDY MATERIALS (STUDENT) ==============
