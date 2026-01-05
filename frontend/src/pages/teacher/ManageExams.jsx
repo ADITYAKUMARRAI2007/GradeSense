@@ -429,7 +429,29 @@ export default function ManageExams({ user }) {
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     {getStatusBadge(selectedExam.status)}
-                    {selectedExam.status !== "closed" && (
+                    {!editMode && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={startEditMode}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <Edit2 className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setRegradeDialogOpen(true)}
+                          className="text-purple-600 hover:text-purple-700"
+                        >
+                          <RotateCcw className="w-4 h-4 mr-1" />
+                          Regrade All
+                        </Button>
+                      </>
+                    )}
+                    {selectedExam.status !== "closed" && !editMode && (
                       <>
                         <Button 
                           variant="outline" 
@@ -456,7 +478,7 @@ export default function ManageExams({ user }) {
                         </Button>
                       </>
                     )}
-                    {selectedExam.status === "closed" && (
+                    {selectedExam.status === "closed" && !editMode && (
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -468,16 +490,45 @@ export default function ManageExams({ user }) {
                         Reopen Exam
                       </Button>
                     )}
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDelete(selectedExam)}
-                      className="text-destructive hover:text-destructive"
-                      data-testid="delete-exam-btn"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Delete
-                    </Button>
+                    {!editMode && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDelete(selectedExam)}
+                        className="text-destructive hover:text-destructive"
+                        data-testid="delete-exam-btn"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </Button>
+                    )}
+                    {editMode && (
+                      <>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={savingEdit}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {savingEdit ? (
+                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4 mr-1" />
+                          )}
+                          Save Changes
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={cancelEditMode}
+                          disabled={savingEdit}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Cancel
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
