@@ -32,7 +32,9 @@ import {
   Maximize2,
   MessageSquarePlus,
   Send,
-  Lightbulb
+  Lightbulb,
+  Sparkles,
+  Brain
 } from "lucide-react";
 
 export default function ReviewPapers({ user }) {
