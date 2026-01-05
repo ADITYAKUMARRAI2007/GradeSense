@@ -1170,9 +1170,12 @@ async def upload_more_papers(
                 continue
             
             # Grade with AI
+            # Get model answer images from separate collection
+            model_answer_imgs = await get_exam_model_answer_images(exam_id)
+            
             scores = await grade_with_ai(
                 images=images,
-                model_answer_images=exam.get("model_answer_images", []),
+                model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
                 total_marks=exam.get("total_marks", 100)
