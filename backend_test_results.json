@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-01-03T05:52:27.275124",
-  "total_tests": 187,
-  "passed_tests": 181,
-  "success_rate": 96.79144385026738,
+  "timestamp": "2026-01-05T05:58:16.344128",
+  "total_tests": 209,
+  "passed_tests": 202,
+  "success_rate": 96.65071770334929,
   "test_details": [
     {
       "test": "Health Check",
@@ -175,7 +175,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU055113)",
+      "test": "Create Student with Valid ID (STU055701)",
       "success": true,
       "details": ""
     },
@@ -217,20 +217,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_fa1ec1cb325f found in batch batch_3e731d29"
+      "details": "Student user_360df813fd08 found in batch batch_55b1ed77"
     },
     {
-      "test": "Create Student with Format STU0551141 (John Doe)",
+      "test": "Create Student with Format STU0557011 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL055114 (Alice Smith)",
+      "test": "Create Student with Format ROLL055701 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A055114 (Bob Jones)",
+      "test": "Create Student with Format A055701 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -417,7 +417,7 @@
     {
       "test": "Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_8bb544d1"
+      "details": "Generated feedback_id: feedback_744139f5"
     },
     {
       "test": "Submit General Feedback",
@@ -427,7 +427,7 @@
     {
       "test": "General Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_4a59e2ff"
+      "details": "Generated feedback_id: feedback_118aac97"
     },
     {
       "test": "Submit Feedback Without Auth (should fail)",
@@ -542,12 +542,12 @@
     {
       "test": "Student Deep Dive: Basic Analysis",
       "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "details": "Request failed: HTTPSConnectionPool(host='gradingsolution.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
       "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "details": "Request failed: HTTPSConnectionPool(host='gradingsolution.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Generate Review Packet",
@@ -692,12 +692,12 @@
     {
       "test": "Student Deep Dive: Basic Analysis",
       "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "details": "Request failed: HTTPSConnectionPool(host='gradingsolution.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
       "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='papermark.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "details": "Request failed: HTTPSConnectionPool(host='gradingsolution.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Generate Review Packet",
@@ -745,6 +745,116 @@
       "details": "5/6 steps successful. Failed: ['student_deep_dive']"
     },
     {
+      "test": "Health Check",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Grade With AI - New Implementation Verification",
+      "success": true,
+      "details": "Found 11/11 key implementation indicators"
+    },
+    {
+      "test": "LLM Model Migration - Gemini 2.5 Pro",
+      "success": true,
+      "details": "Confirmed migration to Gemini 2.5 Pro model"
+    },
+    {
+      "test": "Consistency Feature - Content Hashing",
+      "success": true,
+      "details": "Content hashing implemented for deterministic grading"
+    },
+    {
+      "test": "Create Exam - Strict Mode (\ud83d\udd34 Academic rigor at its highest)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Strict Mode Exam Details",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Grading Mode Storage - Strict",
+      "success": true,
+      "details": "Exam correctly stored with strict grading mode"
+    },
+    {
+      "test": "Create Exam - Balanced Mode (\u2696\ufe0f Fair and reasonable evaluation)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Balanced Mode Exam Details",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Grading Mode Storage - Balanced",
+      "success": true,
+      "details": "Exam correctly stored with balanced grading mode"
+    },
+    {
+      "test": "Create Exam - Conceptual Mode (\ud83d\udd35 Understanding over procedure)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Conceptual Mode Exam Details",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Grading Mode Storage - Conceptual",
+      "success": true,
+      "details": "Exam correctly stored with conceptual grading mode"
+    },
+    {
+      "test": "Create Exam - Lenient Mode (\ud83d\udfe2 Encourage and reward effort)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Verify Lenient Mode Exam Details",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Grading Mode Storage - Lenient",
+      "success": true,
+      "details": "Exam correctly stored with lenient grading mode"
+    },
+    {
+      "test": "LLM Migration - Gemini 2.5 Pro Usage Count",
+      "success": true,
+      "details": "Found 8 instances of gemini-2.5-pro model usage"
+    },
+    {
+      "test": "LLM Migration - Function Coverage",
+      "success": false,
+      "details": "Only 1/7 functions migrated"
+    },
+    {
+      "test": "LLM Migration - GPT-4o Removal",
+      "success": true,
+      "details": "No remaining GPT-4o references found"
+    },
+    {
+      "test": "Consistency Features - Implementation",
+      "success": true,
+      "details": "Found 5/5 consistency indicators"
+    },
+    {
+      "test": "Consistency Features - Hashlib Import",
+      "success": true,
+      "details": "hashlib import found for content hashing"
+    },
+    {
+      "test": "Consistency Features - Deterministic Session ID",
+      "success": true,
+      "details": "Deterministic session ID implementation found"
+    },
+    {
       "test": "Upload More Papers: No Files (should fail)",
       "success": true,
       "details": ""
@@ -782,7 +892,7 @@
     {
       "test": "Existing Student Handling",
       "success": true,
-      "details": "Created test student EXIST055223 for upload-more-papers testing"
+      "details": "Created test student EXIST055813 for upload-more-papers testing"
     },
     {
       "test": "Get Exam Submissions - Teacher Access",
@@ -822,7 +932,7 @@
     {
       "test": "Submission Exists Before Deletion",
       "success": true,
-      "details": "Submission delete_test_sub_1767419543 found in exam submissions"
+      "details": "Submission delete_test_sub_1767592693 found in exam submissions"
     },
     {
       "test": "Delete Submission - Valid Request",
