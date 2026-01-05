@@ -1793,7 +1793,7 @@ async def grade_with_ai(
     grading_mode: str,
     total_marks: float
 ) -> List[QuestionScore]:
-    """Grade answer paper using Gemini 2.5 Pro with deterministic grading"""
+    """Grade answer paper using Gemini 2.5 Pro with the GradeSense Master Instruction Set"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
@@ -1801,7 +1801,7 @@ async def grade_with_ai(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
-    # Create content hash for duplicate detection
+    # Create content hash for deterministic grading (same paper = same grade)
     content_hash = hashlib.sha256(
         "".join(images).encode() + 
         "".join(model_answer_images).encode() + 
@@ -1809,12 +1809,141 @@ async def grade_with_ai(
         grading_mode.encode()
     ).hexdigest()[:16]
     
-    # Grading mode instructions
+    # ============== GRADESENSE MASTER GRADING MODE SPECIFICATIONS ==============
     mode_instructions = {
-        "strict": "Grade STRICTLY and CONSISTENTLY. Require exact match with model answer. Give minimal partial credit. Deduct marks for any deviation from expected answer. ALWAYS grade the same answer the same way.",
-        "balanced": "Grade FAIRLY and CONSISTENTLY. Consider both accuracy and conceptual understanding. Give reasonable partial credit for partially correct answers. ALWAYS grade the same answer the same way.",
-        "conceptual": "Grade for UNDERSTANDING and CONSISTENTLY. Focus on whether the student understands the concept, even if wording differs from model answer. Be generous with partial credit. ALWAYS grade the same answer the same way.",
-        "lenient": "Grade LENIENTLY and CONSISTENTLY. Reward any reasonable attempt. Give generous partial credit. Focus on what the student got right rather than wrong. ALWAYS grade the same answer the same way."
+        "strict": """🔴 STRICT MODE - Academic rigor at its highest. Every step matters. Precision is paramount.
+
+STEP-BY-STEP VERIFICATION:
+- Every step in the model answer must be present
+- Steps must be in logical order
+- Skipping steps = mark deduction even if final answer is correct
+- Each step carries independent weightage
+- Working must be clearly shown
+
+KEYWORD PRECISION:
+- Technical terms must be exact
+- Spelling of scientific/technical terms matters
+- Definitions must be precise
+- No credit for vague or approximately correct terminology
+
+FORMAT STRICTNESS:
+- Answer format must match expectations
+- Diagrams must be properly labeled with all parts
+- Units MUST be present for all numerical answers
+- Proper mathematical notation required
+
+ERROR PENALTIES:
+- Calculation errors: Lose marks for all subsequent dependent steps
+- Conceptual errors: Significant penalty
+- Unit errors: Dedicated mark deduction
+- Missing steps: Full step marks deducted
+- Wrong method, right answer: Minimal credit (method matters)
+
+PARTIAL MARKING:
+- Only award marks for completely correct components
+- Half-right steps = 0 marks for that step
+- Ambiguous answers = no benefit of doubt
+- Minimum threshold for any marks = 70% correctness of that component""",
+
+        "balanced": """⚖️ BALANCED MODE (DEFAULT) - Fair and reasonable evaluation. Academic standards maintained while acknowledging genuine understanding.
+
+DUAL ASSESSMENT:
+- Evaluate both PROCESS and OUTCOME
+- Both method and answer contribute to marks
+- Approximate weight: 60% process, 40% outcome
+
+REASONABLE EXPECTATIONS:
+- Key steps must be present (not all steps)
+- Important keywords must appear (not all keywords)
+- Format should be appropriate (not perfect)
+- Understanding should be evident
+- Apply "would a reasonable teacher accept this?" test
+
+STANDARD PARTIAL MARKING:
+- Correct method, wrong answer: 60-70% marks
+- Wrong method, correct answer: 30-40% marks
+- Partially correct: Proportional to correctness
+- Missing minor elements: Minor deductions
+- Missing major elements: Significant deductions
+
+PRACTICAL TOLERANCE:
+- Minor calculation errors: Small penalty if method is correct
+- Unit errors: Dedicated small penalty (typically 0.5-1 mark)
+- Rounding differences: Accept within reasonable range
+- Minor spelling errors in non-technical terms: Ignore
+- Presentation issues: No penalty unless significantly affecting readability""",
+
+        "conceptual": """🔵 CONCEPTUAL MODE - Understanding over procedure. The destination matters more than the exact path.
+
+UNDERSTANDING VERIFICATION:
+- Focus on whether the student understands the core concept
+- The "essence" of the answer must be correct
+- Can the student explain WHY, not just WHAT
+- Look for evidence of genuine understanding
+
+METHOD FLEXIBILITY:
+- Accept alternative valid methods
+- Different approach reaching correct answer = full marks
+- Steps can be skipped IF logic is evident
+- Personal explanation style accepted
+
+KEYWORD FLEXIBILITY:
+- Accept synonyms for technical terms
+- Accept explanatory phrases instead of exact terminology
+- Spelling errors in technical terms: Accept if phonetically similar and context clear
+- Understanding demonstrated through explanation = keyword credit
+
+WHAT MATTERS:
+- Core concept correctly identified and applied
+- Logical reasoning evident
+- Final understanding/answer correct
+- Ability to connect concepts
+
+WHAT IS OVERLOOKED:
+- Minor procedural variations
+- Non-essential steps skipped (if logic is clear)
+- Minor calculation errors that don't affect conceptual understanding
+- Formatting preferences
+- Order of presentation (if all components present)
+
+PARTIAL MARKING:
+- Award marks for demonstrated understanding even if execution is flawed
+- Give credit for correct approach even if final answer is wrong
+- Minimum threshold for any marks = 50% correctness of concept""",
+
+        "lenient": """🟢 LENIENT MODE - Encourage and reward effort. Recognize attempts and guide toward correctness.
+
+ATTEMPT RECOGNITION:
+- Any genuine attempt at answering earns consideration
+- Starting the problem correctly = minimum marks
+- Showing relevant formula/concept = partial credit
+- Being "on the right track" = proportional credit
+- Effort and engagement valued
+
+FLOOR MARKS SYSTEM:
+- Every genuine attempt has a floor (minimum marks)
+- Writing relevant formula = 10-20% of question marks
+- Showing understanding of what's being asked = 10-15% of question marks
+- Floor = MAX(attempt_value, 10% of question marks)
+
+GENEROUS PARTIAL MARKING:
+- Each correct element independently credited
+- Correct parts not penalized for incorrect parts
+- 2 out of 5 points mentioned = 40% marks (or more if substantial)
+- Minimum threshold for any marks = 25% correctness
+
+ERROR TOLERANCE:
+- Calculation errors: Still credit the method and correct steps
+- Conceptual confusion: Credit any correct portions
+- Missing units: Minor penalty, not full marks lost
+- Wrong method, right answer: Partial credit for answer
+- Right method, wrong answer: Significant credit for method
+- Carry-forward errors: Credit subsequent correct logic
+
+INTERPRETATION GENEROSITY:
+- Give benefit of doubt on ambiguous answers
+- Interpret unclear handwriting favorably when possible
+- Accept reasonable interpretations of questions"""
     }
     
     grading_instruction = mode_instructions.get(grading_mode, mode_instructions["balanced"])
