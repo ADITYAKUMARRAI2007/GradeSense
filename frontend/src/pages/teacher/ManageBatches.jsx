@@ -170,6 +170,111 @@ export default function ManageBatches({ user }) {
     }
   };
 
+  // Fetch available students (not in the current batch)
+  const fetchAvailableStudents = async () => {
+    try {
+      const response = await axios.get(`${API}/students`);
+      // Filter out students already in the batch
+      const batchStudentIds = batchDetails?.students_list?.map(s => s.user_id) || [];
+      const available = response.data.filter(s => !batchStudentIds.includes(s.user_id));
+      setAvailableStudents(available);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    }
+  };
+
+  // Open add student dialog
+  const openAddStudentDialog = () => {
+    setAddStudentMode("existing");
+    setSelectedStudentToAdd("");
+    setNewStudentForm({ name: "", email: "", student_id: "" });
+    fetchAvailableStudents();
+    setAddStudentDialogOpen(true);
+  };
+
+  // Add existing student to batch
+  const handleAddExistingStudent = async () => {
+    if (!selectedStudentToAdd) {
+      toast.error("Please select a student");
+      return;
+    }
+
+    setAddingStudent(true);
+    try {
+      await axios.post(`${API}/batches/${batchDetails.batch_id}/students`, {
+        student_id: selectedStudentToAdd
+      });
+      toast.success("Student added to batch");
+      setAddStudentDialogOpen(false);
+      fetchBatchDetails(batchDetails.batch_id);
+      fetchBatches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to add student");
+    } finally {
+      setAddingStudent(false);
+    }
+  };
+
+  // Create and add new student to batch
+  const handleAddNewStudent = async () => {
+    if (!newStudentForm.name.trim() || !newStudentForm.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+
+    setAddingStudent(true);
+    try {
+      // Create new student
+      const createResponse = await axios.post(`${API}/students`, {
+        name: newStudentForm.name,
+        email: newStudentForm.email,
+        student_id: newStudentForm.student_id || undefined,
+        batch_id: batchDetails.batch_id
+      });
+      
+      toast.success("Student created and added to batch");
+      setAddStudentDialogOpen(false);
+      fetchBatchDetails(batchDetails.batch_id);
+      fetchBatches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to create student");
+    } finally {
+      setAddingStudent(false);
+    }
+  };
+
+  // Remove student from batch
+  const handleRemoveStudent = async (student) => {
+    if (!confirm(`Remove "${student.name}" from this batch?`)) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API}/batches/${batchDetails.batch_id}/students/${student.user_id}`);
+      toast.success("Student removed from batch");
+      fetchBatchDetails(batchDetails.batch_id);
+      fetchBatches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to remove student");
+    }
+  };
+
+  // Delete exam from batch
+  const handleDeleteExam = async (exam) => {
+    if (!confirm(`Delete exam "${exam.exam_name}"?\n\nThis will also delete all submissions and grades for this exam. This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API}/exams/${exam.exam_id}`);
+      toast.success("Exam deleted successfully");
+      fetchBatchDetails(batchDetails.batch_id);
+      fetchBatches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete exam");
+    }
+  };
+
 
   return (
     <Layout user={user}>
