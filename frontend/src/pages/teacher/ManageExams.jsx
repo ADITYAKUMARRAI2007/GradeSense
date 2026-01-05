@@ -919,6 +919,59 @@ export default function ManageExams({ user }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Regrade Confirmation Dialog */}
+      <Dialog open={regradeDialogOpen} onOpenChange={setRegradeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-purple-600" />
+              Regrade All Papers
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Warning:</strong> This will re-grade all {submissions.length} submitted papers using the current exam settings (grading mode, total marks, etc.).
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This is useful when you've:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li>Changed the grading mode</li>
+              <li>Updated the total marks</li>
+              <li>Modified question configuration</li>
+              <li>Updated the model answer</li>
+            </ul>
+            <p className="text-sm font-medium">
+              Are you sure you want to proceed?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegradeDialogOpen(false)} disabled={regrading}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRegradeAll} 
+              disabled={regrading}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {regrading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Regrading...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Yes, Regrade All
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
