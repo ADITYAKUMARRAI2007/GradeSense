@@ -1339,6 +1339,72 @@ async def reopen_batch(batch_id: str, user: User = Depends(get_current_user)):
     
     return {"message": "Batch reopened successfully"}
 
+@api_router.post("/batches/{batch_id}/students")
+async def add_student_to_batch(batch_id: str, data: dict, user: User = Depends(get_current_user)):
+    """Add an existing student to a batch"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can manage batch students")
+    
+    batch = await db.batches.find_one({"batch_id": batch_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    if batch.get("status") == "closed":
+        raise HTTPException(status_code=400, detail="Cannot add students to a closed batch")
+    
+    student_id = data.get("student_id")
+    if not student_id:
+        raise HTTPException(status_code=400, detail="Student ID is required")
+    
+    # Verify student exists and belongs to teacher
+    student = await db.users.find_one({"user_id": student_id, "teacher_id": user.user_id, "role": "student"}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Check if student is already in batch
+    student_batches = student.get("batches", [])
+    if batch_id in student_batches:
+        raise HTTPException(status_code=400, detail="Student is already in this batch")
+    
+    # Add batch to student's batches
+    await db.users.update_one(
+        {"user_id": student_id},
+        {"$addToSet": {"batches": batch_id}}
+    )
+    
+    return {"message": "Student added to batch successfully"}
+
+@api_router.delete("/batches/{batch_id}/students/{student_id}")
+async def remove_student_from_batch(batch_id: str, student_id: str, user: User = Depends(get_current_user)):
+    """Remove a student from a batch"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can manage batch students")
+    
+    batch = await db.batches.find_one({"batch_id": batch_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    if batch.get("status") == "closed":
+        raise HTTPException(status_code=400, detail="Cannot remove students from a closed batch")
+    
+    # Verify student exists
+    student = await db.users.find_one({"user_id": student_id, "teacher_id": user.user_id, "role": "student"}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Check if student is in the batch
+    student_batches = student.get("batches", [])
+    if batch_id not in student_batches:
+        raise HTTPException(status_code=400, detail="Student is not in this batch")
+    
+    # Remove batch from student's batches
+    await db.users.update_one(
+        {"user_id": student_id},
+        {"$pull": {"batches": batch_id}}
+    )
+    
+    return {"message": "Student removed from batch successfully"}
+
 # ============== STUDENT ROUTES ==============
 
 @api_router.delete("/students/{student_user_id}")
