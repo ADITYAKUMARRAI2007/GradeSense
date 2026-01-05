@@ -2633,7 +2633,7 @@ async def upload_model_answer(
     images = pdf_to_images(pdf_bytes)
     
     # Store images in separate collection to avoid MongoDB 16MB document limit
-    file_id = str(uuid4())
+    file_id = str(uuid.uuid4())
     model_answer_data = base64.b64encode(pdf_bytes).decode()
     
     # Store the file data separately
