@@ -67,6 +67,7 @@ export default function ReviewPapers({ user }) {
     teacher_correction: ""
   });
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [extractingQuestions, setExtractingQuestions] = useState(false);
 
   useEffect(() => {
     fetchData();
