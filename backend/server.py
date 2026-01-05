@@ -1145,7 +1145,7 @@ async def delete_submission(submission_id: str, user: User = Depends(get_current
 
 @api_router.put("/exams/{exam_id}")
 async def update_exam(exam_id: str, update_data: dict, user: User = Depends(get_current_user)):
-    """Update exam questions and grading mode"""
+    """Update exam details including name, subject, total marks, grading mode, etc."""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can update exams")
     
@@ -1154,17 +1154,35 @@ async def update_exam(exam_id: str, update_data: dict, user: User = Depends(get_
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Prepare update fields
+    # Prepare update fields - allow more fields now
     update_fields = {}
     
+    # Questions array
     if "questions" in update_data:
         update_fields["questions"] = update_data["questions"]
         logger.info(f"Updating {len(update_data['questions'])} questions for exam {exam_id}")
     
+    # Basic exam details
+    if "exam_name" in update_data:
+        update_fields["exam_name"] = update_data["exam_name"]
+    
+    if "subject_id" in update_data:
+        update_fields["subject_id"] = update_data["subject_id"]
+    
+    if "total_marks" in update_data:
+        update_fields["total_marks"] = float(update_data["total_marks"])
+    
     if "grading_mode" in update_data:
         update_fields["grading_mode"] = update_data["grading_mode"]
     
+    if "exam_type" in update_data:
+        update_fields["exam_type"] = update_data["exam_type"]
+    
+    if "exam_date" in update_data:
+        update_fields["exam_date"] = update_data["exam_date"]
+    
     if update_fields:
+        update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.exams.update_one(
             {"exam_id": exam_id},
             {"$set": update_fields}
