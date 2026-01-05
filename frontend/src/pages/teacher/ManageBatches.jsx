@@ -11,6 +11,7 @@ import { Badge } from "../../components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../components/ui/dialog";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { toast } from "sonner";
 import { 
   Plus, 
@@ -24,7 +25,10 @@ import {
   AlertTriangle,
   Lock,
   LockOpen,
-  Archive
+  Archive,
+  UserPlus,
+  UserMinus,
+  X
 } from "lucide-react";
 
 export default function ManageBatches({ user }) {
