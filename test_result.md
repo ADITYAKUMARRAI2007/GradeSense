@@ -117,6 +117,18 @@ backend:
           agent: "testing"
           comment: "✅ NEW FEATURE COMPREHENSIVE TESTING COMPLETE! Delete Individual Student Paper Feature fully functional and production-ready. ✅ GET /api/exams/{exam_id}/submissions VERIFIED: Returns array of submissions for exam, only accessible by teacher who owns exam, excludes large binary data (file_data, file_images), includes all required fields (submission_id, student_name, total_score, percentage, status). Proper error handling: 404 for non-existent exam, 401 without authentication. ✅ DELETE /api/submissions/{submission_id} VERIFIED: Successfully deletes specific submission, only accessible by teachers, verifies exam belongs to teacher, returns success message 'Submission deleted successfully'. CASCADE DELETION CONFIRMED: Automatically deletes related re-evaluation requests when submission is deleted. ✅ PERMISSION TESTING PASSED: 401 without auth token, 403 with student account, 403 for submission from another teacher's exam. ✅ EDGE CASES VERIFIED: 404 for non-existent submission_id, 404 for already deleted submission, submission count updates correctly after deletion. ✅ CLEANUP VERIFICATION: Complete removal from exam submissions list, all related data properly cleaned up. Feature ready for production use with all test scenarios passing."
 
+  - task: "GradeSense Master Grading Engine Implementation"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "FULL IMPLEMENTATION of comprehensive ~2000 line Master Instruction Set for GradeSense grading engine. Implemented in grade_with_ai function. KEY FEATURES: 1) Four fundamental principles (Consistency, Model Answer Reference, Continuous Improvement, Fairness) 2) Detailed grading modes (STRICT/BALANCED/CONCEPTUAL/LENIENT) with specific marking rules, thresholds, and behaviors 3) Answer type handling (math, diagrams, essays, MCQ) 4) Handwriting interpretation protocols 5) Edge case handling (blank, irrelevant, multiple answers, borderline) 6) Enhanced output format with confidence scores and flags 7) Quality assurance checks. Content hashing preserved for consistency. Gemini 2.5 Pro model retained. Backend compiles and runs successfully. NEEDS TESTING to verify grading quality and consistency."
+
   - task: "Inconsistent Grading for Duplicate Papers"
     implemented: true
     working: "NA"
