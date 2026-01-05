@@ -2176,15 +2176,17 @@ You must grade based on:
 
 **Images:** STUDENT'S ANSWER PAPER
 
-CRITICAL GRADING REQUIREMENTS:
-1. Apply {grading_mode.upper()} grading mode strictly
-2. Use EXACT same criteria for identical answers
-3. Be DETERMINISTIC - same answer = same score ALWAYS  
-4. Give precise numerical scores (use decimals like 8.5, not ranges)
-5. Apply consistent partial credit rules
-6. Use the provided rubrics and your knowledge to assess correctness
-7. Focus on conceptual understanding, calculation accuracy, and completeness
-8. Provide constructive feedback to help the student improve
+## GRADING MODE: {grading_mode.upper()}
+Apply the {grading_mode} mode specifications strictly.
+
+## CRITICAL REQUIREMENTS:
+1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
+2. **RUBRIC-BASED**: Use provided rubrics as primary reference
+3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
+4. **CONSERVATIVE FLAGGING**: Flag uncertain gradings for teacher review
+5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+6. **SUBJECT KNOWLEDGE**: Use your expertise to assess correctness
+7. **CONSTRUCTIVE FEEDBACK**: Help the student understand and improve
 
 Return valid JSON only."""
     
