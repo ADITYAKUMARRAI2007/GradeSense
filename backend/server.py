@@ -1412,20 +1412,24 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     if not submissions:
         return {"message": "No submissions to regrade", "regraded_count": 0}
     
+    # Get model answer images from separate collection
+    model_answer_imgs = await get_exam_model_answer_images(exam_id)
+    
     regraded_count = 0
     errors = []
     
     for submission in submissions:
         try:
             # Get the student's answer images
-            if not submission.get("answer_images"):
+            answer_images = submission.get("answer_images") or submission.get("file_images")
+            if not answer_images:
                 logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
                 continue
             
             # Re-grade using the current exam settings
             scores = await grade_with_ai(
-                images=submission["answer_images"],
-                model_answer_images=exam.get("model_answer_images", []),
+                images=answer_images,
+                model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
                 total_marks=exam.get("total_marks", 100)
