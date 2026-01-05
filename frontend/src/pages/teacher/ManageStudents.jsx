@@ -35,10 +35,12 @@ import {
   BookOpen,
   TrendingUp,
   TrendingDown,
+  Minus,
   Target,
   AlertTriangle,
   CheckCircle,
-  X
+  X,
+  Lightbulb
 } from "lucide-react";
 
 export default function ManageStudents({ user }) {
