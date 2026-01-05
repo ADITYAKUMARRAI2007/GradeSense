@@ -951,13 +951,10 @@ async def get_student_detail(student_user_id: str, user: User = Depends(get_curr
         },
         "subject_performance": subject_performance,
         "recent_submissions": submissions[-10:],
-        "weak_areas": weak_areas[:5],
-        "strong_areas": strong_areas[:5],
-        "recommendations": [
-            "Focus on improving weak areas identified above",
-            "Maintain consistency in strong subjects",
-            "Practice more numerical problems" if any("Math" in s for s in subject_performance.keys()) else "Review conceptual topics"
-        ]
+        "weak_topics": weak_topics,
+        "strong_topics": strong_topics,
+        "topic_performance": topic_performance,  # Full topic data for detailed view
+        "recommendations": recommendations
     }
 
 @api_router.post("/students")
