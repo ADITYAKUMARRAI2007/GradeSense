@@ -277,6 +277,45 @@ export default function ReviewPapers({ user }) {
     }
   };
 
+  const handleExtractQuestions = async () => {
+    if (!filters.exam_id) {
+      toast.error("Please select an exam first");
+      return;
+    }
+
+    const selectedExam = exams.find(e => e.exam_id === filters.exam_id);
+    if (!selectedExam) {
+      toast.error("Exam not found");
+      return;
+    }
+
+    if (!selectedExam.model_answer_images?.length && !selectedExam.question_paper_images?.length) {
+      toast.error("No model answer or question paper found. Upload one first.");
+      return;
+    }
+
+    setExtractingQuestions(true);
+    try {
+      const response = await axios.post(`${API}/exams/${filters.exam_id}/extract-questions`);
+      toast.success(`Successfully extracted ${response.data.updated_count || 0} questions from ${response.data.source || 'document'}`);
+      
+      // Refresh exams to get updated questions
+      const examsRes = await axios.get(`${API}/exams`);
+      setExams(examsRes.data);
+      
+      // If we have a selected submission, refresh its exam questions
+      if (selectedSubmission) {
+        const examResponse = await axios.get(`${API}/exams/${selectedSubmission.exam_id}`);
+        setExamQuestions(examResponse.data.questions || []);
+      }
+    } catch (error) {
+      console.error("Extract questions error:", error);
+      toast.error(error.response?.data?.detail || "Failed to extract questions");
+    } finally {
+      setExtractingQuestions(false);
+    }
+  };
+
   // Memoize DetailContent to prevent recreation on every render
   // This fixes the textarea editing issue
   const DetailContent = useMemo(() => {
