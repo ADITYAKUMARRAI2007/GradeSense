@@ -1701,6 +1701,9 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
     # Delete all re-evaluation requests associated with this exam
     await db.re_evaluations.delete_many({"exam_id": exam_id})
     
+    # Delete exam files from separate collection
+    await db.exam_files.delete_many({"exam_id": exam_id})
+    
     # Delete the exam
     result = await db.exams.delete_one({"exam_id": exam_id, "teacher_id": user.user_id})
     
