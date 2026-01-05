@@ -3320,6 +3320,13 @@ print('Cleanup test submission with multiple re-evaluations created');
         self.test_exams_update_question_topics()
         self.test_comprehensive_analytics_workflow()
         
+        # P0 CRITICAL TEST: NEW GRADESENSE MASTER GRADING ENGINE
+        print("\n🎯 P0 CRITICAL TEST: NEW GRADESENSE MASTER GRADING ENGINE")
+        print("-" * 60)
+        self.test_grading_engine_implementation()
+        self.test_llm_model_migration_verification()
+        self.test_consistency_features()
+        
         # P0 CRITICAL TEST: Upload More Papers to Existing Exam
         print("\n🚨 P0 CRITICAL TEST: Upload More Papers to Existing Exam")
         print("-" * 60)
