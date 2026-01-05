@@ -1667,10 +1667,21 @@ async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
 
 @api_router.get("/exams/{exam_id}")
 async def get_exam(exam_id: str, user: User = Depends(get_current_user)):
-    """Get exam details"""
+    """Get exam details including files from separate collection"""
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Fetch model answer images from separate collection
+    model_answer_imgs = await get_exam_model_answer_images(exam_id)
+    if model_answer_imgs:
+        exam["model_answer_images"] = model_answer_imgs
+    
+    # Fetch question paper images from separate collection  
+    question_paper_imgs = await get_exam_question_paper_images(exam_id)
+    if question_paper_imgs:
+        exam["question_paper_images"] = question_paper_imgs
+    
     return exam
 
 @api_router.delete("/exams/{exam_id}")
