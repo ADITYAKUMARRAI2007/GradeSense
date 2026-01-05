@@ -13,7 +13,7 @@ import base64
 
 class UploadMorePapersTest:
     def __init__(self):
-        self.base_url = "https://papermark.preview.emergentagent.com/api"
+        self.base_url = "https://gradingsolution.preview.emergentagent.com/api"
         self.session_token = None
         self.user_id = None
         self.test_batch_id = None
