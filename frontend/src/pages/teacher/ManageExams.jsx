@@ -231,6 +231,65 @@ export default function ManageExams({ user }) {
     }
   };
 
+  const startEditMode = () => {
+    setEditForm({
+      exam_name: selectedExam.exam_name,
+      subject_id: selectedExam.subject_id,
+      total_marks: selectedExam.total_marks,
+      grading_mode: selectedExam.grading_mode,
+      exam_type: selectedExam.exam_type,
+      exam_date: selectedExam.exam_date
+    });
+    setEditMode(true);
+  };
+
+  const cancelEditMode = () => {
+    setEditMode(false);
+    setEditForm({});
+  };
+
+  const handleSaveEdit = async () => {
+    setSavingEdit(true);
+    try {
+      await axios.put(`${API}/exams/${selectedExam.exam_id}`, {
+        exam_name: editForm.exam_name,
+        subject_id: editForm.subject_id,
+        total_marks: parseFloat(editForm.total_marks),
+        grading_mode: editForm.grading_mode,
+        exam_type: editForm.exam_type,
+        exam_date: editForm.exam_date
+      });
+      toast.success("Exam updated successfully");
+      
+      // Refresh data
+      await fetchData();
+      const updatedExam = await axios.get(`${API}/exams/${selectedExam.exam_id}`);
+      setSelectedExam(updatedExam.data);
+      setEditMode(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update exam");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleRegradeAll = async () => {
+    setRegrading(true);
+    try {
+      const response = await axios.post(`${API}/exams/${selectedExam.exam_id}/regrade-all`);
+      toast.success(`Successfully regraded ${response.data.regraded_count || 0} papers`);
+      setRegradeDialogOpen(false);
+      
+      // Refresh submissions
+      fetchSubmissions(selectedExam.exam_id);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to regrade papers");
+    } finally {
+      setRegrading(false);
+    }
+  };
+
   const handleDelete = async (exam) => {
     if (!confirm(`Are you sure you want to delete "${exam.exam_name}"? This will also delete all submissions and re-evaluation requests associated with this exam.`)) {
       return;
