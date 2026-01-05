@@ -532,40 +532,144 @@ export default function ManageExams({ user }) {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Basic Info */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <BookOpen className="w-4 h-4 text-blue-600" />
-                        <span className="text-xs text-blue-600">Batch</span>
+                  {/* Basic Info - View Mode */}
+                  {!editMode ? (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <BookOpen className="w-4 h-4 text-blue-600" />
+                          <span className="text-xs text-blue-600">Batch</span>
+                        </div>
+                        <p className="font-medium text-sm">{getBatchName(selectedExam.batch_id)}</p>
                       </div>
-                      <p className="font-medium text-sm">{getBatchName(selectedExam.batch_id)}</p>
-                    </div>
-                    
-                    <div className="p-4 bg-orange-50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <FileText className="w-4 h-4 text-orange-600" />
-                        <span className="text-xs text-orange-600">Subject</span>
+                      
+                      <div className="p-4 bg-orange-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className="w-4 h-4 text-orange-600" />
+                          <span className="text-xs text-orange-600">Subject</span>
+                        </div>
+                        <p className="font-medium text-sm">{getSubjectName(selectedExam.subject_id)}</p>
                       </div>
-                      <p className="font-medium text-sm">{getSubjectName(selectedExam.subject_id)}</p>
-                    </div>
 
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span className="text-xs text-green-600">Total Marks</span>
+                      <div className="p-4 bg-green-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <span className="text-xs text-green-600">Total Marks</span>
+                        </div>
+                        <p className="font-medium text-sm">{selectedExam.total_marks}</p>
                       </div>
-                      <p className="font-medium text-sm">{selectedExam.total_marks}</p>
-                    </div>
 
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Calendar className="w-4 h-4 text-purple-600" />
-                        <span className="text-xs text-purple-600">Exam Date</span>
+                      <div className="p-4 bg-purple-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Calendar className="w-4 h-4 text-purple-600" />
+                          <span className="text-xs text-purple-600">Exam Date</span>
+                        </div>
+                        <p className="font-medium text-sm">{selectedExam.exam_date}</p>
                       </div>
-                      <p className="font-medium text-sm">{selectedExam.exam_date}</p>
                     </div>
-                  </div>
+                  ) : (
+                    /* Edit Mode Form */
+                    <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50/30 space-y-4">
+                      <h3 className="font-semibold text-blue-700 flex items-center gap-2">
+                        <Edit2 className="w-4 h-4" />
+                        Edit Exam Details
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="exam_name">Exam Name</Label>
+                          <Input
+                            id="exam_name"
+                            value={editForm.exam_name || ""}
+                            onChange={(e) => setEditForm({...editForm, exam_name: e.target.value})}
+                            placeholder="Enter exam name"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="subject_id">Subject</Label>
+                          <Select
+                            value={editForm.subject_id || ""}
+                            onValueChange={(val) => setEditForm({...editForm, subject_id: val})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subjects.map(s => (
+                                <SelectItem key={s.subject_id} value={s.subject_id}>
+                                  {s.subject_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="total_marks">Total Marks</Label>
+                          <Input
+                            id="total_marks"
+                            type="number"
+                            value={editForm.total_marks || ""}
+                            onChange={(e) => setEditForm({...editForm, total_marks: e.target.value})}
+                            placeholder="Enter total marks"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="grading_mode">Grading Mode</Label>
+                          <Select
+                            value={editForm.grading_mode || "balanced"}
+                            onValueChange={(val) => setEditForm({...editForm, grading_mode: val})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select grading mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="strict">🔴 Strict - Maximum rigor</SelectItem>
+                              <SelectItem value="balanced">⚖️ Balanced - Fair & reasonable</SelectItem>
+                              <SelectItem value="conceptual">🔵 Conceptual - Understanding focused</SelectItem>
+                              <SelectItem value="lenient">🟢 Lenient - Reward effort</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="exam_type">Exam Type</Label>
+                          <Select
+                            value={editForm.exam_type || "unit_test"}
+                            onValueChange={(val) => setEditForm({...editForm, exam_type: val})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select exam type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unit_test">Unit Test</SelectItem>
+                              <SelectItem value="mid_term">Mid Term</SelectItem>
+                              <SelectItem value="final_exam">Final Exam</SelectItem>
+                              <SelectItem value="quiz">Quiz</SelectItem>
+                              <SelectItem value="assignment">Assignment</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="exam_date">Exam Date</Label>
+                          <Input
+                            id="exam_date"
+                            type="date"
+                            value={editForm.exam_date || ""}
+                            onChange={(e) => setEditForm({...editForm, exam_date: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
+                        <strong>Note:</strong> Batch cannot be changed. If you update Total Marks or Grading Mode, 
+                        consider using "Regrade All" to re-evaluate all submissions with the new settings.
+                      </div>
+                    </div>
+                  )}
 
                   {/* Additional Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
