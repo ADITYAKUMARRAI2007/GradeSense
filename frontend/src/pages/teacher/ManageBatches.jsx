@@ -579,33 +579,74 @@ export default function ManageBatches({ user }) {
                   </div>
 
                   {/* Exams List */}
-                  {batchDetails.exams?.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold flex items-center gap-2">
                         <FileText className="w-4 h-4" />
-                        Exams ({batchDetails.exams.length})
+                        Exams ({batchDetails.exams?.length || 0})
                       </h3>
+                      {batchDetails.status !== "closed" && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate("/teacher/upload-grade", { state: { preselectedBatch: batchDetails.batch_id } })}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Exam
+                        </Button>
+                      )}
+                    </div>
+                    {batchDetails.exams?.length > 0 ? (
                       <div className="space-y-2">
                         {batchDetails.exams.map((exam) => (
                           <div 
                             key={exam.exam_id}
-                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group"
                           >
-                            <span className="font-medium text-sm">{exam.exam_name}</span>
-                            <Badge 
-                              className={
-                                exam.status === "completed" 
-                                  ? "bg-green-100 text-green-700" 
-                                  : "bg-yellow-100 text-yellow-700"
-                              }
-                            >
-                              {exam.status}
-                            </Badge>
+                            <div className="flex items-center gap-3 flex-1">
+                              <span className="font-medium text-sm">{exam.exam_name}</span>
+                              <Badge 
+                                className={
+                                  exam.status === "completed" 
+                                    ? "bg-green-100 text-green-700" 
+                                    : exam.status === "closed"
+                                    ? "bg-gray-100 text-gray-700"
+                                    : "bg-yellow-100 text-yellow-700"
+                                }
+                              >
+                                {exam.status}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate("/teacher/manage-exams", { state: { selectedExamId: exam.exam_id } })}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8"
+                              >
+                                View
+                              </Button>
+                              {batchDetails.status !== "closed" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteExam(exam)}
+                                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        No exams in this batch
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
