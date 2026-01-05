@@ -2549,16 +2549,38 @@ async def upload_model_answer(
     
     # Read and convert PDF to images
     pdf_bytes = await file.read()
+    
+    # Check file size - limit to 15MB for safety
+    if len(pdf_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 15MB.")
+    
     images = pdf_to_images(pdf_bytes)
     
-    # Store as base64
+    # Store images in separate collection to avoid MongoDB 16MB document limit
+    file_id = str(uuid4())
     model_answer_data = base64.b64encode(pdf_bytes).decode()
     
+    # Store the file data separately
+    await db.exam_files.update_one(
+        {"exam_id": exam_id, "file_type": "model_answer"},
+        {"$set": {
+            "exam_id": exam_id,
+            "file_type": "model_answer",
+            "file_id": file_id,
+            "file_data": model_answer_data,
+            "images": images,
+            "uploaded_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Store only reference in exam document (not the actual images to avoid size limit)
     await db.exams.update_one(
         {"exam_id": exam_id},
         {"$set": {
-            "model_answer_file": model_answer_data,
-            "model_answer_images": images
+            "model_answer_file_id": file_id,
+            "model_answer_pages": len(images),
+            "has_model_answer": True
         }}
     )
     
@@ -2571,18 +2593,21 @@ async def upload_model_answer(
     extracted_questions = []
     source = ""
     
+    # Get question paper images from separate collection if exists
+    qp_file = await db.exam_files.find_one({"exam_id": exam_id, "file_type": "question_paper"}, {"_id": 0})
+    
     # Prioritize question paper over model answer (same as manual extract)
-    if exam.get("question_paper_images"):
+    if qp_file and qp_file.get("images"):
         source = "question paper"
         logger.info(f"Extracting from question paper (priority)")
         try:
             extracted_questions = await extract_questions_from_question_paper(
-                exam["question_paper_images"],
+                qp_file["images"],
                 len(exam.get("questions", []))
             )
         except Exception as e:
             logger.error(f"Error extracting from question paper: {e}")
-    elif exam.get("model_answer_images"):
+    elif images:
         source = "model answer"
         logger.info(f"Extracting from model answer")
         try:
