@@ -3207,6 +3207,267 @@ print('Cleanup test submission with multiple re-evaluations created');
             print(f"❌ Error in cleanup test: {str(e)}")
             return None
 
+    def test_grading_engine_implementation(self):
+        """Test the NEW GradeSense Master Grading Engine Implementation"""
+        print("\n🎯 Testing NEW GradeSense Master Grading Engine Implementation...")
+        
+        # Test 1: Backend compilation verification
+        self.test_health_check()
+        
+        # Test 2: Verify grade_with_ai function exists and has new implementation
+        print("\n🔍 Verifying grade_with_ai function implementation...")
+        
+        # Check if the function has the new comprehensive system prompt
+        try:
+            with open('/app/backend/server.py', 'r') as f:
+                content = f.read()
+                
+            # Check for key indicators of the new implementation
+            indicators = [
+                "GRADESENSE MASTER GRADING MODE SPECIFICATIONS",
+                "FUNDAMENTAL PRINCIPLES (SACRED - NEVER VIOLATE)",
+                "CONSISTENCY IS SACRED",
+                "MODEL ANSWER IS YOUR HOLY GRAIL",
+                "FAIRNESS ABOVE ALL",
+                "STRICT MODE - Academic rigor at its highest",
+                "BALANCED MODE (DEFAULT) - Fair and reasonable evaluation",
+                "CONCEPTUAL MODE - Understanding over procedure",
+                "LENIENT MODE - Encourage and reward effort",
+                "content_hash = hashlib.sha256",
+                "gemini-2.5-pro"
+            ]
+            
+            found_indicators = []
+            missing_indicators = []
+            
+            for indicator in indicators:
+                if indicator in content:
+                    found_indicators.append(indicator)
+                else:
+                    missing_indicators.append(indicator)
+            
+            if len(found_indicators) >= 8:  # Most indicators should be present
+                self.log_test("Grade With AI - New Implementation Verification", True, 
+                    f"Found {len(found_indicators)}/{len(indicators)} key implementation indicators")
+            else:
+                self.log_test("Grade With AI - New Implementation Verification", False, 
+                    f"Only found {len(found_indicators)}/{len(indicators)} indicators. Missing: {missing_indicators[:3]}")
+            
+            # Check for Gemini 2.5 Pro model usage
+            if "gemini-2.5-pro" in content:
+                self.log_test("LLM Model Migration - Gemini 2.5 Pro", True, 
+                    "Confirmed migration to Gemini 2.5 Pro model")
+            else:
+                self.log_test("LLM Model Migration - Gemini 2.5 Pro", False, 
+                    "Gemini 2.5 Pro model not found in implementation")
+            
+            # Check for content hashing (consistency feature)
+            if "content_hash = hashlib.sha256" in content:
+                self.log_test("Consistency Feature - Content Hashing", True, 
+                    "Content hashing implemented for deterministic grading")
+            else:
+                self.log_test("Consistency Feature - Content Hashing", False, 
+                    "Content hashing not found in implementation")
+                
+        except Exception as e:
+            self.log_test("Grade With AI - Code Review", False, f"Error reading server.py: {str(e)}")
+        
+        # Test 3: Create exams with different grading modes to verify configuration
+        if hasattr(self, 'test_batch_id') and hasattr(self, 'test_subject_id'):
+            self.test_grading_modes_comprehensive()
+        else:
+            print("⚠️  Skipping grading modes test - missing batch or subject")
+    
+    def test_grading_modes_comprehensive(self):
+        """Test all four grading modes with detailed verification"""
+        print("\n⚖️ Testing Comprehensive Grading Modes Implementation...")
+        
+        grading_modes = [
+            {"mode": "strict", "description": "🔴 Academic rigor at its highest"},
+            {"mode": "balanced", "description": "⚖️ Fair and reasonable evaluation"},
+            {"mode": "conceptual", "description": "🔵 Understanding over procedure"},
+            {"mode": "lenient", "description": "🟢 Encourage and reward effort"}
+        ]
+        
+        created_exams = []
+        
+        for mode_info in grading_modes:
+            mode = mode_info["mode"]
+            timestamp = datetime.now().strftime('%H%M%S')
+            
+            exam_data = {
+                "batch_id": self.test_batch_id,
+                "subject_id": self.test_subject_id,
+                "exam_type": "Grading Engine Test",
+                "exam_name": f"GradeSense {mode.title()} Mode Test {timestamp}",
+                "total_marks": 100.0,
+                "exam_date": "2024-01-15",
+                "grading_mode": mode,
+                "questions": [
+                    {
+                        "question_number": 1,
+                        "max_marks": 50.0,
+                        "rubric": f"Test question for {mode} grading mode - solve algebraic equation: 2x + 5 = 15",
+                        "sub_questions": [
+                            {
+                                "sub_id": "a",
+                                "max_marks": 25.0,
+                                "rubric": "Show working steps"
+                            },
+                            {
+                                "sub_id": "b",
+                                "max_marks": 25.0,
+                                "rubric": "Verify your answer"
+                            }
+                        ]
+                    },
+                    {
+                        "question_number": 2,
+                        "max_marks": 50.0,
+                        "rubric": f"Test question for {mode} grading mode - explain photosynthesis process"
+                    }
+                ]
+            }
+            
+            result = self.run_api_test(
+                f"Create Exam - {mode.title()} Mode ({mode_info['description']})",
+                "POST",
+                "exams",
+                200,
+                data=exam_data
+            )
+            
+            if result:
+                exam_id = result.get('exam_id')
+                created_exams.append({
+                    "mode": mode,
+                    "exam_id": exam_id,
+                    "exam_name": exam_data["exam_name"]
+                })
+                
+                # Verify exam was created with correct grading mode
+                exam_details = self.run_api_test(
+                    f"Verify {mode.title()} Mode Exam Details",
+                    "GET",
+                    f"exams/{exam_id}",
+                    200
+                )
+                
+                if exam_details:
+                    stored_mode = exam_details.get("grading_mode")
+                    if stored_mode == mode:
+                        self.log_test(f"Grading Mode Storage - {mode.title()}", True, 
+                            f"Exam correctly stored with {mode} grading mode")
+                    else:
+                        self.log_test(f"Grading Mode Storage - {mode.title()}", False, 
+                            f"Expected {mode}, got {stored_mode}")
+        
+        # Store created exams for potential cleanup
+        self.grading_mode_exams = created_exams
+        
+        return created_exams
+
+    def test_llm_model_migration_verification(self):
+        """Test LLM Model Migration to Gemini 2.5 Pro"""
+        print("\n🤖 Testing LLM Model Migration to Gemini 2.5 Pro...")
+        
+        try:
+            with open('/app/backend/server.py', 'r') as f:
+                content = f.read()
+            
+            # Count occurrences of Gemini 2.5 Pro model usage
+            gemini_count = content.count('gemini-2.5-pro')
+            
+            # Expected functions that should use Gemini 2.5 Pro
+            expected_functions = [
+                'grade_with_ai',
+                'extract_student_info_from_paper',
+                'extract_questions_from_model_answer',
+                'analyze_misconceptions',
+                'student_deep_dive',
+                'generate_review_packet',
+                'infer_topics'
+            ]
+            
+            functions_found = []
+            for func in expected_functions:
+                if func in content and 'gemini-2.5-pro' in content[content.find(func):content.find(func)+2000]:
+                    functions_found.append(func)
+            
+            if gemini_count >= 7:
+                self.log_test("LLM Migration - Gemini 2.5 Pro Usage Count", True, 
+                    f"Found {gemini_count} instances of gemini-2.5-pro model usage")
+            else:
+                self.log_test("LLM Migration - Gemini 2.5 Pro Usage Count", False, 
+                    f"Expected 7+ instances, found {gemini_count}")
+            
+            if len(functions_found) >= 5:
+                self.log_test("LLM Migration - Function Coverage", True, 
+                    f"Gemini 2.5 Pro used in {len(functions_found)}/{len(expected_functions)} expected functions")
+            else:
+                self.log_test("LLM Migration - Function Coverage", False, 
+                    f"Only {len(functions_found)}/{len(expected_functions)} functions migrated")
+            
+            # Check that old GPT-4o references are removed
+            gpt4o_count = content.count('gpt-4o')
+            if gpt4o_count == 0:
+                self.log_test("LLM Migration - GPT-4o Removal", True, 
+                    "No remaining GPT-4o references found")
+            else:
+                self.log_test("LLM Migration - GPT-4o Removal", False, 
+                    f"Found {gpt4o_count} remaining GPT-4o references")
+                
+        except Exception as e:
+            self.log_test("LLM Migration - Code Review", False, f"Error reading server.py: {str(e)}")
+
+    def test_consistency_features(self):
+        """Test consistency features for duplicate paper grading"""
+        print("\n🔄 Testing Consistency Features for Duplicate Paper Grading...")
+        
+        try:
+            with open('/app/backend/server.py', 'r') as f:
+                content = f.read()
+            
+            # Check for content hashing implementation
+            consistency_indicators = [
+                "content_hash = hashlib.sha256",
+                "session_id=f\"grading_{content_hash}\"",
+                "CONSISTENCY IS SACRED",
+                "same paper = same grade",
+                "deterministic grading"
+            ]
+            
+            found_consistency = []
+            for indicator in consistency_indicators:
+                if indicator in content:
+                    found_consistency.append(indicator)
+            
+            if len(found_consistency) >= 3:
+                self.log_test("Consistency Features - Implementation", True, 
+                    f"Found {len(found_consistency)}/{len(consistency_indicators)} consistency indicators")
+            else:
+                self.log_test("Consistency Features - Implementation", False, 
+                    f"Only found {len(found_consistency)}/{len(consistency_indicators)} consistency indicators")
+            
+            # Check for hashlib import
+            if "import hashlib" in content:
+                self.log_test("Consistency Features - Hashlib Import", True, 
+                    "hashlib import found for content hashing")
+            else:
+                self.log_test("Consistency Features - Hashlib Import", False, 
+                    "hashlib import not found")
+            
+            # Check for deterministic session ID usage
+            if "session_id=f\"grading_{content_hash}\"" in content:
+                self.log_test("Consistency Features - Deterministic Session ID", True, 
+                    "Deterministic session ID implementation found")
+            else:
+                self.log_test("Consistency Features - Deterministic Session ID", False, 
+                    "Deterministic session ID not implemented")
+                
+        except Exception as e:
+            self.log_test("Consistency Features - Code Review", False, f"Error reading server.py: {str(e)}")
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting GradeSense API Testing")
