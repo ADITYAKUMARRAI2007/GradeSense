@@ -43,6 +43,14 @@ export default function ManageBatches({ user }) {
   const navigate = useNavigate();
 
   const [showClosed, setShowClosed] = useState(false);
+  
+  // New state for add student dialog
+  const [addStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
+  const [availableStudents, setAvailableStudents] = useState([]);
+  const [selectedStudentToAdd, setSelectedStudentToAdd] = useState("");
+  const [newStudentForm, setNewStudentForm] = useState({ name: "", email: "", student_id: "" });
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [addStudentMode, setAddStudentMode] = useState("existing"); // "existing" or "new"
 
   useEffect(() => {
     fetchBatches();
