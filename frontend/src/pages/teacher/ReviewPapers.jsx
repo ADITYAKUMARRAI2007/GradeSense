@@ -145,7 +145,7 @@ export default function ReviewPapers({ user }) {
       
       const totalScore = newScores.reduce((sum, qs) => sum + qs.obtained_marks, 0);
       const exam = exams.find(e => e.exam_id === prev.exam_id);
-      const totalMarks = exam?.total_marks || 100;
+      const totalMarks = exam?.total_marks || newScores.reduce((sum, q) => sum + q.max_marks, 0) || 100;
       
       return {
         ...prev,
