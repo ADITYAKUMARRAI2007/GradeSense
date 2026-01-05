@@ -515,17 +515,30 @@ export default function ManageBatches({ user }) {
                   )}
 
                   {/* Students List */}
-                  {batchDetails.students_list?.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold flex items-center gap-2">
                         <Users className="w-4 h-4" />
-                        Students ({batchDetails.students_list.length})
+                        Students ({batchDetails.students_list?.length || 0})
                       </h3>
+                      {batchDetails.status !== "closed" && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={openAddStudentDialog}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Add Student
+                        </Button>
+                      )}
+                    </div>
+                    {batchDetails.students_list?.length > 0 ? (
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         {batchDetails.students_list.map((student) => (
                           <div 
                             key={student.user_id}
-                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group"
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -538,16 +551,32 @@ export default function ManageBatches({ user }) {
                                 <p className="text-xs text-muted-foreground">{student.email}</p>
                               </div>
                             </div>
-                            {student.student_id && (
-                              <Badge variant="outline" className="text-xs">
-                                {student.student_id}
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {student.student_id && (
+                                <Badge variant="outline" className="text-xs">
+                                  {student.student_id}
+                                </Badge>
+                              )}
+                              {batchDetails.status !== "closed" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveStudent(student)}
+                                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                                >
+                                  <UserMinus className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        No students in this batch
+                      </div>
+                    )}
+                  </div>
 
                   {/* Exams List */}
                   {batchDetails.exams?.length > 0 && (
