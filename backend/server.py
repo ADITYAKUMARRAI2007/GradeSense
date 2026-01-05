@@ -1705,22 +1705,26 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
+    # Get images from separate collection
+    question_paper_imgs = await get_exam_question_paper_images(exam_id)
+    model_answer_imgs = await get_exam_model_answer_images(exam_id)
+    
     # Prioritize question paper over model answer
     extracted_questions = []
     source = ""
     
-    if exam.get("question_paper_images"):
+    if question_paper_imgs:
         # Extract from question paper (preferred)
         source = "question paper"
         extracted_questions = await extract_questions_from_question_paper(
-            exam["question_paper_images"],
+            question_paper_imgs,
             len(exam.get("questions", []))
         )
-    elif exam.get("model_answer_images"):
+    elif model_answer_imgs:
         # Fallback to model answer
         source = "model answer"
         extracted_questions = await extract_questions_from_model_answer(
-            exam["model_answer_images"],
+            model_answer_imgs,
             len(exam.get("questions", []))
         )
     else:
