@@ -1258,7 +1258,7 @@ export default function ReviewPapers({ user }) {
                               <p className="font-bold text-base lg:text-lg">
                                 {submission.total_score}
                                 <span className="text-xs lg:text-sm font-normal text-muted-foreground">
-                                  /{exams.find(e => e.exam_id === submission.exam_id)?.total_marks || 100}
+                                  /{exams.find(e => e.exam_id === submission.exam_id)?.total_marks || submission.question_scores?.reduce((sum, q) => sum + q.max_marks, 0) || "?"}
                                 </span>
                               </p>
                               <Badge 
