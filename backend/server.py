@@ -2667,12 +2667,38 @@ async def upload_question_paper(
     
     # Read and convert PDF to images
     pdf_bytes = await file.read()
+    
+    # Check file size - limit to 15MB for safety
+    if len(pdf_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 15MB.")
+    
     images = pdf_to_images(pdf_bytes)
     
+    # Store images in separate collection to avoid MongoDB 16MB document limit
+    file_id = str(uuid4())
+    question_paper_data = base64.b64encode(pdf_bytes).decode()
+    
+    # Store the file data separately
+    await db.exam_files.update_one(
+        {"exam_id": exam_id, "file_type": "question_paper"},
+        {"$set": {
+            "exam_id": exam_id,
+            "file_type": "question_paper",
+            "file_id": file_id,
+            "file_data": question_paper_data,
+            "images": images,
+            "uploaded_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Store only reference in exam document
     await db.exams.update_one(
         {"exam_id": exam_id},
         {"$set": {
-            "question_paper_images": images
+            "question_paper_file_id": file_id,
+            "question_paper_pages": len(images),
+            "has_question_paper": True
         }}
     )
     
