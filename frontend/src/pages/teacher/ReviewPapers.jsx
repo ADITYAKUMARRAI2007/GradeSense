@@ -278,25 +278,28 @@ export default function ReviewPapers({ user }) {
   };
 
   const handleExtractQuestions = async () => {
-    if (!filters.exam_id) {
+    // Use selectedSubmission.exam_id when viewing a paper, otherwise use filters.exam_id
+    const examId = selectedSubmission?.exam_id || filters.exam_id;
+    
+    if (!examId) {
       toast.error("Please select an exam first");
       return;
     }
 
-    const selectedExam = exams.find(e => e.exam_id === filters.exam_id);
+    const selectedExam = exams.find(e => e.exam_id === examId);
     if (!selectedExam) {
       toast.error("Exam not found");
       return;
     }
 
     if (!selectedExam.model_answer_images?.length && !selectedExam.question_paper_images?.length) {
-      toast.error("No model answer or question paper found. Upload one first.");
+      toast.error("No model answer or question paper found. Upload one first in Manage Exams.");
       return;
     }
 
     setExtractingQuestions(true);
     try {
-      const response = await axios.post(`${API}/exams/${filters.exam_id}/extract-questions`);
+      const response = await axios.post(`${API}/exams/${examId}/extract-questions`);
       toast.success(`Successfully extracted ${response.data.updated_count || 0} questions from ${response.data.source || 'document'}`);
       
       // Refresh exams to get updated questions
