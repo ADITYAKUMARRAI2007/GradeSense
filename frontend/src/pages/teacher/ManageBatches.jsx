@@ -653,6 +653,119 @@ export default function ManageBatches({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Add Student Dialog */}
+      <Dialog open={addStudentDialogOpen} onOpenChange={setAddStudentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-green-600" />
+              Add Student to {batchDetails?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Mode Selection */}
+            <div className="flex gap-2">
+              <Button
+                variant={addStudentMode === "existing" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAddStudentMode("existing")}
+                className="flex-1"
+              >
+                Existing Student
+              </Button>
+              <Button
+                variant={addStudentMode === "new" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAddStudentMode("new")}
+                className="flex-1"
+              >
+                New Student
+              </Button>
+            </div>
+
+            {addStudentMode === "existing" ? (
+              /* Add Existing Student */
+              <div className="space-y-3">
+                <Label>Select Student</Label>
+                {availableStudents.length > 0 ? (
+                  <Select value={selectedStudentToAdd} onValueChange={setSelectedStudentToAdd}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a student..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStudents.map(student => (
+                        <SelectItem key={student.user_id} value={student.user_id}>
+                          {student.name} ({student.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No available students. All students are already in this batch or no students exist.
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Create New Student */
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="new-student-name">Name *</Label>
+                  <Input
+                    id="new-student-name"
+                    value={newStudentForm.name}
+                    onChange={(e) => setNewStudentForm({...newStudentForm, name: e.target.value})}
+                    placeholder="Student name"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-student-email">Email *</Label>
+                  <Input
+                    id="new-student-email"
+                    type="email"
+                    value={newStudentForm.email}
+                    onChange={(e) => setNewStudentForm({...newStudentForm, email: e.target.value})}
+                    placeholder="student@example.com"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-student-id">Student ID (Optional)</Label>
+                  <Input
+                    id="new-student-id"
+                    value={newStudentForm.student_id}
+                    onChange={(e) => setNewStudentForm({...newStudentForm, student_id: e.target.value})}
+                    placeholder="e.g., STU001"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddStudentDialogOpen(false)}>
+              Cancel
+            </Button>
+            {addStudentMode === "existing" ? (
+              <Button 
+                onClick={handleAddExistingStudent}
+                disabled={!selectedStudentToAdd || addingStudent}
+              >
+                {addingStudent ? "Adding..." : "Add to Batch"}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleAddNewStudent}
+                disabled={!newStudentForm.name.trim() || !newStudentForm.email.trim() || addingStudent}
+              >
+                {addingStudent ? "Creating..." : "Create & Add"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
