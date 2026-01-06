@@ -835,34 +835,121 @@ export default function UploadGrade({ user }) {
                     )}
                   </div>
 
-                  {/* Sub-questions */}
+                  {/* Sub-questions - Level 1: a), b), c) */}
                   {question.sub_questions?.length > 0 && (
-                    <div className="pl-4 border-l-2 border-primary/30 space-y-2">
-                      <Label className="text-sm text-muted-foreground">Sub-questions:</Label>
+                    <div className="pl-4 border-l-2 border-primary/30 space-y-3 mt-2">
+                      <Label className="text-sm text-muted-foreground font-medium">Sub-questions:</Label>
                       {question.sub_questions.map((subQ, subIndex) => (
-                        <div key={subIndex} className="flex items-center gap-2 bg-white p-2 rounded">
-                          <span className="text-sm font-medium w-12">{question.question_number}{subQ.sub_id})</span>
-                          <Input 
-                            type="number"
-                            placeholder="Marks"
-                            value={subQ.max_marks}
-                            onChange={(e) => updateSubQuestion(index, subIndex, "max_marks", parseFloat(e.target.value))}
-                            className="w-20 h-8 text-sm"
-                          />
-                          <Input 
-                            placeholder="Rubric (optional)"
-                            value={subQ.rubric || ""}
-                            onChange={(e) => updateSubQuestion(index, subIndex, "rubric", e.target.value)}
-                            className="flex-1 h-8 text-sm"
-                          />
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => removeSubQuestion(index, subIndex)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
+                        <div key={subIndex} className="space-y-2">
+                          {/* Sub-question row (a, b, c) */}
+                          <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-100">
+                            <span className="text-sm font-semibold text-blue-700 w-12">{subQ.sub_id})</span>
+                            <Input 
+                              type="number"
+                              placeholder="Marks"
+                              value={subQ.max_marks}
+                              onChange={(e) => updateSubQuestion(index, subIndex, "max_marks", parseFloat(e.target.value) || 0)}
+                              className="w-20 h-8 text-sm"
+                            />
+                            <Input 
+                              placeholder="Rubric (optional)"
+                              value={subQ.rubric || ""}
+                              onChange={(e) => updateSubQuestion(index, subIndex, "rubric", e.target.value)}
+                              className="flex-1 h-8 text-sm"
+                            />
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-7 text-xs text-purple-600 hover:text-purple-700"
+                              onClick={() => addSubSubQuestion(index, subIndex)}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              i, ii...
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-700"
+                              onClick={() => removeSubQuestion(index, subIndex)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+
+                          {/* Sub-sub-questions - Level 2: i), ii), iii) */}
+                          {subQ.sub_parts?.length > 0 && (
+                            <div className="pl-6 border-l-2 border-purple-200 space-y-2 ml-4">
+                              {subQ.sub_parts.map((part, partIndex) => (
+                                <div key={partIndex} className="space-y-2">
+                                  <div className="flex items-center gap-2 bg-purple-50 p-2 rounded border border-purple-100">
+                                    <span className="text-sm font-medium text-purple-700 w-10">{part.part_id})</span>
+                                    <Input 
+                                      type="number"
+                                      placeholder="Marks"
+                                      value={part.max_marks}
+                                      onChange={(e) => updateSubSubQuestion(index, subIndex, partIndex, "max_marks", parseFloat(e.target.value) || 0)}
+                                      className="w-16 h-7 text-xs"
+                                    />
+                                    <Input 
+                                      placeholder="Rubric"
+                                      value={part.rubric || ""}
+                                      onChange={(e) => updateSubSubQuestion(index, subIndex, partIndex, "rubric", e.target.value)}
+                                      className="flex-1 h-7 text-xs"
+                                    />
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="h-6 text-xs text-green-600 hover:text-green-700"
+                                      onClick={() => addLevel3Part(index, subIndex, partIndex)}
+                                    >
+                                      <Plus className="w-2 h-2 mr-1" />
+                                      A,B...
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      className="h-6 w-6 text-red-400 hover:text-red-600"
+                                      onClick={() => removeSubSubQuestion(index, subIndex, partIndex)}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+
+                                  {/* Level 3: A), B), C) */}
+                                  {part.sub_parts?.length > 0 && (
+                                    <div className="pl-6 border-l-2 border-green-200 space-y-1 ml-4">
+                                      {part.sub_parts.map((level3, level3Index) => (
+                                        <div key={level3Index} className="flex items-center gap-2 bg-green-50 p-1.5 rounded border border-green-100">
+                                          <span className="text-xs font-medium text-green-700 w-8">{level3.part_id})</span>
+                                          <Input 
+                                            type="number"
+                                            placeholder="Marks"
+                                            value={level3.max_marks}
+                                            onChange={(e) => updateLevel3Part(index, subIndex, partIndex, level3Index, "max_marks", parseFloat(e.target.value) || 0)}
+                                            className="w-14 h-6 text-xs"
+                                          />
+                                          <Input 
+                                            placeholder="Rubric"
+                                            value={level3.rubric || ""}
+                                            onChange={(e) => updateLevel3Part(index, subIndex, partIndex, level3Index, "rubric", e.target.value)}
+                                            className="flex-1 h-6 text-xs"
+                                          />
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon"
+                                            className="h-5 w-5 text-red-400 hover:text-red-600"
+                                            onClick={() => removeLevel3Part(index, subIndex, partIndex, level3Index)}
+                                          >
+                                            <X className="w-2 h-2" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -872,10 +959,11 @@ export default function UploadGrade({ user }) {
                     variant="outline" 
                     size="sm"
                     onClick={() => addSubQuestion(index)}
-                    className="text-xs"
+                    className="text-xs mt-2"
                   >
                     <Plus className="w-3 h-3 mr-1" />
-                    Add Sub-question ({question.question_number}a, {question.question_number}b...)
+                    Add Sub-question (a, b, c...)
+                  </Button>
                   </Button>
                 </div>
               ))}
