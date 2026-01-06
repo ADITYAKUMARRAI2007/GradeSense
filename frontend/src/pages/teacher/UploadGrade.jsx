@@ -964,7 +964,6 @@ export default function UploadGrade({ user }) {
                     <Plus className="w-3 h-3 mr-1" />
                     Add Sub-question (a, b, c...)
                   </Button>
-                  </Button>
                 </div>
               ))}
 
