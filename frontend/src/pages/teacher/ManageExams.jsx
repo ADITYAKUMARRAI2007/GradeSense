@@ -309,6 +309,78 @@ export default function ManageExams({ user }) {
     }
   };
 
+  // Upload Model Answer Paper
+  const handleUploadModelAnswer = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedExam) return;
+    
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error("Please upload a PDF file");
+      return;
+    }
+
+    setUploadingModelAnswer(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(
+        `${API}/exams/${selectedExam.exam_id}/upload-model-answer`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      toast.success(response.data.message || "Model answer uploaded successfully!");
+      
+      // Refresh exam data
+      const examResponse = await axios.get(`${API}/exams/${selectedExam.exam_id}`);
+      setSelectedExam(examResponse.data);
+      fetchData();
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error(error.response?.data?.detail || "Failed to upload model answer");
+    } finally {
+      setUploadingModelAnswer(false);
+      event.target.value = ""; // Reset file input
+    }
+  };
+
+  // Upload Question Paper
+  const handleUploadQuestionPaper = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedExam) return;
+    
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error("Please upload a PDF file");
+      return;
+    }
+
+    setUploadingQuestionPaper(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(
+        `${API}/exams/${selectedExam.exam_id}/upload-question-paper`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      toast.success(response.data.message || "Question paper uploaded successfully!");
+      
+      // Refresh exam data
+      const examResponse = await axios.get(`${API}/exams/${selectedExam.exam_id}`);
+      setSelectedExam(examResponse.data);
+      fetchData();
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error(error.response?.data?.detail || "Failed to upload question paper");
+    } finally {
+      setUploadingQuestionPaper(false);
+      event.target.value = ""; // Reset file input
+    }
+  };
+
   const getBatchName = (batchId) => {
     const batch = batches.find(b => b.batch_id === batchId);
     return batch?.name || "Unknown";
