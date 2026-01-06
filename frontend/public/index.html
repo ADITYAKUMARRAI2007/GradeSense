@@ -5,6 +5,23 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#000000" />
         <meta name="description" content="GradeSense - AI-powered grading tool for handwritten answer papers" />
+        
+        <!-- Google Analytics 4 (GA4) with Cross-Domain Tracking -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-V7NLK7QHGW"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            
+            // GA4 Configuration with Cross-Domain Tracking
+            gtag('config', 'G-V7NLK7QHGW', {
+                'linker': {
+                    'domains': ['scorescript.emergent.host', 'gradesense.in'],
+                    'accept_incoming': true
+                }
+            });
+        </script>
+        
         <!--
         manifest.json provides metadata used when your web app is installed on a
         user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
