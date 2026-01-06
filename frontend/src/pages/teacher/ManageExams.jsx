@@ -175,15 +175,19 @@ export default function ManageExams({ user }) {
   };
 
   const handleExtractQuestions = async (exam) => {
-    if (!exam.model_answer_images?.length) {
-      toast.error("No model answer uploaded for this exam");
+    // Check for documents - either in old storage (images array) or new storage (has_* flags)
+    const hasModelAnswer = exam.model_answer_images?.length > 0 || exam.has_model_answer;
+    const hasQuestionPaper = exam.question_paper_images?.length > 0 || exam.has_question_paper;
+    
+    if (!hasModelAnswer && !hasQuestionPaper) {
+      toast.error("No model answer or question paper uploaded for this exam");
       return;
     }
 
     setExtractingQuestions(true);
     try {
       const response = await axios.post(`${API}/exams/${exam.exam_id}/extract-questions`);
-      toast.success(`Extracted ${response.data.questions?.length || 0} questions from model answer`);
+      toast.success(`Extracted ${response.data.updated_count || response.data.questions?.length || 0} questions from ${response.data.source || 'document'}`);
       fetchData();
       // Refresh selected exam
       const updatedExam = await axios.get(`${API}/exams/${exam.exam_id}`);
