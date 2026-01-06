@@ -1220,7 +1220,10 @@ export default function ReviewPapers({ user }) {
                         </span>
                         {(() => {
                           const selectedExam = exams.find(e => e.exam_id === filters.exam_id);
-                          const hasDocuments = selectedExam?.model_answer_images?.length > 0 || selectedExam?.question_paper_images?.length > 0;
+                          const hasDocuments = selectedExam?.model_answer_images?.length > 0 || 
+                                               selectedExam?.question_paper_images?.length > 0 ||
+                                               selectedExam?.has_model_answer ||
+                                               selectedExam?.has_question_paper;
                           return hasDocuments ? (
                             <Button
                               variant="outline"
@@ -1237,7 +1240,7 @@ export default function ReviewPapers({ user }) {
                               Extract Questions
                             </Button>
                           ) : (
-                            <span className="text-xs text-purple-500">Upload model answer first</span>
+                            <span className="text-xs text-purple-500">Upload model answer or question paper first</span>
                           );
                         })()}
                       </div>
