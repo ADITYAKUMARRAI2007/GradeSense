@@ -145,7 +145,7 @@ export default function UploadGrade({ user }) {
       const nextId = String.fromCharCode(97 + subQs.length); // a, b, c, etc.
       newQuestions[questionIndex].sub_questions = [
         ...subQs,
-        { sub_id: nextId, max_marks: 2, rubric: "" }
+        { sub_id: nextId, max_marks: 2, rubric: "", sub_parts: [] }
       ];
       return { ...prev, questions: newQuestions };
     });
@@ -165,6 +165,82 @@ export default function UploadGrade({ user }) {
       newQuestions[questionIndex].sub_questions = newQuestions[questionIndex].sub_questions
         .filter((_, i) => i !== subIndex)
         .map((sq, i) => ({ ...sq, sub_id: String.fromCharCode(97 + i) }));
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  // Roman numeral converter for sub-sub-questions
+  const toRoman = (num) => {
+    const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+    return romanNumerals[num] || `${num + 1}`;
+  };
+
+  // Add sub-sub-question (i, ii, iii) under a sub-question (a, b, c)
+  const addSubSubQuestion = (questionIndex, subIndex) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      const subParts = newQuestions[questionIndex].sub_questions[subIndex].sub_parts || [];
+      const nextId = toRoman(subParts.length);
+      newQuestions[questionIndex].sub_questions[subIndex].sub_parts = [
+        ...subParts,
+        { part_id: nextId, max_marks: 1, rubric: "", sub_parts: [] }
+      ];
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  // Update sub-sub-question
+  const updateSubSubQuestion = (questionIndex, subIndex, partIndex, field, value) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex][field] = value;
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  // Remove sub-sub-question
+  const removeSubSubQuestion = (questionIndex, subIndex, partIndex) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      newQuestions[questionIndex].sub_questions[subIndex].sub_parts = 
+        newQuestions[questionIndex].sub_questions[subIndex].sub_parts
+          .filter((_, i) => i !== partIndex)
+          .map((sp, i) => ({ ...sp, part_id: toRoman(i) }));
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  // Add level 3 sub-part (A, B, C under i, ii, iii)
+  const addLevel3Part = (questionIndex, subIndex, partIndex) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      const level3Parts = newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts || [];
+      const nextId = String.fromCharCode(65 + level3Parts.length); // A, B, C, etc.
+      newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts = [
+        ...level3Parts,
+        { part_id: nextId, max_marks: 0.5, rubric: "" }
+      ];
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  // Update level 3 part
+  const updateLevel3Part = (questionIndex, subIndex, partIndex, level3Index, field, value) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts[level3Index][field] = value;
+      return { ...prev, questions: newQuestions };
+    });
+  };
+
+  // Remove level 3 part
+  const removeLevel3Part = (questionIndex, subIndex, partIndex, level3Index) => {
+    setFormData(prev => {
+      const newQuestions = [...prev.questions];
+      newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts = 
+        newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts
+          .filter((_, i) => i !== level3Index)
+          .map((sp, i) => ({ ...sp, part_id: String.fromCharCode(65 + i) }));
       return { ...prev, questions: newQuestions };
     });
   };
