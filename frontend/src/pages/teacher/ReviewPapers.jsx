@@ -292,7 +292,11 @@ export default function ReviewPapers({ user }) {
       return;
     }
 
-    if (!selectedExam.model_answer_images?.length && !selectedExam.question_paper_images?.length) {
+    // Check for documents - either in old storage (images array) or new storage (has_* flags)
+    const hasModelAnswer = selectedExam.model_answer_images?.length > 0 || selectedExam.has_model_answer;
+    const hasQuestionPaper = selectedExam.question_paper_images?.length > 0 || selectedExam.has_question_paper;
+    
+    if (!hasModelAnswer && !hasQuestionPaper) {
       toast.error("No model answer or question paper found. Upload one first in Manage Exams.");
       return;
     }
