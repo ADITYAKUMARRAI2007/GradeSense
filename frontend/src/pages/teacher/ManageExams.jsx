@@ -761,10 +761,80 @@ export default function ManageExams({ user }) {
                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                     <h3 className="font-semibold mb-3 flex items-center gap-2 text-purple-800">
                       <Brain className="w-4 h-4" />
-                      AI Tools
+                      AI Tools & Documents
                     </h3>
+                    
+                    {/* Document Upload Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                      {/* Model Answer Upload */}
+                      <div className="p-3 bg-white rounded-lg border border-purple-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-purple-700">Model Answer</span>
+                          {(selectedExam.model_answer_images?.length > 0 || selectedExam.has_model_answer) && (
+                            <Badge className="bg-green-100 text-green-700 text-xs">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Uploaded
+                            </Badge>
+                          )}
+                        </div>
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept=".pdf"
+                            className="hidden"
+                            onChange={handleUploadModelAnswer}
+                            disabled={uploadingModelAnswer}
+                          />
+                          <div className={`flex items-center justify-center gap-2 p-2 border-2 border-dashed border-purple-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-colors ${uploadingModelAnswer ? 'opacity-50 cursor-wait' : ''}`}>
+                            {uploadingModelAnswer ? (
+                              <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                            ) : (
+                              <Upload className="w-4 h-4 text-purple-600" />
+                            )}
+                            <span className="text-xs text-purple-600">
+                              {uploadingModelAnswer ? "Uploading..." : (selectedExam.model_answer_images?.length > 0 || selectedExam.has_model_answer) ? "Replace PDF" : "Upload PDF"}
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+
+                      {/* Question Paper Upload */}
+                      <div className="p-3 bg-white rounded-lg border border-purple-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-purple-700">Question Paper</span>
+                          {(selectedExam.question_paper_images?.length > 0 || selectedExam.has_question_paper) && (
+                            <Badge className="bg-green-100 text-green-700 text-xs">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Uploaded
+                            </Badge>
+                          )}
+                        </div>
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept=".pdf"
+                            className="hidden"
+                            onChange={handleUploadQuestionPaper}
+                            disabled={uploadingQuestionPaper}
+                          />
+                          <div className={`flex items-center justify-center gap-2 p-2 border-2 border-dashed border-purple-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-colors ${uploadingQuestionPaper ? 'opacity-50 cursor-wait' : ''}`}>
+                            {uploadingQuestionPaper ? (
+                              <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                            ) : (
+                              <Upload className="w-4 h-4 text-purple-600" />
+                            )}
+                            <span className="text-xs text-purple-600">
+                              {uploadingQuestionPaper ? "Uploading..." : (selectedExam.question_paper_images?.length > 0 || selectedExam.has_question_paper) ? "Replace PDF" : "Upload PDF"}
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* AI Action Buttons */}
                     <div className="flex flex-wrap gap-2">
-                      {selectedExam.model_answer_images?.length > 0 && (
+                      {(selectedExam.model_answer_images?.length > 0 || selectedExam.has_model_answer || 
+                        selectedExam.question_paper_images?.length > 0 || selectedExam.has_question_paper) && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -777,7 +847,7 @@ export default function ManageExams({ user }) {
                           ) : (
                             <Sparkles className="w-4 h-4 mr-1" />
                           )}
-                          Extract Questions from Model Answer
+                          Extract Questions
                         </Button>
                       )}
                       {selectedExam.questions?.length > 0 && (
@@ -797,9 +867,10 @@ export default function ManageExams({ user }) {
                         </Button>
                       )}
                     </div>
-                    {!selectedExam.model_answer_images?.length && (
+                    {!(selectedExam.model_answer_images?.length > 0 || selectedExam.has_model_answer || 
+                       selectedExam.question_paper_images?.length > 0 || selectedExam.has_question_paper) && (
                       <p className="text-xs text-purple-600 mt-2">
-                        Upload a model answer to enable question extraction
+                        Upload a model answer or question paper to enable AI features
                       </p>
                     )}
                   </div>
