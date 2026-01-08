@@ -9,7 +9,7 @@ import os
 
 class DuplicateAndDeletionTester:
     def __init__(self):
-        self.base_url = "https://gradingsolution.preview.emergentagent.com/api"
+        self.base_url = "https://gradesense-ai.preview.emergentagent.com/api"
         self.session_token = None
         self.user_id = None
         self.tests_run = 0
