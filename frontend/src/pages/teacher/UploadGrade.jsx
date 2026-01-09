@@ -313,12 +313,18 @@ export default function UploadGrade({ user }) {
     });
   };
 
-  // Add level 3 sub-part (A, B, C under i, ii, iii)
+  // Add level 3 sub-part with format support
   const addLevel3Part = (questionIndex, subIndex, partIndex) => {
+    const generator = getLabelGenerator(questionIndex, 'level3');
+    addLevel3PartWithFormat(questionIndex, subIndex, partIndex, null, generator);
+  };
+
+  const addLevel3PartWithFormat = (questionIndex, subIndex, partIndex, formatKey = null, existingGenerator = null) => {
     setFormData(prev => {
       const newQuestions = [...prev.questions];
       const level3Parts = newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts || [];
-      const nextId = String.fromCharCode(65 + level3Parts.length); // A, B, C, etc.
+      const generator = existingGenerator || (formatKey ? LABELING_FORMATS[formatKey].generator : getLabelGenerator(questionIndex, 'level3'));
+      const nextId = generator(level3Parts.length);
       newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts = [
         ...level3Parts,
         { part_id: nextId, max_marks: 0.5, rubric: "" }
@@ -338,12 +344,13 @@ export default function UploadGrade({ user }) {
 
   // Remove level 3 part
   const removeLevel3Part = (questionIndex, subIndex, partIndex, level3Index) => {
+    const generator = getLabelGenerator(questionIndex, 'level3');
     setFormData(prev => {
       const newQuestions = [...prev.questions];
       newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts = 
         newQuestions[questionIndex].sub_questions[subIndex].sub_parts[partIndex].sub_parts
           .filter((_, i) => i !== level3Index)
-          .map((sp, i) => ({ ...sp, part_id: String.fromCharCode(65 + i) }));
+          .map((sp, i) => ({ ...sp, part_id: generator(i) }));
       return { ...prev, questions: newQuestions };
     });
   };
