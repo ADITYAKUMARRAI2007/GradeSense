@@ -516,7 +516,11 @@ export default function ReviewPapers({ user }) {
         {/* Mobile: Questions Section */}
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-3">
-            {selectedSubmission.question_scores?.map((qs, index) => (
+            {selectedSubmission.question_scores?.map((qs, index) => {
+              const hasSubQuestions = qs.sub_scores && qs.sub_scores.length > 0;
+              const examQuestion = examQuestions.find(q => q.question_number === qs.question_number);
+              
+              return (
               <div 
                 key={index}
                 className={`p-3 rounded-lg border question-card ${qs.is_reviewed ? "reviewed" : ""}`}
@@ -524,12 +528,16 @@ export default function ReviewPapers({ user }) {
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-semibold text-sm">Question {qs.question_number}</h4>
                   <div className="flex items-center gap-1">
-                    <Input 
-                      type="number"
-                      value={qs.obtained_marks}
-                      onChange={(e) => updateQuestionScore(index, "obtained_marks", parseFloat(e.target.value) || 0)}
-                      className="w-16 text-center text-sm"
-                    />
+                    {hasSubQuestions ? (
+                      <span className="text-sm font-medium text-orange-600">{qs.obtained_marks}</span>
+                    ) : (
+                      <Input 
+                        type="number"
+                        value={qs.obtained_marks}
+                        onChange={(e) => updateQuestionScore(index, "obtained_marks", parseFloat(e.target.value) || 0)}
+                        className="w-16 text-center text-sm"
+                      />
+                    )}
                     <span className="text-muted-foreground text-sm">/ {qs.max_marks}</span>
                   </div>
                 </div>
@@ -542,52 +550,108 @@ export default function ReviewPapers({ user }) {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">AI Feedback</Label>
-                    <Textarea 
-                      value={qs.ai_feedback}
-                      onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                      className="mt-1 text-xs"
-                      rows={2}
-                    />
+                {/* Sub-Questions Section for Mobile */}
+                {hasSubQuestions ? (
+                  <div className="space-y-2 mt-2">
+                    {qs.sub_scores.map((subScore, subIndex) => {
+                      const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
+                      return (
+                        <div 
+                          key={subScore.sub_id}
+                          className="ml-2 p-2 bg-orange-50/50 rounded border border-orange-200"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-xs text-orange-800">
+                              Part {subScore.sub_id}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <Input 
+                                type="number"
+                                value={subScore.obtained_marks}
+                                onChange={(e) => updateSubQuestionScore(index, subIndex, "obtained_marks", parseFloat(e.target.value) || 0)}
+                                className="w-12 text-center text-xs"
+                                step="0.5"
+                              />
+                              <span className="text-muted-foreground text-xs">/ {subScore.max_marks}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">AI Feedback</Label>
+                            <Textarea 
+                              value={subScore.ai_feedback || ""}
+                              onChange={(e) => updateSubQuestionScore(index, subIndex, "ai_feedback", e.target.value)}
+                              className="mt-1 text-xs"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Overall feedback if present */}
+                    {qs.ai_feedback && (
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">Overall AI Feedback</Label>
+                        <Textarea 
+                          value={qs.ai_feedback}
+                          onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                          className="mt-1 text-xs"
+                          rows={2}
+                        />
+                      </div>
+                    )}
                   </div>
-
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Teacher Comment</Label>
-                    <Textarea 
-                      value={qs.teacher_comment || ""}
-                      onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
-                      placeholder="Add your comments..."
-                      className="mt-1 text-xs"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Checkbox 
-                        id={`reviewed-mobile-${index}`}
-                        checked={qs.is_reviewed}
-                        onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
+                ) : (
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">AI Feedback</Label>
+                      <Textarea 
+                        value={qs.ai_feedback}
+                        onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                        className="mt-1 text-xs"
+                        rows={2}
                       />
-                      <Label htmlFor={`reviewed-mobile-${index}`} className="text-xs cursor-pointer">
-                        Mark as reviewed
-                      </Label>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openFeedbackDialog(qs)}
-                      className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                    >
-                      <MessageSquarePlus className="w-3 h-3 mr-1" />
-                      Improve AI
-                    </Button>
                   </div>
+                )}
+
+                {/* Teacher Comment - always shown */}
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Teacher Comment</Label>
+                  <Textarea 
+                    value={qs.teacher_comment || ""}
+                    onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
+                    placeholder="Add your comments..."
+                    className="mt-1 text-xs"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id={`reviewed-mobile-${index}`}
+                      checked={qs.is_reviewed}
+                      onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
+                    />
+                    <Label htmlFor={`reviewed-mobile-${index}`} className="text-xs cursor-pointer">
+                      Mark as reviewed
+                    </Label>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openFeedbackDialog(qs)}
+                    className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
+                    <MessageSquarePlus className="w-3 h-3 mr-1" />
+                    Improve AI
+                  </Button>
                 </div>
               </div>
-            ))}
+            );})}
+          </div>
+        </ScrollArea>
           </div>
         </ScrollArea>
       </div>
