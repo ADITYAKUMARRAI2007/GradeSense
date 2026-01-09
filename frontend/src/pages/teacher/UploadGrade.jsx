@@ -972,10 +972,10 @@ export default function UploadGrade({ user }) {
                               variant="ghost" 
                               size="sm"
                               className="h-7 text-xs text-purple-600 hover:text-purple-700"
-                              onClick={() => addSubSubQuestion(index, subIndex)}
+                              onClick={() => handleAddSubQuestionClick(index, 'level2', subIndex)}
                             >
                               <Plus className="w-3 h-3 mr-1" />
-                              i, ii...
+                              {labelFormats[index]?.level2 ? LABELING_FORMATS[labelFormats[index].level2].name : "i, ii..."}
                             </Button>
                             <Button 
                               variant="ghost" 
@@ -1011,10 +1011,10 @@ export default function UploadGrade({ user }) {
                                       variant="ghost" 
                                       size="sm"
                                       className="h-6 text-xs text-green-600 hover:text-green-700"
-                                      onClick={() => addLevel3Part(index, subIndex, partIndex)}
+                                      onClick={() => handleAddSubQuestionClick(index, 'level3', subIndex, partIndex)}
                                     >
                                       <Plus className="w-2 h-2 mr-1" />
-                                      A,B...
+                                      {labelFormats[index]?.level3 ? LABELING_FORMATS[labelFormats[index].level3].name : "A, B..."}
                                     </Button>
                                     <Button 
                                       variant="ghost" 
