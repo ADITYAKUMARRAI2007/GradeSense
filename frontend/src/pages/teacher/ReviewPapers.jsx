@@ -652,8 +652,6 @@ export default function ReviewPapers({ user }) {
             );})}
           </div>
         </ScrollArea>
-          </div>
-        </ScrollArea>
       </div>
 
       {/* Desktop: Resizable Panels */}
