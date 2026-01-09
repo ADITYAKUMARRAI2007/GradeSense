@@ -1069,11 +1069,11 @@ export default function UploadGrade({ user }) {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => addSubQuestion(index)}
+                    onClick={() => handleAddSubQuestionClick(index, 'level1')}
                     className="text-xs mt-2"
                   >
                     <Plus className="w-3 h-3 mr-1" />
-                    Add Sub-question (a, b, c...)
+                    Add Sub-question ({labelFormats[index]?.level1 ? LABELING_FORMATS[labelFormats[index].level1].name : "a, b, c..."})
                   </Button>
                 </div>
               ))}
