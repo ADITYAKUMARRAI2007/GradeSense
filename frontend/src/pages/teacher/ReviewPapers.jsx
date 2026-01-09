@@ -1055,25 +1055,25 @@ export default function ReviewPapers({ user }) {
                           id={`reviewed-desktop-${index}`}
                           checked={qs.is_reviewed}
                           onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
-                          />
-                          <Label htmlFor={`reviewed-desktop-${index}`} className="text-xs lg:text-sm cursor-pointer">
-                            Mark as reviewed
-                          </Label>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openFeedbackDialog(qs)}
-                          className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                          title="Submit feedback to improve AI grading"
-                        >
-                          <MessageSquarePlus className="w-3 h-3 mr-1" />
-                          Improve AI
-                        </Button>
+                        />
+                        <Label htmlFor={`reviewed-desktop-${index}`} className="text-xs lg:text-sm cursor-pointer">
+                          Mark as reviewed
+                        </Label>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openFeedbackDialog(qs)}
+                        className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                        title="Submit feedback to improve AI grading"
+                      >
+                        <MessageSquarePlus className="w-3 h-3 mr-1" />
+                        Improve AI
+                      </Button>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             </ScrollArea>
           </Panel>
