@@ -62,6 +62,15 @@ const EXAM_TYPES = [
   "Custom"
 ];
 
+// Sub-question labeling formats
+const LABELING_FORMATS = {
+  lowercase: { name: "a, b, c...", generator: (i) => String.fromCharCode(97 + i) },
+  uppercase: { name: "A, B, C...", generator: (i) => String.fromCharCode(65 + i) },
+  roman_lower: { name: "i, ii, iii...", generator: (i) => ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'][i] || `${i + 1}` },
+  roman_upper: { name: "I, II, III...", generator: (i) => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}` },
+  numbers: { name: "1, 2, 3...", generator: (i) => `${i + 1}` },
+};
+
 export default function UploadGrade({ user }) {
   const [step, setStep] = useState(1);
   const [batches, setBatches] = useState([]);
@@ -69,6 +78,12 @@ export default function UploadGrade({ user }) {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+
+  // Sub-question labeling format state (per question)
+  const [labelFormats, setLabelFormats] = useState({});
+  // Modal state for format selection
+  const [formatModalOpen, setFormatModalOpen] = useState(false);
+  const [pendingAddSubQuestion, setPendingAddSubQuestion] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
