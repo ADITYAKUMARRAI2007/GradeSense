@@ -1281,6 +1281,7 @@ export default function UploadGrade({ user }) {
                     setStudentFiles([]);
                     setExamId(null);
                     setResults(null);
+                    setLabelFormats({});
                   }}
                 >
                   Grade More Papers
@@ -1293,6 +1294,36 @@ export default function UploadGrade({ user }) {
             </CardContent>
           </Card>
         )}
+
+        {/* Format Selection Modal */}
+        <Dialog open={formatModalOpen} onOpenChange={setFormatModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-orange-600">Choose Label Format</DialogTitle>
+              <DialogDescription>
+                Select how you want to label the sub-questions. This format will be used for all sub-questions at this level.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3 py-4">
+              {Object.entries(LABELING_FORMATS).map(([key, format]) => (
+                <Button
+                  key={key}
+                  variant="outline"
+                  className="h-16 flex flex-col items-center justify-center gap-1 hover:bg-orange-50 hover:border-orange-300"
+                  onClick={() => confirmFormatAndAdd(key)}
+                >
+                  <span className="text-lg font-semibold text-orange-600">{format.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {format.generator(0)}), {format.generator(1)}), {format.generator(2)})...
+                  </span>
+                </Button>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground text-center">
+              Subsequent sub-questions will automatically follow this pattern
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
