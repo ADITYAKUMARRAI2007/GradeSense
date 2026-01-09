@@ -935,7 +935,7 @@ export default function ReviewPapers({ user }) {
                             <p className="text-xs font-medium text-blue-800 mb-1">Question {qs.question_number} (from AI assessment):</p>
                             <p className="text-xs text-gray-700 line-clamp-3">{qs.ai_feedback.slice(0, 200)}...</p>
                             <p className="text-xs text-muted-foreground italic mt-1">
-                              Note: View model answer or use "Extract Questions" in Manage Exams for full question text
+                              Note: View model answer or use &quot;Extract Questions&quot; in Manage Exams for full question text
                             </p>
                           </div>
                         );
@@ -955,7 +955,7 @@ export default function ReviewPapers({ user }) {
                           </p>
                           <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc">
                             <li>View model answer (left panel)</li>
-                            <li>Or go to Manage Exams → Select exam → Click "Extract Questions"</li>
+                            <li>Or go to Manage Exams → Select exam → Click &quot;Extract Questions&quot;</li>
                           </ul>
                         </div>
                       ) : null;
