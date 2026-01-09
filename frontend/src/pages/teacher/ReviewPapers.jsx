@@ -143,6 +143,41 @@ export default function ReviewPapers({ user }) {
       const newScores = [...prev.question_scores];
       newScores[index] = { ...newScores[index], [field]: value };
       
+      // Recalculate obtained_marks from sub_scores if they exist
+      if (newScores[index].sub_scores?.length > 0) {
+        newScores[index].obtained_marks = newScores[index].sub_scores.reduce(
+          (sum, ss) => sum + (ss.obtained_marks || 0), 0
+        );
+      }
+      
+      const totalScore = newScores.reduce((sum, qs) => sum + qs.obtained_marks, 0);
+      const exam = exams.find(e => e.exam_id === prev.exam_id);
+      const totalMarks = exam?.total_marks || newScores.reduce((sum, q) => sum + q.max_marks, 0) || 100;
+      
+      return {
+        ...prev,
+        question_scores: newScores,
+        total_score: totalScore,
+        percentage: Math.round((totalScore / totalMarks) * 100 * 100) / 100
+      };
+    });
+  };
+
+  // Function to update sub-question scores
+  const updateSubQuestionScore = (questionIndex, subIndex, field, value) => {
+    setSelectedSubmission(prev => {
+      const newScores = [...prev.question_scores];
+      const newSubScores = [...(newScores[questionIndex].sub_scores || [])];
+      newSubScores[subIndex] = { ...newSubScores[subIndex], [field]: value };
+      
+      // Recalculate parent question's obtained_marks from sub_scores
+      const totalSubMarks = newSubScores.reduce((sum, ss) => sum + (ss.obtained_marks || 0), 0);
+      newScores[questionIndex] = { 
+        ...newScores[questionIndex], 
+        sub_scores: newSubScores,
+        obtained_marks: totalSubMarks
+      };
+      
       const totalScore = newScores.reduce((sum, qs) => sum + qs.obtained_marks, 0);
       const exam = exams.find(e => e.exam_id === prev.exam_id);
       const totalMarks = exam?.total_marks || newScores.reduce((sum, q) => sum + q.max_marks, 0) || 100;
