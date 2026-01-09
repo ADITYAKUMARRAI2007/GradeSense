@@ -831,34 +831,43 @@ export default function ReviewPapers({ user }) {
           <Panel defaultSize={45} minSize={30} maxSize={70}>
             <ScrollArea className="h-full">
               <div className="p-4 space-y-3">
-                {selectedSubmission.question_scores?.map((qs, index) => (
+                {selectedSubmission.question_scores?.map((qs, index) => {
+                  const hasSubQuestions = qs.sub_scores && qs.sub_scores.length > 0;
+                  const examQuestion = examQuestions.find(q => q.question_number === qs.question_number);
+                  
+                  return (
                   <div 
                     key={index}
                     className={`p-3 lg:p-4 rounded-lg border question-card ${
                       qs.is_reviewed ? "reviewed" : ""
                     }`}
                   >
+                    {/* Question Header with Total Score */}
                     <div className="flex items-center justify-between mb-2 lg:mb-3">
                       <h4 className="font-semibold text-sm lg:text-base">Question {qs.question_number}</h4>
                       <div className="flex items-center gap-1 lg:gap-2">
-                        <Input 
-                          type="number"
-                          value={qs.obtained_marks}
-                          onChange={(e) => updateQuestionScore(index, "obtained_marks", parseFloat(e.target.value) || 0)}
-                          className="w-16 lg:w-20 text-center text-sm"
-                          data-testid={`score-q${qs.question_number}`}
-                        />
+                        {hasSubQuestions ? (
+                          // Show total as read-only for questions with sub-questions
+                          <span className="text-sm font-medium text-orange-600">{qs.obtained_marks}</span>
+                        ) : (
+                          <Input 
+                            type="number"
+                            value={qs.obtained_marks}
+                            onChange={(e) => updateQuestionScore(index, "obtained_marks", parseFloat(e.target.value) || 0)}
+                            className="w-16 lg:w-20 text-center text-sm"
+                            data-testid={`score-q${qs.question_number}`}
+                          />
+                        )}
                         <span className="text-muted-foreground text-sm">/ {qs.max_marks}</span>
                       </div>
                     </div>
 
                     {/* Full Question Text - from exam questions or submission */}
                     {(() => {
-                      const examQuestion = examQuestions.find(q => q.question_number === qs.question_number);
                       const questionText = qs.question_text || examQuestion?.rubric || examQuestion?.question_text;
                       
                       // If no question text, show AI's assessment as a fallback
-                      if (!questionText && qs.ai_feedback) {
+                      if (!questionText && qs.ai_feedback && !hasSubQuestions) {
                         return (
                           <div className="mb-3 p-3 bg-blue-50/50 rounded border-l-4 border-blue-300">
                             <p className="text-xs font-medium text-blue-800 mb-1">Question {qs.question_number} (from AI assessment):</p>
@@ -876,7 +885,7 @@ export default function ReviewPapers({ user }) {
                             <strong className="text-blue-700">Q{qs.question_number}:</strong> {questionText}
                           </p>
                         </div>
-                      ) : (
+                      ) : !hasSubQuestions ? (
                         <div className="mb-3 p-2 bg-amber-50 rounded border-l-2 border-amber-400">
                           <p className="text-xs text-amber-800 font-medium">⚠️ Question {qs.question_number}</p>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -887,37 +896,103 @@ export default function ReviewPapers({ user }) {
                             <li>Or go to Manage Exams → Select exam → Click "Extract Questions"</li>
                           </ul>
                         </div>
-                      );
+                      ) : null;
                     })()}
 
-                    <div className="space-y-2 lg:space-y-3">
-                      <div>
-                        <Label className="text-xs lg:text-sm text-muted-foreground">AI Feedback</Label>
-                        <Textarea 
-                          value={qs.ai_feedback}
-                          onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                          className="mt-1 text-xs lg:text-sm"
-                          rows={2}
-                        />
+                    {/* Sub-Questions Section */}
+                    {hasSubQuestions ? (
+                      <div className="space-y-3 mt-3">
+                        {qs.sub_scores.map((subScore, subIndex) => {
+                          const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
+                          return (
+                            <div 
+                              key={subScore.sub_id}
+                              className="ml-4 p-3 bg-orange-50/50 rounded-lg border border-orange-200"
+                            >
+                              {/* Sub-question Header */}
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium text-sm text-orange-800">
+                                  Part {subScore.sub_id}
+                                  {examSubQuestion?.rubric && (
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      - {examSubQuestion.rubric.slice(0, 50)}...
+                                    </span>
+                                  )}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <Input 
+                                    type="number"
+                                    value={subScore.obtained_marks}
+                                    onChange={(e) => updateSubQuestionScore(index, subIndex, "obtained_marks", parseFloat(e.target.value) || 0)}
+                                    className="w-14 text-center text-xs"
+                                    step="0.5"
+                                  />
+                                  <span className="text-muted-foreground text-xs">/ {subScore.max_marks}</span>
+                                </div>
+                              </div>
+                              
+                              {/* Sub-question AI Feedback */}
+                              <div>
+                                <Label className="text-xs text-muted-foreground">AI Feedback for Part {subScore.sub_id}</Label>
+                                <Textarea 
+                                  value={subScore.ai_feedback || ""}
+                                  onChange={(e) => updateSubQuestionScore(index, subIndex, "ai_feedback", e.target.value)}
+                                  className="mt-1 text-xs"
+                                  rows={2}
+                                  placeholder={`Feedback for part ${subScore.sub_id}...`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Overall AI Feedback for the question (if any) */}
+                        {qs.ai_feedback && (
+                          <div className="mt-2">
+                            <Label className="text-xs lg:text-sm text-muted-foreground">Overall AI Feedback</Label>
+                            <Textarea 
+                              value={qs.ai_feedback}
+                              onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                              className="mt-1 text-xs lg:text-sm"
+                              rows={2}
+                            />
+                          </div>
+                        )}
                       </div>
-
-                      <div>
-                        <Label className="text-xs lg:text-sm text-muted-foreground">Teacher Comment</Label>
-                        <Textarea 
-                          value={qs.teacher_comment || ""}
-                          onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
-                          placeholder="Add your comments..."
-                          className="mt-1 text-xs lg:text-sm"
-                          rows={2}
-                        />
+                    ) : (
+                      /* No sub-questions - show regular feedback */
+                      <div className="space-y-2 lg:space-y-3">
+                        <div>
+                          <Label className="text-xs lg:text-sm text-muted-foreground">AI Feedback</Label>
+                          <Textarea 
+                            value={qs.ai_feedback}
+                            onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                            className="mt-1 text-xs lg:text-sm"
+                            rows={2}
+                          />
+                        </div>
                       </div>
+                    )}
 
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <Checkbox 
-                            id={`reviewed-desktop-${index}`}
-                            checked={qs.is_reviewed}
-                            onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
+                    {/* Teacher Comment - always shown */}
+                    <div className="mt-3">
+                      <Label className="text-xs lg:text-sm text-muted-foreground">Teacher Comment</Label>
+                      <Textarea 
+                        value={qs.teacher_comment || ""}
+                        onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
+                        placeholder="Add your comments..."
+                        className="mt-1 text-xs lg:text-sm"
+                        rows={2}
+                      />
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap mt-3">
+                      <div className="flex items-center gap-2">
+                        <Checkbox 
+                          id={`reviewed-desktop-${index}`}
+                          checked={qs.is_reviewed}
+                          onCheckedChange={(checked) => updateQuestionScore(index, "is_reviewed", checked)}
                           />
                           <Label htmlFor={`reviewed-desktop-${index}`} className="text-xs lg:text-sm cursor-pointer">
                             Mark as reviewed
