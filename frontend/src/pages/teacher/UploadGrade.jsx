@@ -149,15 +149,95 @@ export default function UploadGrade({ user }) {
           question_number: i + 1
         }))
       }));
+      // Clean up label formats for this question
+      setLabelFormats(prev => {
+        const newFormats = { ...prev };
+        delete newFormats[index];
+        return newFormats;
+      });
     }
   };
 
-  // Sub-question management
+  // Get the label generator for a specific question and level
+  const getLabelGenerator = (questionIndex, level = 'level1') => {
+    const formatKey = labelFormats[questionIndex]?.[level] || 
+      (level === 'level1' ? 'lowercase' : level === 'level2' ? 'roman_lower' : 'uppercase');
+    return LABELING_FORMATS[formatKey]?.generator || LABELING_FORMATS.lowercase.generator;
+  };
+
+  // Handle clicking "Add Sub-question" - show format selector if first sub-question
+  const handleAddSubQuestionClick = (questionIndex, level = 'level1', subIndex = null, partIndex = null) => {
+    const question = formData.questions[questionIndex];
+    let needsFormatSelection = false;
+    
+    if (level === 'level1') {
+      needsFormatSelection = !question.sub_questions || question.sub_questions.length === 0;
+    } else if (level === 'level2' && subIndex !== null) {
+      const subQ = question.sub_questions?.[subIndex];
+      needsFormatSelection = !subQ?.sub_parts || subQ.sub_parts.length === 0;
+    } else if (level === 'level3' && subIndex !== null && partIndex !== null) {
+      const part = question.sub_questions?.[subIndex]?.sub_parts?.[partIndex];
+      needsFormatSelection = !part?.sub_parts || part.sub_parts.length === 0;
+    }
+
+    if (needsFormatSelection && !labelFormats[questionIndex]?.[level]) {
+      setPendingAddSubQuestion({ questionIndex, level, subIndex, partIndex });
+      setFormatModalOpen(true);
+    } else {
+      // Format already selected, add directly
+      if (level === 'level1') {
+        addSubQuestion(questionIndex);
+      } else if (level === 'level2') {
+        addSubSubQuestion(questionIndex, subIndex);
+      } else if (level === 'level3') {
+        addLevel3Part(questionIndex, subIndex, partIndex);
+      }
+    }
+  };
+
+  // Confirm format selection and add sub-question
+  const confirmFormatAndAdd = (formatKey) => {
+    if (!pendingAddSubQuestion) return;
+    
+    const { questionIndex, level, subIndex, partIndex } = pendingAddSubQuestion;
+    
+    // Save the selected format
+    setLabelFormats(prev => ({
+      ...prev,
+      [questionIndex]: {
+        ...prev[questionIndex],
+        [level]: formatKey
+      }
+    }));
+
+    // Close modal and add the sub-question
+    setFormatModalOpen(false);
+    
+    // Use setTimeout to ensure state is updated before adding
+    setTimeout(() => {
+      if (level === 'level1') {
+        addSubQuestionWithFormat(questionIndex, formatKey);
+      } else if (level === 'level2') {
+        addSubSubQuestionWithFormat(questionIndex, subIndex, formatKey);
+      } else if (level === 'level3') {
+        addLevel3PartWithFormat(questionIndex, subIndex, partIndex, formatKey);
+      }
+      setPendingAddSubQuestion(null);
+    }, 0);
+  };
+
+  // Sub-question management with format support
   const addSubQuestion = (questionIndex) => {
+    const generator = getLabelGenerator(questionIndex, 'level1');
+    addSubQuestionWithFormat(questionIndex, null, generator);
+  };
+
+  const addSubQuestionWithFormat = (questionIndex, formatKey = null, existingGenerator = null) => {
     setFormData(prev => {
       const newQuestions = [...prev.questions];
       const subQs = newQuestions[questionIndex].sub_questions || [];
-      const nextId = String.fromCharCode(97 + subQs.length); // a, b, c, etc.
+      const generator = existingGenerator || (formatKey ? LABELING_FORMATS[formatKey].generator : getLabelGenerator(questionIndex, 'level1'));
+      const nextId = generator(subQs.length);
       newQuestions[questionIndex].sub_questions = [
         ...subQs,
         { sub_id: nextId, max_marks: 2, rubric: "", sub_parts: [] }
@@ -175,27 +255,34 @@ export default function UploadGrade({ user }) {
   };
 
   const removeSubQuestion = (questionIndex, subIndex) => {
+    const generator = getLabelGenerator(questionIndex, 'level1');
     setFormData(prev => {
       const newQuestions = [...prev.questions];
       newQuestions[questionIndex].sub_questions = newQuestions[questionIndex].sub_questions
         .filter((_, i) => i !== subIndex)
-        .map((sq, i) => ({ ...sq, sub_id: String.fromCharCode(97 + i) }));
+        .map((sq, i) => ({ ...sq, sub_id: generator(i) }));
       return { ...prev, questions: newQuestions };
     });
   };
 
-  // Roman numeral converter for sub-sub-questions
+  // Roman numeral converter for sub-sub-questions (kept for backwards compatibility)
   const toRoman = (num) => {
     const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
     return romanNumerals[num] || `${num + 1}`;
   };
 
-  // Add sub-sub-question (i, ii, iii) under a sub-question (a, b, c)
+  // Add sub-sub-question with format support
   const addSubSubQuestion = (questionIndex, subIndex) => {
+    const generator = getLabelGenerator(questionIndex, 'level2');
+    addSubSubQuestionWithFormat(questionIndex, subIndex, null, generator);
+  };
+
+  const addSubSubQuestionWithFormat = (questionIndex, subIndex, formatKey = null, existingGenerator = null) => {
     setFormData(prev => {
       const newQuestions = [...prev.questions];
       const subParts = newQuestions[questionIndex].sub_questions[subIndex].sub_parts || [];
-      const nextId = toRoman(subParts.length);
+      const generator = existingGenerator || (formatKey ? LABELING_FORMATS[formatKey].generator : getLabelGenerator(questionIndex, 'level2'));
+      const nextId = generator(subParts.length);
       newQuestions[questionIndex].sub_questions[subIndex].sub_parts = [
         ...subParts,
         { part_id: nextId, max_marks: 1, rubric: "", sub_parts: [] }
@@ -215,12 +302,13 @@ export default function UploadGrade({ user }) {
 
   // Remove sub-sub-question
   const removeSubSubQuestion = (questionIndex, subIndex, partIndex) => {
+    const generator = getLabelGenerator(questionIndex, 'level2');
     setFormData(prev => {
       const newQuestions = [...prev.questions];
       newQuestions[questionIndex].sub_questions[subIndex].sub_parts = 
         newQuestions[questionIndex].sub_questions[subIndex].sub_parts
           .filter((_, i) => i !== partIndex)
-          .map((sp, i) => ({ ...sp, part_id: toRoman(i) }));
+          .map((sp, i) => ({ ...sp, part_id: generator(i) }));
       return { ...prev, questions: newQuestions };
     });
   };
