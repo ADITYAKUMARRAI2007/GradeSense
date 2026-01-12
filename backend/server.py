@@ -2578,66 +2578,73 @@ Return valid JSON only."""
         file_contents=all_images
     )
     
-    try:
-        ai_response = await chat.send_message(user_message)
-        
-        # Parse the response
-        import json
-        response_text = ai_response.strip()
-        if response_text.startswith("```"):
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
-        
-        result = json.loads(response_text)
-        scores = []
-        
-        for q in questions:
-            q_num = q["question_number"]
-            score_data = next(
-                (s for s in result.get("scores", []) if s["question_number"] == q_num),
-                None
-            )
+    # Retry logic with exponential backoff for large documents
+    import asyncio
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"AI grading attempt {attempt + 1}/{max_retries} with {len(all_images)} images")
+            ai_response = await chat.send_message(user_message)
             
-            if score_data:
-                # Handle sub-scores
-                sub_scores = []
-                if q.get("sub_questions") and score_data.get("sub_scores"):
-                    for sq in q["sub_questions"]:
-                        sq_data = next(
-                            (ss for ss in score_data.get("sub_scores", []) if ss.get("sub_id") == sq["sub_id"]),
-                            None
-                        )
-                        if sq_data:
-                            sub_scores.append(SubQuestionScore(
-                                sub_id=sq["sub_id"],
-                                max_marks=sq["max_marks"],
-                                obtained_marks=min(sq_data.get("obtained_marks", 0), sq["max_marks"]),
-                                ai_feedback=sq_data.get("ai_feedback", "")
-                            ))
-                        else:
-                            sub_scores.append(SubQuestionScore(
-                                sub_id=sq["sub_id"],
-                                max_marks=sq["max_marks"],
-                                obtained_marks=sq["max_marks"] * 0.5,
-                                ai_feedback="Could not grade this sub-question"
-                            ))
+            # Parse the response
+            import json
+            response_text = ai_response.strip()
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+            
+            result = json.loads(response_text)
+            scores = []
+            
+            for q in questions:
+                q_num = q["question_number"]
+                score_data = next(
+                    (s for s in result.get("scores", []) if s["question_number"] == q_num),
+                    None
+                )
                 
-                scores.append(QuestionScore(
-                    question_number=q_num,
-                    max_marks=q["max_marks"],
-                    obtained_marks=min(score_data["obtained_marks"], q["max_marks"]),
-                    ai_feedback=score_data["ai_feedback"],
-                    sub_scores=[s.model_dump() for s in sub_scores],
-                    error_annotations=score_data.get("error_annotations", []),
-                    question_text=q.get("question_text") or q.get("rubric")  # Include question text from exam
-                ))
-            else:
-                scores.append(QuestionScore(
-                    question_number=q_num,
-                    max_marks=q["max_marks"],
-                    obtained_marks=q["max_marks"] * 0.5,
-                    ai_feedback="Could not grade this question"
+                if score_data:
+                    # Handle sub-scores
+                    sub_scores = []
+                    if q.get("sub_questions") and score_data.get("sub_scores"):
+                        for sq in q["sub_questions"]:
+                            sq_data = next(
+                                (ss for ss in score_data.get("sub_scores", []) if ss.get("sub_id") == sq["sub_id"]),
+                                None
+                            )
+                            if sq_data:
+                                sub_scores.append(SubQuestionScore(
+                                    sub_id=sq["sub_id"],
+                                    max_marks=sq["max_marks"],
+                                    obtained_marks=min(sq_data.get("obtained_marks", 0), sq["max_marks"]),
+                                    ai_feedback=sq_data.get("ai_feedback", "")
+                                ))
+                            else:
+                                sub_scores.append(SubQuestionScore(
+                                    sub_id=sq["sub_id"],
+                                    max_marks=sq["max_marks"],
+                                    obtained_marks=sq["max_marks"] * 0.5,
+                                    ai_feedback="Could not grade this sub-question"
+                                ))
+                    
+                    scores.append(QuestionScore(
+                        question_number=q_num,
+                        max_marks=q["max_marks"],
+                        obtained_marks=min(score_data["obtained_marks"], q["max_marks"]),
+                        ai_feedback=score_data["ai_feedback"],
+                        sub_scores=[s.model_dump() for s in sub_scores],
+                        error_annotations=score_data.get("error_annotations", []),
+                        question_text=q.get("question_text") or q.get("rubric")
+                    ))
+                else:
+                    scores.append(QuestionScore(
+                        question_number=q_num,
+                        max_marks=q["max_marks"],
+                        obtained_marks=q["max_marks"] * 0.5,
+                        ai_feedback="Could not grade this question"
                 ))
         
         return scores
