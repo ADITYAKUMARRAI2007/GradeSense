@@ -2023,8 +2023,9 @@ Important:
 """
         ).with_model("gemini", "gemini-2.5-pro")
         
-        # Create image contents
-        image_contents = [ImageContent(image_base64=img) for img in question_paper_images[:5]]
+        # Create image contents - process ALL pages, no limit
+        image_contents = [ImageContent(image_base64=img) for img in question_paper_images]
+        logger.info(f"Extracting questions from {len(image_contents)} question paper pages")
         
         prompt = f"""Extract the questions from this question paper.
         
