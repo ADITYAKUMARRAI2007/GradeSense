@@ -2133,18 +2133,38 @@ Return ONLY the JSON with ALL {num_questions} questions, no other text."""
             file_contents=image_contents
         )
         
-        ai_response = await chat.send_message(user_message)
+        # Retry logic for model answer extraction
+        import asyncio
+        max_retries = 3
+        retry_delay = 5
         
-        # Parse JSON response
-        response_text = ai_response.strip()
-        if response_text.startswith("```"):
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Model answer extraction attempt {attempt + 1}/{max_retries}")
+                ai_response = await chat.send_message(user_message)
+                
+                # Parse JSON response
+                response_text = ai_response.strip()
+                if response_text.startswith("```"):
+                    response_text = response_text.split("```")[1]
+                    if response_text.startswith("json"):
+                        response_text = response_text[4:]
+                
+                import json
+                result = json.loads(response_text)
+                logger.info(f"Successfully extracted {len(result.get('questions', []))} questions from model answer")
+                return result.get("questions", [])
+                
+            except Exception as e:
+                error_str = str(e).lower()
+                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str):
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.info(f"Retrying model answer extraction in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise e
         
-        import json
-        result = json.loads(response_text)
-        return result.get("questions", [])
+        return []
         
     except Exception as e:
         logger.error(f"Error extracting questions: {e}")
