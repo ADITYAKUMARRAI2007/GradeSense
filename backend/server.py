@@ -2453,16 +2453,18 @@ Your measure of success: When the same paper graded by you and by an expert teac
         
         questions_text += q_text + "\n"
     
-    # Create image contents list
+    # Create image contents list - NO PAGE LIMITS
     all_images = []
     
-    # Add model answer images if provided (now optional)
+    # Add ALL model answer images if provided
     if model_answer_images:
-        for i, img in enumerate(model_answer_images[:3]):
+        logger.info(f"Including {len(model_answer_images)} model answer pages for grading")
+        for i, img in enumerate(model_answer_images):
             all_images.append(ImageContent(image_base64=img))
     
-    # Add student answer images
-    for i, img in enumerate(images[:5]):
+    # Add ALL student answer images - no truncation
+    logger.info(f"Including {len(images)} student answer pages for grading")
+    for i, img in enumerate(images):
         all_images.append(ImageContent(image_base64=img))
     
     # Construct prompt based on whether model answer is available
