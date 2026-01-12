@@ -2093,8 +2093,9 @@ Important:
 """
         ).with_model("gemini", "gemini-2.5-pro")
         
-        # Create image contents
-        image_contents = [ImageContent(image_base64=img) for img in model_answer_images[:5]]
+        # Create image contents - process ALL pages, no limit
+        image_contents = [ImageContent(image_base64=img) for img in model_answer_images]
+        logger.info(f"Extracting questions from {len(image_contents)} model answer pages")
         
         prompt = f"""Extract the question text from these model answer images.
         
