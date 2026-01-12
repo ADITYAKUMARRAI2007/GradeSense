@@ -2499,6 +2499,9 @@ Your measure of success: When the same paper graded by you and by an expert teac
     
     logger.info(f"Total images being sent to AI: {len(all_images)}")
     
+    # Calculate how many model answer images were actually included
+    model_images_included = len(all_images) - len(images) if model_answer_images else 0
+    
     # Construct prompt based on whether model answer is available
     if model_answer_images:
         prompt_text = f"""# GRADING TASK
@@ -2516,8 +2519,10 @@ First, analyze the MODEL ANSWER thoroughly:
 {questions_text}
 
 **Image Layout:**
-- First {min(len(model_answer_images), 3)} image(s): MODEL ANSWER (your holy grail reference)
-- Remaining images: STUDENT'S ANSWER PAPER
+- First {model_images_included} image(s): MODEL ANSWER (your holy grail reference)
+- Next {len(images)} images: STUDENT'S ANSWER PAPER (evaluate ALL pages carefully)
+
+**IMPORTANT**: The student paper has {len(images)} pages. You MUST examine EVERY page and grade ALL questions found. Do not skip any page.
 
 ## GRADING MODE: {grading_mode.upper()}
 Apply the {grading_mode} mode specifications strictly.
@@ -2529,6 +2534,7 @@ Apply the {grading_mode} mode specifications strictly.
 4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
 5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
 6. **FEEDBACK QUALITY**: Provide constructive, specific feedback that helps learning
+7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
 
 ## PHASE 3: OUTPUT
 Grade each question providing:
