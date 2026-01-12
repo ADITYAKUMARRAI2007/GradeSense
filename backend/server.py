@@ -2646,20 +2646,36 @@ Return valid JSON only."""
                         obtained_marks=q["max_marks"] * 0.5,
                         ai_feedback="Could not grade this question"
                 ))
-        
-        return scores
-    except Exception as e:
-        logger.error(f"AI grading error: {e}")
-        # Return default scores on error
-        return [
-            QuestionScore(
-                question_number=q["question_number"],
-                max_marks=q["max_marks"],
-                obtained_marks=q["max_marks"] * 0.5,
-                ai_feedback=f"Auto-graded: Please review manually. Error: {str(e)}"
-            )
-            for q in questions
-        ]
+            
+            logger.info(f"AI grading successful on attempt {attempt + 1}")
+            return scores
+            
+        except Exception as e:
+            logger.error(f"AI grading error on attempt {attempt + 1}: {e}")
+            
+            if attempt < max_retries - 1:
+                # Check if it's a retryable error (502, 503, timeout)
+                error_str = str(e).lower()
+                if "502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    # Non-retryable error, break and return default
+                    break
+            
+    # All retries failed - return default scores
+    logger.error(f"AI grading failed after {max_retries} attempts")
+    return [
+        QuestionScore(
+            question_number=q["question_number"],
+            max_marks=q["max_marks"],
+            obtained_marks=q["max_marks"] * 0.5,
+            ai_feedback=f"Auto-graded: Please review manually. AI service temporarily unavailable after {max_retries} attempts."
+        )
+        for q in questions
+    ]
 
 @api_router.post("/exams/{exam_id}/upload-model-answer")
 async def upload_model_answer(
