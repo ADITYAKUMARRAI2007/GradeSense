@@ -2453,19 +2453,51 @@ Your measure of success: When the same paper graded by you and by an expert teac
         
         questions_text += q_text + "\n"
     
-    # Create image contents list - NO PAGE LIMITS
+    # Create image contents list - with intelligent batching for large documents
     all_images = []
+    total_images = len(images) + (len(model_answer_images) if model_answer_images else 0)
     
-    # Add ALL model answer images if provided
-    if model_answer_images:
-        logger.info(f"Including {len(model_answer_images)} model answer pages for grading")
-        for i, img in enumerate(model_answer_images):
+    # SMART BATCHING: If total images > 15, we need to be strategic
+    # Gemini 2.5 Pro handles up to ~20-25 images well in one request
+    MAX_IMAGES_PER_REQUEST = 20
+    
+    if total_images > MAX_IMAGES_PER_REQUEST:
+        logger.warning(f"Large document detected: {total_images} total images. Using optimized processing.")
+        
+        # Strategy: Include key model answer pages + all student pages
+        # If model answer is huge, sample key pages (first, middle, last)
+        if model_answer_images and len(model_answer_images) > 8:
+            # Sample model answer strategically
+            model_sample_indices = [0, 1, 2]  # First 3 pages
+            mid = len(model_answer_images) // 2
+            model_sample_indices.extend([mid - 1, mid, mid + 1])  # Middle 3 pages
+            model_sample_indices.extend([len(model_answer_images) - 3, len(model_answer_images) - 2, len(model_answer_images) - 1])  # Last 3 pages
+            model_sample_indices = sorted(list(set(i for i in model_sample_indices if 0 <= i < len(model_answer_images))))
+            
+            logger.info(f"Sampling {len(model_sample_indices)} model answer pages from {len(model_answer_images)}")
+            for i in model_sample_indices:
+                all_images.append(ImageContent(image_base64=model_answer_images[i]))
+        elif model_answer_images:
+            logger.info(f"Including all {len(model_answer_images)} model answer pages")
+            for img in model_answer_images:
+                all_images.append(ImageContent(image_base64=img))
+        
+        # Always include ALL student answer pages - this is critical
+        logger.info(f"Including all {len(images)} student answer pages for grading")
+        for img in images:
+            all_images.append(ImageContent(image_base64=img))
+    else:
+        # Normal case - include everything
+        if model_answer_images:
+            logger.info(f"Including {len(model_answer_images)} model answer pages for grading")
+            for img in model_answer_images:
+                all_images.append(ImageContent(image_base64=img))
+        
+        logger.info(f"Including {len(images)} student answer pages for grading")
+        for img in images:
             all_images.append(ImageContent(image_base64=img))
     
-    # Add ALL student answer images - no truncation
-    logger.info(f"Including {len(images)} student answer pages for grading")
-    for i, img in enumerate(images):
-        all_images.append(ImageContent(image_base64=img))
+    logger.info(f"Total images being sent to AI: {len(all_images)}")
     
     # Construct prompt based on whether model answer is available
     if model_answer_images:
