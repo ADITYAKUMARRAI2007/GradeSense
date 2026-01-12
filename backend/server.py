@@ -1968,18 +1968,21 @@ async def get_or_create_student(
     return (user_id, None)
 
 def pdf_to_images(pdf_bytes: bytes) -> List[str]:
-    """Convert PDF pages to base64 images"""
+    """Convert PDF pages to base64 images - NO PAGE LIMIT"""
     images = []
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     
-    for page_num in range(min(len(doc), 10)):  # Limit to 10 pages
+    # Process ALL pages - no limit
+    for page_num in range(len(doc)):
         page = doc[page_num]
-        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
+        # Use 1.5x zoom for balance between quality and token efficiency
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
         img_bytes = pix.tobytes("jpeg")
         img_base64 = base64.b64encode(img_bytes).decode()
         images.append(img_base64)
     
     doc.close()
+    logger.info(f"Converted PDF with {len(images)} pages to images")
     return images
 
 async def extract_questions_from_question_paper(
