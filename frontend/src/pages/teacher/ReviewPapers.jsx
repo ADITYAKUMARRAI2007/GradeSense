@@ -885,12 +885,10 @@ export default function ReviewPapers({ user }) {
           </Panel>
 
           {/* Resize Handle */}
-          <PanelResizeHandle className="w-3 bg-border hover:bg-orange-300 transition-colors cursor-col-resize flex items-center justify-center group">
-            <div className="w-1 h-12 bg-muted-foreground/40 group-hover:bg-orange-500 rounded-full transition-colors" />
-          </PanelResizeHandle>
+          <PanelResizeHandle className="w-2 bg-gray-200 hover:bg-orange-400 transition-colors cursor-col-resize" />
 
           {/* Right Panel - Questions Breakdown */}
-          <Panel defaultSize={45} minSize={30} maxSize={70}>
+          <Panel defaultSize={45} minSize={30} maxSize={70} collapsible={false}>
             <ScrollArea className="h-full">
               <div className="p-4 space-y-3">
                 {selectedSubmission.question_scores?.map((qs, index) => {
