@@ -2034,18 +2034,39 @@ Expected number of questions: {num_questions}
 Return ONLY the JSON, no other text."""
         
         user_message = UserMessage(text=prompt, file_contents=image_contents)
-        ai_response = await chat.send_message(user_message)
         
-        # Parse response
-        import json
-        response_text = ai_response.strip()
-        if response_text.startswith("```"):
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
+        # Retry logic for question extraction
+        import asyncio
+        max_retries = 3
+        retry_delay = 5
         
-        result = json.loads(response_text)
-        return result.get("questions", [])
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Question extraction attempt {attempt + 1}/{max_retries}")
+                ai_response = await chat.send_message(user_message)
+                
+                # Parse response
+                import json
+                response_text = ai_response.strip()
+                if response_text.startswith("```"):
+                    response_text = response_text.split("```")[1]
+                    if response_text.startswith("json"):
+                        response_text = response_text[4:]
+                
+                result = json.loads(response_text)
+                logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
+                return result.get("questions", [])
+                
+            except Exception as e:
+                error_str = str(e).lower()
+                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str):
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.info(f"Retrying question extraction in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise e
+        
+        return []
         
     except Exception as e:
         logger.error(f"Error extracting questions from question paper: {e}")
