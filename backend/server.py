@@ -2589,16 +2589,42 @@ Your measure of success: When the same paper graded by you and by an expert teac
             system_message=master_system_prompt
         ).with_model("gemini", "gemini-2.5-flash")
 
-        # Prepare images: ALL model answer images + Chunk of student images
+        # Smart model answer selection to reduce payload size
+        # For large model answers, use a sliding window approach
         chunk_all_images = []
-        if model_answer_images:
-            for img in model_answer_images:
-                chunk_all_images.append(ImageContent(image_base64=img))
+        total_model_pages = len(model_answer_images) if model_answer_images else 0
+        
+        if total_model_pages <= 8:
+            # Small model answer - use all pages
+            model_imgs_to_use = model_answer_images if model_answer_images else []
+        elif total_model_pages > 0:
+            # Large model answer - use sliding window
+            MODEL_WINDOW_SIZE = 8
+            chunk_ratio = start_page_num / max(1, len(images))
+            model_start = int(chunk_ratio * (total_model_pages - MODEL_WINDOW_SIZE))
+            model_start = max(0, min(model_start, total_model_pages - MODEL_WINDOW_SIZE))
+            model_end = min(model_start + MODEL_WINDOW_SIZE, total_model_pages)
+            
+            # Always include first 2 pages (marking scheme/overview)
+            first_pages = model_answer_images[:2] if total_model_pages > 2 else []
+            window_pages = model_answer_images[model_start:model_end]
+            
+            model_imgs_to_use = first_pages.copy()
+            for img in window_pages:
+                if img not in model_imgs_to_use:
+                    model_imgs_to_use.append(img)
+            
+            logger.info(f"Chunk {chunk_idx+1}: Using {len(model_imgs_to_use)} model answer pages (of {total_model_pages})")
+        else:
+            model_imgs_to_use = []
+        
+        for img in model_imgs_to_use:
+            chunk_all_images.append(ImageContent(image_base64=img))
         
         for img in chunk_imgs:
             chunk_all_images.append(ImageContent(image_base64=img))
             
-        model_images_included = len(model_answer_images) if model_answer_images else 0
+        model_images_included = len(model_imgs_to_use)
         
         # Build prompt
         partial_instruction = ""
