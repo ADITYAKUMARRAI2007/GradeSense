@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { API } from "../../App";
 import Layout from "../../components/Layout";
@@ -30,6 +30,15 @@ export default function TeacherDashboard({ user }) {
   const [generalFeedback, setGeneralFeedback] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const navigate = useNavigate();
+
+  const dateString = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }, []);
 
   useEffect(() => {
     fetchDashboard();
@@ -110,12 +119,7 @@ export default function TeacherDashboard({ user }) {
               Welcome back, {user?.name?.split(" ")[0]}!
             </h1>
             <p className="text-sm lg:text-base text-muted-foreground mt-1">
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+              {dateString}
             </p>
           </div>
           <Button 
