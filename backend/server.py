@@ -2718,42 +2718,48 @@ Your measure of success: When the same paper graded by you and by an expert teac
             system_message=master_system_prompt
         ).with_model("gemini", "gemini-2.5-flash")
 
-        # Smart model answer selection to reduce payload size
-        # For large model answers, use a sliding window approach
+        # Prepare student images only (model answer is now text-based when available)
         chunk_all_images = []
-        total_model_pages = len(model_answer_images) if model_answer_images else 0
         
-        if total_model_pages <= 8:
-            # Small model answer - use all pages
-            model_imgs_to_use = model_answer_images if model_answer_images else []
-        elif total_model_pages > 0:
-            # Large model answer - use sliding window
-            MODEL_WINDOW_SIZE = 8
-            chunk_ratio = start_page_num / max(1, len(images))
-            model_start = int(chunk_ratio * (total_model_pages - MODEL_WINDOW_SIZE))
-            model_start = max(0, min(model_start, total_model_pages - MODEL_WINDOW_SIZE))
-            model_end = min(model_start + MODEL_WINDOW_SIZE, total_model_pages)
-            
-            # Always include first 2 pages (marking scheme/overview)
-            first_pages = model_answer_images[:2] if total_model_pages > 2 else []
-            window_pages = model_answer_images[model_start:model_end]
-            
-            model_imgs_to_use = first_pages.copy()
-            for img in window_pages:
-                if img not in model_imgs_to_use:
-                    model_imgs_to_use.append(img)
-            
-            logger.info(f"Chunk {chunk_idx+1}: Using {len(model_imgs_to_use)} model answer pages (of {total_model_pages})")
+        # TEXT-BASED GRADING: Only send student images, model answer is in prompt text
+        if use_text_based_grading:
+            # Only add student images
+            for img in chunk_imgs:
+                chunk_all_images.append(ImageContent(image_base64=img))
+            model_images_included = 0
+            logger.info(f"Chunk {chunk_idx+1}: TEXT-BASED grading with {len(chunk_imgs)} student images")
         else:
-            model_imgs_to_use = []
-        
-        for img in model_imgs_to_use:
-            chunk_all_images.append(ImageContent(image_base64=img))
-        
-        for img in chunk_imgs:
-            chunk_all_images.append(ImageContent(image_base64=img))
+            # IMAGE-BASED GRADING (fallback): Include model answer images
+            total_model_pages = len(model_answer_images) if model_answer_images else 0
             
-        model_images_included = len(model_imgs_to_use)
+            if total_model_pages <= 8:
+                model_imgs_to_use = model_answer_images if model_answer_images else []
+            elif total_model_pages > 0:
+                MODEL_WINDOW_SIZE = 8
+                chunk_ratio = start_page_num / max(1, len(images))
+                model_start = int(chunk_ratio * (total_model_pages - MODEL_WINDOW_SIZE))
+                model_start = max(0, min(model_start, total_model_pages - MODEL_WINDOW_SIZE))
+                model_end = min(model_start + MODEL_WINDOW_SIZE, total_model_pages)
+                
+                first_pages = model_answer_images[:2] if total_model_pages > 2 else []
+                window_pages = model_answer_images[model_start:model_end]
+                
+                model_imgs_to_use = first_pages.copy()
+                for img in window_pages:
+                    if img not in model_imgs_to_use:
+                        model_imgs_to_use.append(img)
+                
+                logger.info(f"Chunk {chunk_idx+1}: Using {len(model_imgs_to_use)} model answer pages (of {total_model_pages})")
+            else:
+                model_imgs_to_use = []
+            
+            for img in model_imgs_to_use:
+                chunk_all_images.append(ImageContent(image_base64=img))
+            
+            for img in chunk_imgs:
+                chunk_all_images.append(ImageContent(image_base64=img))
+                
+            model_images_included = len(model_imgs_to_use)
         
         # Build prompt
         partial_instruction = ""
@@ -2769,7 +2775,49 @@ This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {sta
 - Do NOT guess marks for questions you cannot see.
 """
 
-        if model_answer_images:
+        # TEXT-BASED GRADING PROMPT (preferred - faster, no timeout)
+        if use_text_based_grading:
+            prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
+
+## MODEL ANSWER REFERENCE (Pre-Extracted Text)
+Below is the complete model answer content. Use this as your grading reference:
+
+--- MODEL ANSWER START ---
+{model_answer_text}
+--- MODEL ANSWER END ---
+
+## PHASE 1: STUDENT PAPER EVALUATION
+
+**Questions to Grade:**
+{questions_text}
+
+**Images Provided:** {len(chunk_imgs)} pages of STUDENT'S ANSWER PAPER (Pages {start_page_num+1}-{start_page_num+len(chunk_imgs)})
+{partial_instruction}
+
+**IMPORTANT**: Examine EVERY page of the student's answer and grade ALL questions found.
+
+## GRADING MODE: {grading_mode.upper()}
+Apply the {grading_mode} mode specifications strictly.
+
+## CRITICAL REQUIREMENTS:
+1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
+2. **MODEL ANSWER IS REFERENCE**: Compare student answers against the model answer text provided above
+3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
+4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
+5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+6. **FEEDBACK QUALITY**: Provide constructive, specific feedback that helps learning
+7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
+
+## PHASE 2: OUTPUT
+Grade each question providing:
+- Exact marks with breakdown
+- What was done well
+- What needs improvement
+- Error annotations if applicable
+
+Return valid JSON only."""
+
+        elif model_answer_images:
             prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
 
 ## PHASE 1: PRE-GRADING ANALYSIS
