@@ -3138,6 +3138,27 @@ async def upload_model_answer(
         force_extraction = True
         
     result = await auto_extract_questions(exam_id, force=force_extraction)
+    
+    # NEW: Extract model answer content as TEXT for faster grading
+    # This is done ONCE during upload and stored for use during grading
+    logger.info(f"Extracting model answer content as text for exam {exam_id}...")
+    
+    # Get questions for context
+    updated_exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    questions = updated_exam.get("questions", [])
+    
+    model_answer_text = await extract_model_answer_content(images, questions)
+    
+    if model_answer_text:
+        # Store the extracted text in exam_files collection
+        await db.exam_files.update_one(
+            {"exam_id": exam_id, "file_type": "model_answer"},
+            {"$set": {
+                "model_answer_text": model_answer_text,
+                "text_extracted_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        logger.info(f"Stored model answer text: {len(model_answer_text)} characters")
 
     message = "Model answer uploaded successfully."
     if result.get("success"):
@@ -3145,13 +3166,17 @@ async def upload_model_answer(
             message = f"✨ Model answer uploaded! Questions kept from {result.get('source').replace('_', ' ')}."
         else:
             message = f"✨ Model answer uploaded & {result.get('count')} questions auto-extracted from {result.get('source').replace('_', ' ')}!"
+    
+    if model_answer_text:
+        message += " Answer content extracted for fast grading."
 
     return {
         "message": message,
         "pages": len(images),
         "auto_extracted": result.get("success", False),
         "extracted_count": result.get("count", 0),
-        "source": result.get("source", "")
+        "source": result.get("source", ""),
+        "text_extracted": bool(model_answer_text)
     }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
