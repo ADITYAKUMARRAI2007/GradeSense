@@ -2383,9 +2383,14 @@ async def grade_with_ai(
     model_answer_images: List[str],
     questions: List[dict],
     grading_mode: str,
-    total_marks: float
+    total_marks: float,
+    model_answer_text: str = ""  # NEW: Pre-extracted model answer content
 ) -> List[QuestionScore]:
-    """Grade answer paper using Gemini 2.5 Pro with the GradeSense Master Instruction Set"""
+    """Grade answer paper using Gemini 2.5 Flash with the GradeSense Master Instruction Set.
+    
+    If model_answer_text is provided, uses text-based grading (faster, no timeout).
+    Falls back to image-based grading if text is not available.
+    """
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
@@ -2393,13 +2398,22 @@ async def grade_with_ai(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
+    # Determine grading mode: text-based (preferred) or image-based (fallback)
+    use_text_based_grading = bool(model_answer_text and len(model_answer_text) > 100)
+    
+    if use_text_based_grading:
+        logger.info(f"Using TEXT-BASED grading (model answer: {len(model_answer_text)} chars)")
+    else:
+        logger.info(f"Using IMAGE-BASED grading (model answer: {len(model_answer_images)} images)")
+    
     # Create content hash for deterministic grading (same paper = same grade)
-    content_hash = hashlib.sha256(
-        "".join(images).encode() + 
-        "".join(model_answer_images).encode() + 
-        str(questions).encode() + 
-        grading_mode.encode()
-    ).hexdigest()[:16]
+    content_to_hash = "".join(images).encode() + str(questions).encode() + grading_mode.encode()
+    if use_text_based_grading:
+        content_to_hash += model_answer_text.encode()
+    else:
+        content_to_hash += "".join(model_answer_images).encode()
+    
+    content_hash = hashlib.sha256(content_to_hash).hexdigest()[:16]
     
     # ============== GRADESENSE MASTER GRADING MODE SPECIFICATIONS ==============
     mode_instructions = {
