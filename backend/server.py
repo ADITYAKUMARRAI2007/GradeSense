@@ -2759,6 +2759,17 @@ Return valid JSON only."""
                         if score_data.get("error_annotations"):
                             existing["error_annotations"] = score_data.get("error_annotations")
 
+    # Check if all chunks failed
+    if successful_chunks == 0:
+        logger.error("All grading chunks failed - no data collected")
+        raise HTTPException(
+            status_code=500,
+            detail="AI grading failed completely. This may be due to insufficient budget or service issues. Please check your Universal Key balance in Profile → Universal Key."
+        )
+    
+    if successful_chunks < total_chunks:
+        logger.warning(f"Only {successful_chunks}/{total_chunks} chunks succeeded. Partial grading results.")
+
     # Convert final map to QuestionScore objects
     final_scores = []
     for q in questions:
