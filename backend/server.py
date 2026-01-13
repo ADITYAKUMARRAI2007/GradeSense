@@ -1815,7 +1815,7 @@ Important:
 - Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("gemini", "gemini-2.5-pro")
+        ).with_model("gemini", "gemini-2.5-flash")
         
         # Use first page only (usually has student info)
         first_page = [file_images[0]]
@@ -2021,7 +2021,7 @@ Important:
 - Maintain the original formatting and numbering
 - Extract exactly what's written, don't paraphrase
 """
-        ).with_model("gemini", "gemini-2.5-pro")
+        ).with_model("gemini", "gemini-2.5-flash")
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in question_paper_images]
@@ -2112,7 +2112,7 @@ Important:
 - Look through ALL pages carefully
 - Return questions in order (Q1, Q2, Q3, etc.)
 """
-        ).with_model("gemini", "gemini-2.5-pro")
+        ).with_model("gemini", "gemini-2.5-flash")
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images]
@@ -2587,7 +2587,7 @@ Your measure of success: When the same paper graded by you and by an expert teac
             api_key=api_key,
             session_id=f"grading_{content_hash}_{chunk_idx}",
             system_message=master_system_prompt
-        ).with_model("gemini", "gemini-2.5-pro")
+        ).with_model("gemini", "gemini-2.5-flash")
 
         # Prepare images: ALL model answer images + Chunk of student images
         chunk_all_images = []
@@ -3714,7 +3714,7 @@ Only return the JSON array, no other text."""
                 api_key=llm_key,
                 session_id=f"misconceptions_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert at analyzing student misconceptions and learning patterns."
-            ).with_model("gemini", "gemini-2.5-pro")
+            ).with_model("gemini", "gemini-2.5-flash")
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -3973,7 +3973,7 @@ Keep response concise (under 200 words). Format as JSON:
                 api_key=llm_key,
                 session_id=f"student_analysis_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert educational analyst providing personalized student guidance."
-            ).with_model("gemini", "gemini-2.5-pro")
+            ).with_model("gemini", "gemini-2.5-flash")
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -4097,7 +4097,7 @@ Only return the JSON array."""
             api_key=llm_key,
             session_id=f"review_packet_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert educator creating practice questions to help students improve."
-        ).with_model("gemini", "gemini-2.5-pro")
+        ).with_model("gemini", "gemini-2.5-flash")
         
         user_message = UserMessage(text=generation_prompt)
         ai_response = await chat.send_message(user_message)
@@ -4184,7 +4184,7 @@ Only return the JSON object."""
             api_key=llm_key,
             session_id=f"infer_topics_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert at analyzing exam questions and categorizing them by topic."
-        ).with_model("gemini", "gemini-2.5-pro")
+        ).with_model("gemini", "gemini-2.5-flash")
         
         user_message = UserMessage(text=inference_prompt)
         ai_response = await chat.send_message(user_message)
