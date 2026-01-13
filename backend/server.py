@@ -1424,8 +1424,9 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     if not submissions:
         return {"message": "No submissions to regrade", "regraded_count": 0}
     
-    # Get model answer images from separate collection
+    # Get model answer images and pre-extracted text from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
+    model_answer_txt = await get_exam_model_answer_text(exam_id)
     
     regraded_count = 0
     errors = []
@@ -1444,7 +1445,8 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100)
+                total_marks=exam.get("total_marks", 100),
+                model_answer_text=model_answer_txt  # NEW: Use pre-extracted text
             )
             
             # Calculate total score using exam's total_marks
