@@ -1457,8 +1457,27 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
             logger.info(f"Regraded submission {submission['submission_id']}: {total_score}/{exam_total_marks}")
             
         except Exception as e:
-            logger.error(f"Error regrading submission {submission['submission_id']}: {str(e)}")
-            errors.append({"submission_id": submission["submission_id"], "error": str(e)})
+            error_str = str(e)
+            logger.error(f"Error regrading submission {submission['submission_id']}: {error_str}")
+            
+            # Check for budget exceeded error
+            if "budget" in error_str.lower() and "exceeded" in error_str.lower():
+                raise HTTPException(
+                    status_code=402,  # Payment Required
+                    detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
+                )
+            
+            errors.append({"submission_id": submission["submission_id"], "error": error_str})
+    
+    # If all submissions failed with errors, return error
+    if regraded_count == 0 and errors:
+        error_messages = [e.get("error", "") for e in errors]
+        if any("budget" in msg.lower() for msg in error_messages):
+            raise HTTPException(
+                status_code=402,
+                detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
+            )
+        raise HTTPException(status_code=500, detail=f"Failed to regrade papers: {errors[0].get('error', 'Unknown error')}")
     
     return {
         "message": f"Regraded {regraded_count} submissions",
