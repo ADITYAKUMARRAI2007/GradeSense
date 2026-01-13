@@ -2636,12 +2636,21 @@ Return valid JSON only."""
                 return res.get("scores", [])
 
             except Exception as e:
-                logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
+                error_str = str(e)
+                logger.error(f"Error grading chunk {chunk_idx+1}: {error_str}")
+                
+                # Check for budget exceeded - propagate immediately
+                if "budget" in error_str.lower() and "exceeded" in error_str.lower():
+                    raise HTTPException(
+                        status_code=402,
+                        detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
+                    )
+                
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay * (2**attempt))
 
         logger.error(f"Failed to grade chunk {chunk_idx+1} after retries")
-        return []
+        return None  # Return None instead of [] to indicate failure
 
     # CHUNKED PROCESSING LOGIC
     CHUNK_SIZE = 10
