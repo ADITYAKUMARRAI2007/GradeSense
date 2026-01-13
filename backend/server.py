@@ -2676,9 +2676,20 @@ Return valid JSON only."""
 
     # Store aggregated results
     final_scores_map = {} # question_number -> QuestionScore object
+    
+    # Track chunk failures
+    successful_chunks = 0
+    total_chunks = len(chunks)
 
     for idx, (start_idx, chunk_imgs) in enumerate(chunks):
         chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
+        
+        # Check if chunk processing failed completely
+        if chunk_scores_data is None:
+            logger.warning(f"Chunk {idx+1}/{total_chunks} returned no data")
+            continue
+        
+        successful_chunks += 1
 
         # Aggregate logic
         for q in questions:
