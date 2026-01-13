@@ -2472,12 +2472,6 @@ Grade with integrity. Grade with insight. Grade with care.
 Your measure of success: When the same paper graded by you and by an expert teacher receives the same marks.
 """
 
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=f"grading_{content_hash}",
-        system_message=master_system_prompt
-    ).with_model("gemini", "gemini-2.5-pro")
-    
     # Prepare question details with sub-questions
     questions_text = ""
     for q in questions:
@@ -2493,59 +2487,42 @@ Your measure of success: When the same paper graded by you and by an expert teac
                     q_text += f", Rubric: {sq['rubric']}"
         
         questions_text += q_text + "\n"
-    
-    # Create image contents list - with intelligent batching for large documents
-    all_images = []
-    total_images = len(images) + (len(model_answer_images) if model_answer_images else 0)
-    
-    # SMART BATCHING: If total images > 15, we need to be strategic
-    # Gemini 2.5 Pro handles up to ~20-25 images well in one request
-    MAX_IMAGES_PER_REQUEST = 20
-    
-    if total_images > MAX_IMAGES_PER_REQUEST:
-        logger.warning(f"Large document detected: {total_images} total images. Using optimized processing.")
-        
-        # Strategy: Include key model answer pages + all student pages
-        # If model answer is huge, sample key pages (first, middle, last)
-        if model_answer_images and len(model_answer_images) > 8:
-            # Sample model answer strategically
-            model_sample_indices = [0, 1, 2]  # First 3 pages
-            mid = len(model_answer_images) // 2
-            model_sample_indices.extend([mid - 1, mid, mid + 1])  # Middle 3 pages
-            model_sample_indices.extend([len(model_answer_images) - 3, len(model_answer_images) - 2, len(model_answer_images) - 1])  # Last 3 pages
-            model_sample_indices = sorted(list(set(i for i in model_sample_indices if 0 <= i < len(model_answer_images))))
-            
-            logger.info(f"Sampling {len(model_sample_indices)} model answer pages from {len(model_answer_images)}")
-            for i in model_sample_indices:
-                all_images.append(ImageContent(image_base64=model_answer_images[i]))
-        elif model_answer_images:
-            logger.info(f"Including all {len(model_answer_images)} model answer pages")
-            for img in model_answer_images:
-                all_images.append(ImageContent(image_base64=img))
-        
-        # Always include ALL student answer pages - this is critical
-        logger.info(f"Including all {len(images)} student answer pages for grading")
-        for img in images:
-            all_images.append(ImageContent(image_base64=img))
-    else:
-        # Normal case - include everything
+
+    # Define helper for grading a chunk of images
+    async def process_chunk(chunk_imgs, chunk_idx, total_chunks, start_page_num):
+        chunk_chat = LlmChat(
+            api_key=api_key,
+            session_id=f"grading_{content_hash}_{chunk_idx}",
+            system_message=master_system_prompt
+        ).with_model("gemini", "gemini-2.5-pro")
+
+        # Prepare images: ALL model answer images + Chunk of student images
+        chunk_all_images = []
         if model_answer_images:
-            logger.info(f"Including {len(model_answer_images)} model answer pages for grading")
             for img in model_answer_images:
-                all_images.append(ImageContent(image_base64=img))
+                chunk_all_images.append(ImageContent(image_base64=img))
         
-        logger.info(f"Including {len(images)} student answer pages for grading")
-        for img in images:
-            all_images.append(ImageContent(image_base64=img))
-    
-    logger.info(f"Total images being sent to AI: {len(all_images)}")
-    
-    # Calculate how many model answer images were actually included
-    model_images_included = len(all_images) - len(images) if model_answer_images else 0
-    
-    # Construct prompt based on whether model answer is available
-    if model_answer_images:
-        prompt_text = f"""# GRADING TASK
+        for img in chunk_imgs:
+            chunk_all_images.append(ImageContent(image_base64=img))
+            
+        model_images_included = len(model_answer_images) if model_answer_images else 0
+        
+        # Build prompt
+        partial_instruction = ""
+        if total_chunks > 1:
+            partial_instruction = f"""
+**PARTIAL SUBMISSION NOTICE**:
+This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {start_page_num+1} to {start_page_num+len(chunk_imgs)}).
+
+**INSTRUCTIONS FOR PARTIAL GRADING**:
+- Grade ONLY the questions visible in this part.
+- If a question (or sub-question) is completely missing from these pages, return -1.0 for 'obtained_marks' to indicate 'Not Seen'.
+- If a question is present but incorrect/blank, return 0.0 or appropriate marks.
+- Do NOT guess marks for questions you cannot see.
+"""
+
+        if model_answer_images:
+            prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
 
 ## PHASE 1: PRE-GRADING ANALYSIS
 First, analyze the MODEL ANSWER thoroughly:
@@ -2561,9 +2538,10 @@ First, analyze the MODEL ANSWER thoroughly:
 
 **Image Layout:**
 - First {model_images_included} image(s): MODEL ANSWER (your holy grail reference)
-- Next {len(images)} images: STUDENT'S ANSWER PAPER (evaluate ALL pages carefully)
+- Next {len(chunk_imgs)} images: STUDENT'S ANSWER PAPER (evaluate ALL pages carefully)
+{partial_instruction}
 
-**IMPORTANT**: The student paper has {len(images)} pages. You MUST examine EVERY page and grade ALL questions found. Do not skip any page.
+**IMPORTANT**: The student paper part has {len(chunk_imgs)} pages. You MUST examine EVERY page and grade ALL questions found. Do not skip any page.
 
 ## GRADING MODE: {grading_mode.upper()}
 Apply the {grading_mode} mode specifications strictly.
@@ -2585,8 +2563,8 @@ Grade each question providing:
 - Error annotations if applicable
 
 Return valid JSON only."""
-    else:
-        prompt_text = f"""# GRADING TASK (WITHOUT MODEL ANSWER)
+        else:
+            prompt_text = f"""# GRADING TASK (WITHOUT MODEL ANSWER) {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
 
 ## IMPORTANT: No Model Answer Provided
 You must grade based on:
@@ -2598,7 +2576,8 @@ You must grade based on:
 **Questions to Grade:**
 {questions_text}
 
-**Images:** STUDENT'S ANSWER PAPER
+**Images:** STUDENT'S ANSWER PAPER (Pages {start_page_num+1}-{start_page_num+len(chunk_imgs)})
+{partial_instruction}
 
 ## GRADING MODE: {grading_mode.upper()}
 Apply the {grading_mode} mode specifications strictly.
@@ -2613,110 +2592,192 @@ Apply the {grading_mode} mode specifications strictly.
 7. **CONSTRUCTIVE FEEDBACK**: Help the student understand and improve
 
 Return valid JSON only."""
+
+        user_msg = UserMessage(text=prompt_text, file_contents=chunk_all_images)
+
+        # Retry logic
+        import asyncio
+        max_retries = 3
+        retry_delay = 5
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
+                ai_resp = await chunk_chat.send_message(user_msg)
+
+                # Parse
+                import json
+                resp_text = ai_resp.strip()
+                if resp_text.startswith("```"):
+                    resp_text = resp_text.split("```")[1]
+                    if resp_text.startswith("json"):
+                        resp_text = resp_text[4:]
+
+                res = json.loads(resp_text)
+                return res.get("scores", [])
+
+            except Exception as e:
+                logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (2**attempt))
+
+        logger.error(f"Failed to grade chunk {chunk_idx+1} after retries")
+        return []
+
+    # CHUNKED PROCESSING LOGIC
+    CHUNK_SIZE = 10
+    OVERLAP = 2
+    total_student_pages = len(images)
     
-    user_message = UserMessage(
-        text=prompt_text,
-        file_contents=all_images
-    )
+    if total_student_pages > 20:
+        logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
     
-    # Retry logic with exponential backoff for large documents
-    import asyncio
-    max_retries = 3
-    retry_delay = 5  # seconds
+    # Create chunks
+    chunks = []
+    if total_student_pages <= 12: # Use simple processing for small docs (limit raised slightly)
+        chunks.append((0, images))
+    else:
+        for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
+            chunk = images[i : i + CHUNK_SIZE]
+            if not chunk: break
+            chunks.append((i, chunk))
+            if i + CHUNK_SIZE >= total_student_pages:
+                break
     
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"AI grading attempt {attempt + 1}/{max_retries} with {len(all_images)} images")
-            ai_response = await chat.send_message(user_message)
+    logger.info(f"Processing student paper in {len(chunks)} chunk(s)")
+
+    # Store aggregated results
+    final_scores_map = {} # question_number -> QuestionScore object
+
+    for idx, (start_idx, chunk_imgs) in enumerate(chunks):
+        chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
+
+        # Aggregate logic
+        for q in questions:
+            q_num = q["question_number"]
             
-            # Parse the response
-            import json
-            response_text = ai_response.strip()
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
+            # Find score in this chunk
+            score_data = next((s for s in chunk_scores_data if s["question_number"] == q_num), None)
             
-            result = json.loads(response_text)
-            scores = []
+            # Create default if not found in chunk (treat as -1/Not Seen)
+            if not score_data:
+                score_data = {"question_number": q_num, "obtained_marks": -1.0, "ai_feedback": "Not seen in this chunk", "sub_scores": []}
             
-            for q in questions:
-                q_num = q["question_number"]
-                score_data = next(
-                    (s for s in result.get("scores", []) if s["question_number"] == q_num),
-                    None
-                )
+            # If not in final map, add it
+            if q_num not in final_scores_map:
+                # Convert dict to object for easier handling, but be careful with sub_scores
+                # We'll use a temporary dict structure for aggregation and convert to Pydantic at the end
+                final_scores_map[q_num] = {
+                    "question_number": q_num,
+                    "max_marks": q["max_marks"],
+                    "obtained_marks": score_data.get("obtained_marks", -1.0),
+                    "ai_feedback": score_data.get("ai_feedback", ""),
+                    "error_annotations": score_data.get("error_annotations", []),
+                    "sub_scores": score_data.get("sub_scores", []),
+                    "question_text": q.get("question_text") or q.get("rubric")
+                }
+            else:
+                existing = final_scores_map[q_num]
+                new_obtained = score_data.get("obtained_marks", -1.0)
                 
-                if score_data:
-                    # Handle sub-scores
-                    sub_scores = []
-                    if q.get("sub_questions") and score_data.get("sub_scores"):
-                        for sq in q["sub_questions"]:
-                            sq_data = next(
-                                (ss for ss in score_data.get("sub_scores", []) if ss.get("sub_id") == sq["sub_id"]),
-                                None
-                            )
-                            if sq_data:
-                                sub_scores.append(SubQuestionScore(
-                                    sub_id=sq["sub_id"],
-                                    max_marks=sq["max_marks"],
-                                    obtained_marks=min(sq_data.get("obtained_marks", 0), sq["max_marks"]),
-                                    ai_feedback=sq_data.get("ai_feedback", "")
-                                ))
-                            else:
-                                sub_scores.append(SubQuestionScore(
-                                    sub_id=sq["sub_id"],
-                                    max_marks=sq["max_marks"],
-                                    obtained_marks=sq["max_marks"] * 0.5,
-                                    ai_feedback="Could not grade this sub-question"
-                                ))
+                # Merge sub-scores
+                if q.get("sub_questions"):
+                    existing_subs = existing.get("sub_scores", [])
+                    new_subs = score_data.get("sub_scores", [])
+
+                    merged_subs = []
+                    # Create map of existing subs
+                    existing_sub_map = {s["sub_id"]: s for s in existing_subs}
+
+                    # Merge new subs
+                    for ns in new_subs:
+                        s_id = ns["sub_id"]
+                        if s_id in existing_sub_map:
+                            es = existing_sub_map[s_id]
+                            # Take max marks (treating -1 as lowest)
+                            es_marks = es.get("obtained_marks", -1.0)
+                            ns_marks = ns.get("obtained_marks", -1.0)
+
+                            if ns_marks > es_marks:
+                                es["obtained_marks"] = ns_marks
+                                es["ai_feedback"] = ns.get("ai_feedback", es.get("ai_feedback"))
+                        else:
+                            existing_sub_map[s_id] = ns
+
+                    existing["sub_scores"] = list(existing_sub_map.values())
+
+                    # Recalculate total obtained marks from sub-scores
+                    # Sum only positive marks (ignore -1s)
+                    total_sub = sum(max(0.0, s.get("obtained_marks", 0.0)) for s in existing["sub_scores"])
+                    existing["obtained_marks"] = total_sub
                     
-                    scores.append(QuestionScore(
-                        question_number=q_num,
-                        max_marks=q["max_marks"],
-                        obtained_marks=min(score_data["obtained_marks"], q["max_marks"]),
-                        ai_feedback=score_data["ai_feedback"],
-                        sub_scores=[s.model_dump() for s in sub_scores],
-                        error_annotations=score_data.get("error_annotations", []),
-                        question_text=q.get("question_text") or q.get("rubric")
-                    ))
                 else:
-                    scores.append(QuestionScore(
-                        question_number=q_num,
-                        max_marks=q["max_marks"],
-                        obtained_marks=q["max_marks"] * 0.5,
-                        ai_feedback="Could not grade this question"
-                ))
+                    # No sub-questions: take max score
+                    if new_obtained > existing["obtained_marks"]:
+                        existing["obtained_marks"] = new_obtained
+                        existing["ai_feedback"] = score_data.get("ai_feedback", existing["ai_feedback"])
+                        # Keep annotations from the better chunk
+                        if score_data.get("error_annotations"):
+                            existing["error_annotations"] = score_data.get("error_annotations")
+
+    # Convert final map to QuestionScore objects
+    final_scores = []
+    for q in questions:
+        q_num = q["question_number"]
+        if q_num in final_scores_map:
+            data = final_scores_map[q_num]
             
-            logger.info(f"AI grading successful on attempt {attempt + 1}")
-            return scores
+            # Clean up -1.0 marks to 0.0
+            if data["obtained_marks"] < 0:
+                data["obtained_marks"] = 0.0
+                data["ai_feedback"] += " (Question not found in any page)"
+
+            # Clean up sub-scores
+            final_sub_scores = []
+            if q.get("sub_questions"):
+                # Ensure all sub-questions are present
+                current_subs = data.get("sub_scores", [])
+                current_sub_map = {s["sub_id"]: s for s in current_subs}
+
+                for sq in q["sub_questions"]:
+                    sq_data = current_sub_map.get(sq["sub_id"])
+                    if sq_data:
+                        marks = sq_data.get("obtained_marks", -1.0)
+                        if marks < 0: marks = 0.0
+
+                        final_sub_scores.append(SubQuestionScore(
+                            sub_id=sq["sub_id"],
+                            max_marks=sq["max_marks"],
+                            obtained_marks=min(marks, sq["max_marks"]), # Cap at max
+                            ai_feedback=sq_data.get("ai_feedback", "")
+                        ))
+                    else:
+                        final_sub_scores.append(SubQuestionScore(
+                            sub_id=sq["sub_id"],
+                            max_marks=sq["max_marks"],
+                            obtained_marks=0.0,
+                            ai_feedback="Not attempted/found"
+                        ))
             
-        except Exception as e:
-            logger.error(f"AI grading error on attempt {attempt + 1}: {e}")
-            
-            if attempt < max_retries - 1:
-                # Check if it's a retryable error (502, 503, timeout)
-                error_str = str(e).lower()
-                if "502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str:
-                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    # Non-retryable error, break and return default
-                    break
-            
-    # All retries failed - return default scores
-    logger.error(f"AI grading failed after {max_retries} attempts")
-    return [
-        QuestionScore(
-            question_number=q["question_number"],
-            max_marks=q["max_marks"],
-            obtained_marks=q["max_marks"] * 0.5,
-            ai_feedback=f"Auto-graded: Please review manually. AI service temporarily unavailable after {max_retries} attempts."
-        )
-        for q in questions
-    ]
+            final_scores.append(QuestionScore(
+                question_number=q_num,
+                max_marks=q["max_marks"],
+                obtained_marks=min(data["obtained_marks"], q["max_marks"]), # Cap at max
+                ai_feedback=data["ai_feedback"],
+                sub_scores=[s.model_dump() for s in final_sub_scores],
+                error_annotations=data.get("error_annotations", []),
+                question_text=q.get("question_text") or q.get("rubric")
+            ))
+        else:
+            # Should not happen if loop covers all questions
+             final_scores.append(QuestionScore(
+                question_number=q_num,
+                max_marks=q["max_marks"],
+                obtained_marks=0.0,
+                ai_feedback="Error: Question not processed"
+            ))
+
+    return final_scores
 
 @api_router.post("/exams/{exam_id}/upload-model-answer")
 async def upload_model_answer(
