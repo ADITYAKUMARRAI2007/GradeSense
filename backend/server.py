@@ -2523,14 +2523,42 @@ Your measure of success: When the same paper graded by you and by an expert teac
             system_message=master_system_prompt
         ).with_model("gemini", "gemini-2.5-pro")
 
-        # Prepare images: Limited model answer images + Chunk of student images
-        # To prevent payload from being too large, limit model answer pages
-        MAX_MODEL_ANSWER_PAGES = 8  # Limit model answer pages to prevent timeouts
+        # Smart model answer selection strategy:
+        # - For small model answers (<=15 pages): use all
+        # - For large model answers: use proportional sliding window based on student chunk position
         chunk_all_images = []
         
-        model_imgs_to_use = model_answer_images[:MAX_MODEL_ANSWER_PAGES] if model_answer_images else []
-        if model_answer_images and len(model_answer_images) > MAX_MODEL_ANSWER_PAGES:
-            logger.warning(f"Model answer has {len(model_answer_images)} pages, using first {MAX_MODEL_ANSWER_PAGES} to prevent timeout")
+        total_model_pages = len(model_answer_images) if model_answer_images else 0
+        
+        if total_model_pages <= 15:
+            # Small model answer - use all pages
+            model_imgs_to_use = model_answer_images
+        elif total_model_pages > 0:
+            # Large model answer - use sliding window approach
+            # Calculate which portion of model answer corresponds to this chunk
+            chunk_ratio = start_page_num / max(1, len(images))  # Where we are in student paper
+            
+            # Select proportional section of model answer (with some overlap)
+            MODEL_WINDOW_SIZE = 12  # Pages of model answer per chunk
+            WINDOW_OVERLAP = 3
+            
+            model_start = int(chunk_ratio * (total_model_pages - MODEL_WINDOW_SIZE))
+            model_start = max(0, min(model_start, total_model_pages - MODEL_WINDOW_SIZE))
+            model_end = min(model_start + MODEL_WINDOW_SIZE, total_model_pages)
+            
+            # Always include first few pages (often contain marking scheme/overview)
+            first_pages = model_answer_images[:3] if total_model_pages > 3 else []
+            window_pages = model_answer_images[model_start:model_end]
+            
+            # Combine, avoiding duplicates
+            model_imgs_to_use = first_pages.copy()
+            for img in window_pages:
+                if img not in model_imgs_to_use:
+                    model_imgs_to_use.append(img)
+            
+            logger.info(f"Chunk {chunk_idx+1}: Using model answer pages 1-3 + {model_start+1}-{model_end} (of {total_model_pages} total)")
+        else:
+            model_imgs_to_use = []
         
         for img in model_imgs_to_use:
             chunk_all_images.append(ImageContent(image_base64=img))
