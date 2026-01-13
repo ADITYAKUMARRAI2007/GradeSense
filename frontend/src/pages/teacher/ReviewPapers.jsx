@@ -552,16 +552,19 @@ export default function ReviewPapers({ user }) {
 
                 {/* Sub-Questions Section for Mobile */}
                 {hasSubQuestions ? (
-                  <div className="space-y-2 mt-2">
+                  <div className="space-y-3 mt-3">
                     {qs.sub_scores.map((subScore, subIndex) => {
                       const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
+                      const subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
+                      
                       return (
                         <div 
                           key={subScore.sub_id}
-                          className="ml-2 p-2 bg-orange-50/50 rounded border border-orange-200"
+                          className="ml-2 p-2 bg-gradient-to-r from-orange-50 to-amber-50/30 rounded border border-orange-200"
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-xs text-orange-800">
+                          {/* Sub-question Header with Score */}
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-xs text-orange-700">
                               Part {subScore.sub_id}
                             </span>
                             <div className="flex items-center gap-1">
@@ -575,8 +578,19 @@ export default function ReviewPapers({ user }) {
                               <span className="text-muted-foreground text-xs">/ {subScore.max_marks}</span>
                             </div>
                           </div>
+                          
+                          {/* Sub-question Text */}
+                          {subQuestionText && (
+                            <div className="mb-2 p-1.5 bg-white/80 rounded border-l-2 border-orange-400">
+                              <p className="text-xs text-gray-700">
+                                <strong className="text-orange-600">{subScore.sub_id})</strong> {subQuestionText}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Sub-question AI Feedback */}
                           <div>
-                            <Label className="text-xs text-muted-foreground">AI Feedback</Label>
+                            <Label className="text-xs text-muted-foreground">Feedback</Label>
                             <Textarea 
                               value={subScore.ai_feedback || ""}
                               onChange={(e) => updateSubQuestionScore(index, subIndex, "ai_feedback", e.target.value)}
@@ -588,18 +602,17 @@ export default function ReviewPapers({ user }) {
                       );
                     })}
                     
-                    {/* Overall feedback if present */}
-                    {qs.ai_feedback && (
-                      <div className="mt-2">
-                        <Label className="text-xs text-muted-foreground">Overall AI Feedback</Label>
-                        <Textarea 
-                          value={qs.ai_feedback}
-                          onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                          className="mt-1 text-xs"
-                          rows={2}
-                        />
-                      </div>
-                    )}
+                    {/* Overall feedback AFTER all sub-questions */}
+                    <div className="ml-2 mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                      <Label className="text-xs font-medium text-blue-700">Overall Feedback for Q{qs.question_number}</Label>
+                      <Textarea 
+                        value={qs.ai_feedback || ""}
+                        onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                        className="mt-1 text-xs"
+                        rows={2}
+                        placeholder="Overall feedback..."
+                      />
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
