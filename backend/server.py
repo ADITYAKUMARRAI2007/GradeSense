@@ -1397,7 +1397,7 @@ async def reopen_exam(exam_id: str, user: User = Depends(get_current_user)):
 
 @api_router.post("/exams/{exam_id}/regrade-all")
 async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current_user)):
-    """Regrade all submissions for an exam with current settings - PARALLEL PROCESSING"""
+    """Regrade all submissions for an exam with current settings"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can regrade exams")
     
@@ -1415,107 +1415,50 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     # Get model answer images from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
     
-    # Semaphore to limit concurrent regrading (3 at a time)
-    MAX_CONCURRENT_REGRADE = 3
-    regrade_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REGRADE)
-    
-    async def regrade_single_submission(submission: dict) -> tuple:
-        """Regrade a single submission with semaphore control"""
-        async with regrade_semaphore:
-            try:
-                # Get the student's answer images
-                answer_images = submission.get("answer_images") or submission.get("file_images")
-                if not answer_images:
-                    logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
-                    return None, None  # Skip, no error
-                
-                logger.info(f"Starting parallel regrade for submission: {submission['submission_id']}")
-                
-                # Re-grade using the current exam settings
-                scores = await grade_with_ai(
-                    images=answer_images,
-                    model_answer_images=model_answer_imgs,
-                    questions=exam.get("questions", []),
-                    grading_mode=exam.get("grading_mode", "balanced"),
-                    total_marks=exam.get("total_marks", 100)
-                )
-                
-                # Calculate total score using exam's total_marks
-                total_score = sum(s.obtained_marks for s in scores)
-                exam_total_marks = exam.get("total_marks", 100)
-                percentage = round((total_score / exam_total_marks) * 100, 2) if exam_total_marks > 0 else 0
-                
-                # Update submission with new scores
-                await db.submissions.update_one(
-                    {"submission_id": submission["submission_id"]},
-                    {"$set": {
-                        "question_scores": [s.model_dump() for s in scores],
-                        "total_score": total_score,
-                        "percentage": percentage,
-                        "graded_at": datetime.now(timezone.utc).isoformat(),
-                        "regraded_at": datetime.now(timezone.utc).isoformat(),
-                        "grading_mode_used": exam.get("grading_mode", "balanced")
-                    }}
-                )
-                
-                logger.info(f"Regraded submission {submission['submission_id']}: {total_score}/{exam_total_marks}")
-                return submission["submission_id"], None
-                
-            except Exception as e:
-                error_str = str(e)
-                logger.error(f"Error regrading submission {submission['submission_id']}: {error_str}")
-                
-                # Check for budget exceeded error - propagate immediately
-                if "budget" in error_str.lower() and "exceeded" in error_str.lower():
-                    raise  # Re-raise to be caught by gather
-                
-                return None, {"submission_id": submission["submission_id"], "error": error_str}
-    
-    # Process all submissions in parallel
-    logger.info(f"Starting parallel regrade of {len(submissions)} submissions (max {MAX_CONCURRENT_REGRADE} concurrent)")
-    
-    tasks = [regrade_single_submission(sub) for sub in submissions]
-    
-    try:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as e:
-        error_str = str(e)
-        if "budget" in error_str.lower() and "exceeded" in error_str.lower():
-            raise HTTPException(
-                status_code=402,
-                detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
-            )
-        raise
-    
-    # Collect results
     regraded_count = 0
     errors = []
     
-    for result in results:
-        if isinstance(result, Exception):
-            error_str = str(result)
-            if "budget" in error_str.lower() and "exceeded" in error_str.lower():
-                raise HTTPException(
-                    status_code=402,
-                    detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
-                )
-            errors.append({"error": error_str})
-        elif result:
-            success_id, error = result
-            if success_id:
-                regraded_count += 1
-            if error:
-                errors.append(error)
-    
-    # If all submissions failed with errors, return error
-    if regraded_count == 0 and errors:
-        error_messages = [e.get("error", "") for e in errors]
-        if any("budget" in msg.lower() for msg in error_messages):
-            raise HTTPException(
-                status_code=402,
-                detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
+    for submission in submissions:
+        try:
+            # Get the student's answer images
+            answer_images = submission.get("answer_images") or submission.get("file_images")
+            if not answer_images:
+                logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
+                continue
+            
+            # Re-grade using the current exam settings
+            scores = await grade_with_ai(
+                images=answer_images,
+                model_answer_images=model_answer_imgs,
+                questions=exam.get("questions", []),
+                grading_mode=exam.get("grading_mode", "balanced"),
+                total_marks=exam.get("total_marks", 100)
             )
-        raise HTTPException(status_code=500, detail=f"Failed to regrade papers: {errors[0].get('error', 'Unknown error')}")
+            
+            # Calculate total score using exam's total_marks
+            total_score = sum(s.obtained_marks for s in scores)
+            exam_total_marks = exam.get("total_marks", 100)
+            percentage = round((total_score / exam_total_marks) * 100, 2) if exam_total_marks > 0 else 0
+            
+            # Update submission with new scores
+            await db.submissions.update_one(
+                {"submission_id": submission["submission_id"]},
+                {"$set": {
+                    "question_scores": [s.model_dump() for s in scores],
+                    "total_score": total_score,
+                    "percentage": percentage,
+                    "graded_at": datetime.now(timezone.utc).isoformat(),
+                    "regraded_at": datetime.now(timezone.utc).isoformat(),
+                    "grading_mode_used": exam.get("grading_mode", "balanced")
+                }}
+            )
+            
+            regraded_count += 1
+            logger.info(f"Regraded submission {submission['submission_id']}: {total_score}/{exam_total_marks}")
+            
+        except Exception as e:
+            logger.error(f"Error regrading submission {submission['submission_id']}: {str(e)}")
+            errors.append({"submission_id": submission["submission_id"], "error": str(e)})
     
     return {
         "message": f"Regraded {regraded_count} submissions",
@@ -2025,24 +1968,16 @@ async def get_or_create_student(
     return (user_id, None)
 
 def pdf_to_images(pdf_bytes: bytes) -> List[str]:
-    """Convert PDF pages to base64 images - NO PAGE LIMIT, optimized for API calls"""
+    """Convert PDF pages to base64 images - NO PAGE LIMIT"""
     images = []
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     
     # Process ALL pages - no limit
     for page_num in range(len(doc)):
         page = doc[page_num]
-        # Use 1.2x zoom (reduced from 1.5x) for smaller payloads while maintaining readability
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.2, 1.2))
-        
-        # Convert to PIL Image for better JPEG compression
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        
-        # Compress with quality=75 (good balance of quality vs size)
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=75, optimize=True)
-        img_bytes = buffer.getvalue()
-        
+        # Use 1.5x zoom for balance between quality and token efficiency
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+        img_bytes = pix.tobytes("jpeg")
         img_base64 = base64.b64encode(img_bytes).decode()
         images.append(img_base64)
     
@@ -2234,6 +2169,99 @@ Return ONLY the JSON with ALL {num_questions} questions, no other text."""
     except Exception as e:
         logger.error(f"Error extracting questions: {e}")
         return []
+
+async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str, Any]:
+    """
+    Auto-extract questions from question paper (priority) or model answer.
+
+    Priority:
+    1. Question Paper (if exists)
+    2. Model Answer (if exists)
+
+    If 'force' is True, re-extraction is performed even if already extracted from the target source.
+    """
+    try:
+        # Get exam
+        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+        if not exam:
+            logger.error(f"Auto-extraction failed: Exam {exam_id} not found")
+            return {"success": False, "message": "Exam not found"}
+
+        # Check available sources
+        qp_imgs = await get_exam_question_paper_images(exam_id)
+        ma_imgs = await get_exam_model_answer_images(exam_id)
+
+        target_source = None
+        images_to_use = []
+        extraction_func = None
+
+        if qp_imgs:
+            target_source = "question_paper"
+            images_to_use = qp_imgs
+            extraction_func = extract_questions_from_question_paper
+        elif ma_imgs:
+            target_source = "model_answer"
+            images_to_use = ma_imgs
+            extraction_func = extract_questions_from_model_answer
+        else:
+            return {"success": False, "message": "No documents available for extraction"}
+
+        # Check if already extracted
+        current_source = exam.get("extraction_source")
+        questions_exist = any(q.get("rubric") for q in exam.get("questions", []))
+
+        if not force and questions_exist and current_source == target_source:
+            logger.info(f"Skipping extraction for {exam_id}: Already extracted from {current_source}")
+            return {
+                "success": True,
+                "message": f"Questions already extracted from {target_source.replace('_', ' ')}",
+                "count": len([q for q in exam.get("questions", []) if q.get("rubric")]),
+                "source": target_source,
+                "skipped": True
+            }
+
+        logger.info(f"Auto-extracting questions for {exam_id} from {target_source} (Force={force})")
+
+        # Perform extraction
+        extracted_questions = await extraction_func(
+            images_to_use,
+            len(exam.get("questions", []))
+        )
+
+        if not extracted_questions:
+            logger.warning(f"Extraction returned no questions for {exam_id} from {target_source}")
+            return {"success": False, "message": f"Failed to extract questions from {target_source.replace('_', ' ')}"}
+
+        # Update questions in database
+        questions = exam.get("questions", [])
+        updated_count = 0
+
+        for i, q in enumerate(questions):
+            if i < len(extracted_questions):
+                q["rubric"] = extracted_questions[i]
+                q["question_text"] = extracted_questions[i]
+                updated_count += 1
+
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {
+                "questions": questions,
+                "extraction_source": target_source
+            }}
+        )
+
+        logger.info(f"Successfully extracted {updated_count} questions from {target_source}")
+        return {
+            "success": True,
+            "message": f"Successfully extracted {updated_count} questions from {target_source.replace('_', ' ')}",
+            "count": updated_count,
+            "source": target_source,
+            "skipped": False
+        }
+
+    except Exception as e:
+        logger.error(f"Auto-extraction error for {exam_id}: {e}")
+        return {"success": False, "message": f"Error during extraction: {str(e)}"}
 
 async def grade_with_ai(
     images: List[str],
@@ -2561,50 +2589,16 @@ Your measure of success: When the same paper graded by you and by an expert teac
             system_message=master_system_prompt
         ).with_model("gemini", "gemini-2.5-pro")
 
-        # Smart model answer selection strategy:
-        # - For small model answers (<=15 pages): use all
-        # - For large model answers: use proportional sliding window based on student chunk position
+        # Prepare images: ALL model answer images + Chunk of student images
         chunk_all_images = []
-        
-        total_model_pages = len(model_answer_images) if model_answer_images else 0
-        
-        if total_model_pages <= 15:
-            # Small model answer - use all pages
-            model_imgs_to_use = model_answer_images
-        elif total_model_pages > 0:
-            # Large model answer - use sliding window approach
-            # Calculate which portion of model answer corresponds to this chunk
-            chunk_ratio = start_page_num / max(1, len(images))  # Where we are in student paper
-            
-            # Select proportional section of model answer (with some overlap)
-            MODEL_WINDOW_SIZE = 12  # Pages of model answer per chunk
-            WINDOW_OVERLAP = 3
-            
-            model_start = int(chunk_ratio * (total_model_pages - MODEL_WINDOW_SIZE))
-            model_start = max(0, min(model_start, total_model_pages - MODEL_WINDOW_SIZE))
-            model_end = min(model_start + MODEL_WINDOW_SIZE, total_model_pages)
-            
-            # Always include first few pages (often contain marking scheme/overview)
-            first_pages = model_answer_images[:3] if total_model_pages > 3 else []
-            window_pages = model_answer_images[model_start:model_end]
-            
-            # Combine, avoiding duplicates
-            model_imgs_to_use = first_pages.copy()
-            for img in window_pages:
-                if img not in model_imgs_to_use:
-                    model_imgs_to_use.append(img)
-            
-            logger.info(f"Chunk {chunk_idx+1}: Using model answer pages 1-3 + {model_start+1}-{model_end} (of {total_model_pages} total)")
-        else:
-            model_imgs_to_use = []
-        
-        for img in model_imgs_to_use:
-            chunk_all_images.append(ImageContent(image_base64=img))
+        if model_answer_images:
+            for img in model_answer_images:
+                chunk_all_images.append(ImageContent(image_base64=img))
         
         for img in chunk_imgs:
             chunk_all_images.append(ImageContent(image_base64=img))
             
-        model_images_included = len(model_imgs_to_use)
+        model_images_included = len(model_answer_images) if model_answer_images else 0
         
         # Build prompt
         partial_instruction = ""
@@ -2716,34 +2710,24 @@ Return valid JSON only."""
                 return res.get("scores", [])
 
             except Exception as e:
-                error_str = str(e)
-                logger.error(f"Error grading chunk {chunk_idx+1}: {error_str}")
-                
-                # Check for budget exceeded - propagate immediately
-                if "budget" in error_str.lower() and "exceeded" in error_str.lower():
-                    raise HTTPException(
-                        status_code=402,
-                        detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
-                    )
-                
+                logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay * (2**attempt))
 
         logger.error(f"Failed to grade chunk {chunk_idx+1} after retries")
-        return None  # Return None instead of [] to indicate failure
+        return []
 
-    # CHUNKED PROCESSING LOGIC - Balanced for large documents
-    # With 76% image compression, we can handle larger chunks
-    CHUNK_SIZE = 8  # Pages per chunk (balanced for ~2MB payloads)
-    OVERLAP = 2     # Overlap to catch questions spanning pages
+    # CHUNKED PROCESSING LOGIC
+    CHUNK_SIZE = 10
+    OVERLAP = 2
     total_student_pages = len(images)
     
-    if total_student_pages > 15:
+    if total_student_pages > 20:
         logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
     
     # Create chunks
     chunks = []
-    if total_student_pages <= 10:  # Process as single chunk if 10 or fewer pages
+    if total_student_pages <= 12: # Use simple processing for small docs (limit raised slightly)
         chunks.append((0, images))
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
@@ -2757,20 +2741,9 @@ Return valid JSON only."""
 
     # Store aggregated results
     final_scores_map = {} # question_number -> QuestionScore object
-    
-    # Track chunk failures
-    successful_chunks = 0
-    total_chunks = len(chunks)
 
     for idx, (start_idx, chunk_imgs) in enumerate(chunks):
         chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
-        
-        # Check if chunk processing failed completely
-        if chunk_scores_data is None:
-            logger.warning(f"Chunk {idx+1}/{total_chunks} returned no data")
-            continue
-        
-        successful_chunks += 1
 
         # Aggregate logic
         for q in questions:
@@ -2839,17 +2812,6 @@ Return valid JSON only."""
                         # Keep annotations from the better chunk
                         if score_data.get("error_annotations"):
                             existing["error_annotations"] = score_data.get("error_annotations")
-
-    # Check if all chunks failed
-    if successful_chunks == 0:
-        logger.error("All grading chunks failed - no data collected")
-        raise HTTPException(
-            status_code=500,
-            detail="AI grading failed completely. This may be due to insufficient budget or service issues. Please check your Universal Key balance in Profile → Universal Key."
-        )
-    
-    if successful_chunks < total_chunks:
-        logger.warning(f"Only {successful_chunks}/{total_chunks} chunks succeeded. Partial grading results.")
 
     # Convert final map to QuestionScore objects
     final_scores = []
@@ -2961,72 +2923,33 @@ async def upload_model_answer(
         }}
     )
     
-    # AUTO-EXTRACT questions (same logic as manual extract button)
-    logger.info(f"Auto-extracting questions from model answer for exam {exam_id}")
+    # Check if question paper exists
+    qp_imgs = await get_exam_question_paper_images(exam_id)
     
-    # Refresh exam data after upload
-    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    # Logic:
+    # 1. If Question Paper exists -> Skip extraction (already done, unless we force, but user said skip)
+    # 2. If NO Question Paper -> Force extraction from Model Answer
     
-    extracted_questions = []
-    source = ""
-    
-    # Get question paper images from separate collection if exists
-    qp_file = await db.exam_files.find_one({"exam_id": exam_id, "file_type": "question_paper"}, {"_id": 0})
-    
-    # Prioritize question paper over model answer (same as manual extract)
-    if qp_file and qp_file.get("images"):
-        source = "question paper"
-        logger.info(f"Extracting from question paper (priority)")
-        try:
-            extracted_questions = await extract_questions_from_question_paper(
-                qp_file["images"],
-                len(exam.get("questions", []))
-            )
-        except Exception as e:
-            logger.error(f"Error extracting from question paper: {e}")
-    elif images:
-        source = "model answer"
-        logger.info(f"Extracting from model answer")
-        try:
-            extracted_questions = await extract_questions_from_model_answer(
-                images,
-                len(exam.get("questions", []))
-            )
-        except Exception as e:
-            logger.error(f"Error extracting from model answer: {e}")
-    
-    # Update exam questions if extraction succeeded
-    if extracted_questions and len(extracted_questions) > 0:
-        questions = exam.get("questions", [])
-        updated_count = 0
+    force_extraction = False
+    if not qp_imgs:
+        force_extraction = True
         
-        for i, q in enumerate(questions):
-            if i < len(extracted_questions):
-                q["rubric"] = extracted_questions[i]
-                q["question_text"] = extracted_questions[i]
-                updated_count += 1
-        
-        # Save updated questions to database
-        await db.exams.update_one(
-            {"exam_id": exam_id},
-            {"$set": {"questions": questions}}
-        )
-        
-        logger.info(f"Auto-extracted {updated_count} questions from {source}")
-        return {
-            "message": f"✨ Model answer uploaded & {updated_count} questions auto-extracted from {source}!",
-            "pages": len(images),
-            "auto_extracted": True,
-            "extracted_count": updated_count,
-            "source": source
-        }
-    else:
-        logger.warning(f"Could not auto-extract questions for exam {exam_id}")
-        return {
-            "message": "Model answer uploaded successfully. Use 'Extract Questions' button in Manage Exams if needed.",
-            "pages": len(images),
-            "auto_extracted": False
-        }
+    result = await auto_extract_questions(exam_id, force=force_extraction)
+
+    message = "Model answer uploaded successfully."
+    if result.get("success"):
+        if result.get("skipped"):
+            message = f"✨ Model answer uploaded! Questions kept from {result.get('source').replace('_', ' ')}."
+        else:
+            message = f"✨ Model answer uploaded & {result.get('count')} questions auto-extracted from {result.get('source').replace('_', ' ')}!"
+
+    return {
+        "message": message,
+        "pages": len(images),
+        "auto_extracted": result.get("success", False),
+        "extracted_count": result.get("count", 0),
+        "source": result.get("source", "")
+    }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
 async def upload_question_paper(
@@ -3079,52 +3002,23 @@ async def upload_question_paper(
         }}
     )
     
-    # AUTO-EXTRACT questions from question paper
+    # AUTO-EXTRACT questions from question paper (Priority: Always extract when uploading QP)
     logger.info(f"Auto-extracting questions from question paper for exam {exam_id}")
-    try:
-        extracted_questions = await extract_questions_from_question_paper(
-            images,
-            len(exam.get("questions", []))
-        )
+
+    result = await auto_extract_questions(exam_id, force=True)
+
+    message = "Question paper uploaded successfully."
+    if result.get("success"):
+        message = f"✨ Question paper uploaded & {result.get('count')} questions auto-extracted!"
+    else:
+        message = "Question paper uploaded, but auto-extraction failed."
         
-        if extracted_questions:
-            # Update question rubrics with extracted text
-            questions = exam.get("questions", [])
-            updated_count = 0
-            
-            for i, q in enumerate(questions):
-                if i < len(extracted_questions):
-                    q["rubric"] = extracted_questions[i]
-                    q["question_text"] = extracted_questions[i]
-                    updated_count += 1
-            
-            # Save updated questions
-            await db.exams.update_one(
-                {"exam_id": exam_id},
-                {"$set": {"questions": questions}}
-            )
-            
-            logger.info(f"Auto-extracted {updated_count} questions from question paper")
-            return {
-                "message": f"✨ Question paper uploaded & {updated_count} questions auto-extracted!",
-                "pages": len(images),
-                "auto_extracted": True,
-                "extracted_count": updated_count
-            }
-        else:
-            logger.warning(f"Could not auto-extract questions from question paper for exam {exam_id}")
-            return {
-                "message": "Question paper uploaded, but questions could not be auto-extracted.",
-                "pages": len(images),
-                "auto_extracted": False
-            }
-    except Exception as e:
-        logger.error(f"Error during auto-extraction: {e}")
-        return {
-            "message": "Question paper uploaded, but auto-extraction failed.",
-            "pages": len(images),
-            "auto_extracted": False
-        }
+    return {
+        "message": message,
+        "pages": len(images),
+        "auto_extracted": result.get("success", False),
+        "extracted_count": result.get("count", 0)
+    }
 
 @api_router.post("/exams/{exam_id}/upload-papers")
 async def upload_student_papers(
@@ -3132,7 +3026,7 @@ async def upload_student_papers(
     files: List[UploadFile] = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload and grade student papers with auto-student creation - PARALLEL PROCESSING"""
+    """Upload and grade student papers with auto-student creation"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload papers")
     
@@ -3148,146 +3042,110 @@ async def upload_student_papers(
         {"$set": {"status": "processing"}}
     )
     
-    # Pre-read all files first (required because file objects can't be read in parallel tasks)
-    file_data_list = []
-    for file in files:
-        pdf_bytes = await file.read()
-        file_data_list.append({
-            "filename": file.filename,
-            "pdf_bytes": pdf_bytes
-        })
-    
-    # Semaphore to limit concurrent grading (3 students at a time to avoid API rate limits)
-    MAX_CONCURRENT_GRADING = 3
-    grading_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GRADING)
-    
-    async def process_single_paper(file_data: dict, exam: dict, teacher_id: str):
-        """Process a single student paper with semaphore control"""
-        async with grading_semaphore:
-            filename = file_data["filename"]
-            pdf_bytes = file_data["pdf_bytes"]
-            
-            try:
-                # Process the PDF first to get images
-                images = pdf_to_images(pdf_bytes)
-                
-                if not images:
-                    return None, {
-                        "filename": filename,
-                        "error": "Failed to extract images from PDF"
-                    }
-                
-                # Extract student ID and name from the paper using AI
-                student_id, student_name = await extract_student_info_from_paper(images, filename)
-                
-                # Fallback to filename if AI extraction fails
-                if not student_id or not student_name:
-                    filename_id, filename_name = parse_student_from_filename(filename)
-                    
-                    if not student_id and filename_id:
-                        student_id = filename_id
-                    
-                    if not student_name and filename_name:
-                        student_name = filename_name
-                    
-                    if not student_id and not student_name:
-                        return None, {
-                            "filename": filename,
-                            "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
-                        }
-                    
-                    if not student_id:
-                        student_id = f"AUTO_{uuid.uuid4().hex[:6]}"
-                    if not student_name:
-                        student_name = f"Student {student_id}"
-                
-                # Get or create student
-                user_id, error = await get_or_create_student(
-                    student_id=student_id,
-                    student_name=student_name,
-                    batch_id=exam["batch_id"],
-                    teacher_id=teacher_id
-                )
-                
-                if error:
-                    return None, {
-                        "filename": filename,
-                        "student_id": student_id,
-                        "error": error
-                    }
-                
-                logger.info(f"Starting parallel grading for student: {student_name}")
-                
-                # Grade with AI using the grading mode from exam
-                scores = await grade_with_ai(
-                    images=images,
-                    model_answer_images=exam.get("model_answer_images", []),
-                    questions=exam.get("questions", []),
-                    grading_mode=exam.get("grading_mode", "balanced"),
-                    total_marks=exam.get("total_marks", 100)
-                )
-                
-                total_score = sum(s.obtained_marks for s in scores)
-                percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
-                
-                submission_id = f"sub_{uuid.uuid4().hex[:8]}"
-                submission = {
-                    "submission_id": submission_id,
-                    "exam_id": exam["exam_id"],
-                    "student_id": user_id,
-                    "student_name": student_name,
-                    "file_data": base64.b64encode(pdf_bytes).decode(),
-                    "file_images": images,
-                    "total_score": total_score,
-                    "percentage": round(percentage, 2),
-                    "question_scores": [s.model_dump() for s in scores],
-                    "status": "ai_graded",
-                    "graded_at": datetime.now(timezone.utc).isoformat(),
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-                
-                await db.submissions.insert_one(submission)
-                
-                logger.info(f"Completed grading for student: {student_name} - Score: {total_score}/{exam['total_marks']}")
-                
-                return {
-                    "submission_id": submission_id,
-                    "student_id": student_id,
-                    "student_name": student_name,
-                    "total_score": total_score,
-                    "percentage": percentage
-                }, None
-                
-            except Exception as e:
-                logger.error(f"Error processing {filename}: {e}")
-                return None, {
-                    "filename": filename,
-                    "error": str(e)
-                }
-    
-    # Process all papers in parallel (with semaphore limiting concurrency)
-    logger.info(f"Starting parallel grading of {len(file_data_list)} papers (max {MAX_CONCURRENT_GRADING} concurrent)")
-    
-    tasks = [
-        process_single_paper(file_data, exam, user.user_id)
-        for file_data in file_data_list
-    ]
-    
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Collect results
     submissions = []
     errors = []
     
-    for result in results:
-        if isinstance(result, Exception):
-            errors.append({"error": str(result)})
-        elif result:
-            submission, error = result
-            if submission:
-                submissions.append(submission)
+    for file in files:
+        try:
+            # Process the PDF first to get images
+            pdf_bytes = await file.read()
+            images = pdf_to_images(pdf_bytes)
+            
+            if not images:
+                errors.append({
+                    "filename": file.filename,
+                    "error": "Failed to extract images from PDF"
+                })
+                continue
+            
+            # Extract student ID and name from the paper using AI
+            student_id, student_name = await extract_student_info_from_paper(images, file.filename)
+            
+            # Fallback to filename if AI extraction fails
+            if not student_id or not student_name:
+                filename_id, filename_name = parse_student_from_filename(file.filename)
+                
+                # Use filename ID if AI didn't find it
+                if not student_id and filename_id:
+                    student_id = filename_id
+                
+                # Use filename name if AI didn't find it
+                if not student_name and filename_name:
+                    student_name = filename_name
+                
+                # If still no ID or name, report error
+                if not student_id and not student_name:
+                    errors.append({
+                        "filename": file.filename,
+                        "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
+                    })
+                    continue
+                
+                # If we have one but not the other, use what we have
+                if not student_id:
+                    student_id = f"AUTO_{uuid.uuid4().hex[:6]}"
+                if not student_name:
+                    student_name = f"Student {student_id}"
+            
+            # Get or create student
+            user_id, error = await get_or_create_student(
+                student_id=student_id,
+                student_name=student_name,
+                batch_id=exam["batch_id"],
+                teacher_id=user.user_id
+            )
+            
             if error:
-                errors.append(error)
+                errors.append({
+                    "filename": file.filename,
+                    "student_id": student_id,
+                    "error": error
+                })
+                continue
+            
+            # Grade with AI using the grading mode from exam
+            scores = await grade_with_ai(
+                images=images,
+                model_answer_images=exam.get("model_answer_images", []),
+                questions=exam.get("questions", []),
+                grading_mode=exam.get("grading_mode", "balanced"),
+                total_marks=exam.get("total_marks", 100)
+            )
+            
+            total_score = sum(s.obtained_marks for s in scores)
+            percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
+            
+            submission_id = f"sub_{uuid.uuid4().hex[:8]}"
+            submission = {
+                "submission_id": submission_id,
+                "exam_id": exam_id,
+                "student_id": user_id,
+                "student_name": student_name,
+                "file_data": base64.b64encode(pdf_bytes).decode(),
+                "file_images": images,
+                "total_score": total_score,
+                "percentage": round(percentage, 2),
+                "question_scores": [s.model_dump() for s in scores],
+                "status": "ai_graded",
+                "graded_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.submissions.insert_one(submission)
+            submissions.append({
+                "submission_id": submission_id,
+                "student_id": student_id,
+                "student_name": student_name,
+                "total_score": total_score,
+                "percentage": percentage
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing {file.filename}: {e}")
+            errors.append({
+                "filename": file.filename,
+                "error": str(e)
+            })
     
     # Update exam status
     await db.exams.update_one(
