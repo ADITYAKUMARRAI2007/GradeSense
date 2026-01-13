@@ -2652,17 +2652,17 @@ Return valid JSON only."""
         logger.error(f"Failed to grade chunk {chunk_idx+1} after retries")
         return None  # Return None instead of [] to indicate failure
 
-    # CHUNKED PROCESSING LOGIC
-    CHUNK_SIZE = 10
-    OVERLAP = 2
+    # CHUNKED PROCESSING LOGIC - Reduced chunk size to prevent 502 timeouts
+    CHUNK_SIZE = 5  # Reduced from 10 to prevent API timeouts
+    OVERLAP = 1     # Reduced overlap
     total_student_pages = len(images)
     
-    if total_student_pages > 20:
+    if total_student_pages > 10:
         logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
     
     # Create chunks
     chunks = []
-    if total_student_pages <= 12: # Use simple processing for small docs (limit raised slightly)
+    if total_student_pages <= 5:  # Only process as single chunk if 5 or fewer pages
         chunks.append((0, images))
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
