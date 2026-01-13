@@ -3094,7 +3094,7 @@ async def upload_student_papers(
     files: List[UploadFile] = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload and grade student papers with auto-student creation"""
+    """Upload and grade student papers with auto-student creation - PARALLEL PROCESSING"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload papers")
     
@@ -3110,14 +3110,146 @@ async def upload_student_papers(
         {"$set": {"status": "processing"}}
     )
     
+    # Pre-read all files first (required because file objects can't be read in parallel tasks)
+    file_data_list = []
+    for file in files:
+        pdf_bytes = await file.read()
+        file_data_list.append({
+            "filename": file.filename,
+            "pdf_bytes": pdf_bytes
+        })
+    
+    # Semaphore to limit concurrent grading (3 students at a time to avoid API rate limits)
+    MAX_CONCURRENT_GRADING = 3
+    grading_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GRADING)
+    
+    async def process_single_paper(file_data: dict, exam: dict, teacher_id: str):
+        """Process a single student paper with semaphore control"""
+        async with grading_semaphore:
+            filename = file_data["filename"]
+            pdf_bytes = file_data["pdf_bytes"]
+            
+            try:
+                # Process the PDF first to get images
+                images = pdf_to_images(pdf_bytes)
+                
+                if not images:
+                    return None, {
+                        "filename": filename,
+                        "error": "Failed to extract images from PDF"
+                    }
+                
+                # Extract student ID and name from the paper using AI
+                student_id, student_name = await extract_student_info_from_paper(images, filename)
+                
+                # Fallback to filename if AI extraction fails
+                if not student_id or not student_name:
+                    filename_id, filename_name = parse_student_from_filename(filename)
+                    
+                    if not student_id and filename_id:
+                        student_id = filename_id
+                    
+                    if not student_name and filename_name:
+                        student_name = filename_name
+                    
+                    if not student_id and not student_name:
+                        return None, {
+                            "filename": filename,
+                            "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
+                        }
+                    
+                    if not student_id:
+                        student_id = f"AUTO_{uuid.uuid4().hex[:6]}"
+                    if not student_name:
+                        student_name = f"Student {student_id}"
+                
+                # Get or create student
+                user_id, error = await get_or_create_student(
+                    student_id=student_id,
+                    student_name=student_name,
+                    batch_id=exam["batch_id"],
+                    teacher_id=teacher_id
+                )
+                
+                if error:
+                    return None, {
+                        "filename": filename,
+                        "student_id": student_id,
+                        "error": error
+                    }
+                
+                logger.info(f"Starting parallel grading for student: {student_name}")
+                
+                # Grade with AI using the grading mode from exam
+                scores = await grade_with_ai(
+                    images=images,
+                    model_answer_images=exam.get("model_answer_images", []),
+                    questions=exam.get("questions", []),
+                    grading_mode=exam.get("grading_mode", "balanced"),
+                    total_marks=exam.get("total_marks", 100)
+                )
+                
+                total_score = sum(s.obtained_marks for s in scores)
+                percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
+                
+                submission_id = f"sub_{uuid.uuid4().hex[:8]}"
+                submission = {
+                    "submission_id": submission_id,
+                    "exam_id": exam["exam_id"],
+                    "student_id": user_id,
+                    "student_name": student_name,
+                    "file_data": base64.b64encode(pdf_bytes).decode(),
+                    "file_images": images,
+                    "total_score": total_score,
+                    "percentage": round(percentage, 2),
+                    "question_scores": [s.model_dump() for s in scores],
+                    "status": "ai_graded",
+                    "graded_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                
+                await db.submissions.insert_one(submission)
+                
+                logger.info(f"Completed grading for student: {student_name} - Score: {total_score}/{exam['total_marks']}")
+                
+                return {
+                    "submission_id": submission_id,
+                    "student_id": student_id,
+                    "student_name": student_name,
+                    "total_score": total_score,
+                    "percentage": percentage
+                }, None
+                
+            except Exception as e:
+                logger.error(f"Error processing {filename}: {e}")
+                return None, {
+                    "filename": filename,
+                    "error": str(e)
+                }
+    
+    # Process all papers in parallel (with semaphore limiting concurrency)
+    logger.info(f"Starting parallel grading of {len(file_data_list)} papers (max {MAX_CONCURRENT_GRADING} concurrent)")
+    
+    tasks = [
+        process_single_paper(file_data, exam, user.user_id)
+        for file_data in file_data_list
+    ]
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Collect results
     submissions = []
     errors = []
     
-    for file in files:
-        try:
-            # Process the PDF first to get images
-            pdf_bytes = await file.read()
-            images = pdf_to_images(pdf_bytes)
+    for result in results:
+        if isinstance(result, Exception):
+            errors.append({"error": str(result)})
+        elif result:
+            submission, error = result
+            if submission:
+                submissions.append(submission)
+            if error:
+                errors.append(error)
             
             if not images:
                 errors.append({
