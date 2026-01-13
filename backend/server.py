@@ -2523,16 +2523,22 @@ Your measure of success: When the same paper graded by you and by an expert teac
             system_message=master_system_prompt
         ).with_model("gemini", "gemini-2.5-pro")
 
-        # Prepare images: ALL model answer images + Chunk of student images
+        # Prepare images: Limited model answer images + Chunk of student images
+        # To prevent payload from being too large, limit model answer pages
+        MAX_MODEL_ANSWER_PAGES = 8  # Limit model answer pages to prevent timeouts
         chunk_all_images = []
-        if model_answer_images:
-            for img in model_answer_images:
-                chunk_all_images.append(ImageContent(image_base64=img))
+        
+        model_imgs_to_use = model_answer_images[:MAX_MODEL_ANSWER_PAGES] if model_answer_images else []
+        if model_answer_images and len(model_answer_images) > MAX_MODEL_ANSWER_PAGES:
+            logger.warning(f"Model answer has {len(model_answer_images)} pages, using first {MAX_MODEL_ANSWER_PAGES} to prevent timeout")
+        
+        for img in model_imgs_to_use:
+            chunk_all_images.append(ImageContent(image_base64=img))
         
         for img in chunk_imgs:
             chunk_all_images.append(ImageContent(image_base64=img))
             
-        model_images_included = len(model_answer_images) if model_answer_images else 0
+        model_images_included = len(model_imgs_to_use)
         
         # Build prompt
         partial_instruction = ""
