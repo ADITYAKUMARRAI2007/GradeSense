@@ -1397,7 +1397,7 @@ async def reopen_exam(exam_id: str, user: User = Depends(get_current_user)):
 
 @api_router.post("/exams/{exam_id}/regrade-all")
 async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current_user)):
-    """Regrade all submissions for an exam with current settings"""
+    """Regrade all submissions for an exam with current settings - PARALLEL PROCESSING"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can regrade exams")
     
@@ -1415,59 +1415,97 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     # Get model answer images from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
     
+    # Semaphore to limit concurrent regrading (3 at a time)
+    MAX_CONCURRENT_REGRADE = 3
+    regrade_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REGRADE)
+    
+    async def regrade_single_submission(submission: dict) -> tuple:
+        """Regrade a single submission with semaphore control"""
+        async with regrade_semaphore:
+            try:
+                # Get the student's answer images
+                answer_images = submission.get("answer_images") or submission.get("file_images")
+                if not answer_images:
+                    logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
+                    return None, None  # Skip, no error
+                
+                logger.info(f"Starting parallel regrade for submission: {submission['submission_id']}")
+                
+                # Re-grade using the current exam settings
+                scores = await grade_with_ai(
+                    images=answer_images,
+                    model_answer_images=model_answer_imgs,
+                    questions=exam.get("questions", []),
+                    grading_mode=exam.get("grading_mode", "balanced"),
+                    total_marks=exam.get("total_marks", 100)
+                )
+                
+                # Calculate total score using exam's total_marks
+                total_score = sum(s.obtained_marks for s in scores)
+                exam_total_marks = exam.get("total_marks", 100)
+                percentage = round((total_score / exam_total_marks) * 100, 2) if exam_total_marks > 0 else 0
+                
+                # Update submission with new scores
+                await db.submissions.update_one(
+                    {"submission_id": submission["submission_id"]},
+                    {"$set": {
+                        "question_scores": [s.model_dump() for s in scores],
+                        "total_score": total_score,
+                        "percentage": percentage,
+                        "graded_at": datetime.now(timezone.utc).isoformat(),
+                        "regraded_at": datetime.now(timezone.utc).isoformat(),
+                        "grading_mode_used": exam.get("grading_mode", "balanced")
+                    }}
+                )
+                
+                logger.info(f"Regraded submission {submission['submission_id']}: {total_score}/{exam_total_marks}")
+                return submission["submission_id"], None
+                
+            except Exception as e:
+                error_str = str(e)
+                logger.error(f"Error regrading submission {submission['submission_id']}: {error_str}")
+                
+                # Check for budget exceeded error - propagate immediately
+                if "budget" in error_str.lower() and "exceeded" in error_str.lower():
+                    raise  # Re-raise to be caught by gather
+                
+                return None, {"submission_id": submission["submission_id"], "error": error_str}
+    
+    # Process all submissions in parallel
+    logger.info(f"Starting parallel regrade of {len(submissions)} submissions (max {MAX_CONCURRENT_REGRADE} concurrent)")
+    
+    tasks = [regrade_single_submission(sub) for sub in submissions]
+    
+    try:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        error_str = str(e)
+        if "budget" in error_str.lower() and "exceeded" in error_str.lower():
+            raise HTTPException(
+                status_code=402,
+                detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
+            )
+        raise
+    
+    # Collect results
     regraded_count = 0
     errors = []
     
-    for submission in submissions:
-        try:
-            # Get the student's answer images
-            answer_images = submission.get("answer_images") or submission.get("file_images")
-            if not answer_images:
-                logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
-                continue
-            
-            # Re-grade using the current exam settings
-            scores = await grade_with_ai(
-                images=answer_images,
-                model_answer_images=model_answer_imgs,
-                questions=exam.get("questions", []),
-                grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100)
-            )
-            
-            # Calculate total score using exam's total_marks
-            total_score = sum(s.obtained_marks for s in scores)
-            exam_total_marks = exam.get("total_marks", 100)
-            percentage = round((total_score / exam_total_marks) * 100, 2) if exam_total_marks > 0 else 0
-            
-            # Update submission with new scores
-            await db.submissions.update_one(
-                {"submission_id": submission["submission_id"]},
-                {"$set": {
-                    "question_scores": [s.model_dump() for s in scores],
-                    "total_score": total_score,
-                    "percentage": percentage,
-                    "graded_at": datetime.now(timezone.utc).isoformat(),
-                    "regraded_at": datetime.now(timezone.utc).isoformat(),
-                    "grading_mode_used": exam.get("grading_mode", "balanced")
-                }}
-            )
-            
-            regraded_count += 1
-            logger.info(f"Regraded submission {submission['submission_id']}: {total_score}/{exam_total_marks}")
-            
-        except Exception as e:
-            error_str = str(e)
-            logger.error(f"Error regrading submission {submission['submission_id']}: {error_str}")
-            
-            # Check for budget exceeded error
+    for result in results:
+        if isinstance(result, Exception):
+            error_str = str(result)
             if "budget" in error_str.lower() and "exceeded" in error_str.lower():
                 raise HTTPException(
-                    status_code=402,  # Payment Required
+                    status_code=402,
                     detail="AI grading budget has been exceeded. Please add more balance to your Universal Key in Profile → Universal Key → Add Balance"
                 )
-            
-            errors.append({"submission_id": submission["submission_id"], "error": error_str})
+            errors.append({"error": error_str})
+        elif result:
+            success_id, error = result
+            if success_id:
+                regraded_count += 1
+            if error:
+                errors.append(error)
     
     # If all submissions failed with errors, return error
     if regraded_count == 0 and errors:
