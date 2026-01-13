@@ -961,63 +961,74 @@ export default function ReviewPapers({ user }) {
 
                     {/* Sub-Questions Section */}
                     {hasSubQuestions ? (
-                      <div className="space-y-3 mt-3">
+                      <div className="space-y-4 mt-3">
                         {qs.sub_scores.map((subScore, subIndex) => {
                           const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
+                          const subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
+                          
                           return (
                             <div 
                               key={subScore.sub_id}
-                              className="ml-4 p-3 bg-orange-50/50 rounded-lg border border-orange-200"
+                              className="ml-4 p-3 bg-gradient-to-r from-orange-50 to-amber-50/30 rounded-lg border border-orange-200 shadow-sm"
                             >
-                              {/* Sub-question Header */}
+                              {/* Sub-question Header with Score */}
                               <div className="flex items-center justify-between mb-2">
-                                <span className="font-medium text-sm text-orange-800">
+                                <span className="font-semibold text-sm text-orange-700">
                                   Part {subScore.sub_id}
-                                  {examSubQuestion?.rubric && (
-                                    <span className="text-xs text-muted-foreground ml-2">
-                                      - {examSubQuestion.rubric.slice(0, 50)}...
-                                    </span>
-                                  )}
                                 </span>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1 bg-white px-2 py-1 rounded border">
                                   <Input 
                                     type="number"
                                     value={subScore.obtained_marks}
                                     onChange={(e) => updateSubQuestionScore(index, subIndex, "obtained_marks", parseFloat(e.target.value) || 0)}
-                                    className="w-14 text-center text-xs"
+                                    className="w-14 text-center text-sm font-medium border-0 p-0 h-6"
                                     step="0.5"
                                   />
-                                  <span className="text-muted-foreground text-xs">/ {subScore.max_marks}</span>
+                                  <span className="text-muted-foreground text-sm">/ {subScore.max_marks}</span>
                                 </div>
                               </div>
                               
+                              {/* Sub-question Text */}
+                              {subQuestionText && (
+                                <div className="mb-3 p-2 bg-white/80 rounded border-l-3 border-orange-400">
+                                  <p className="text-xs text-gray-700 whitespace-pre-wrap">
+                                    <strong className="text-orange-600">{subScore.sub_id})</strong> {subQuestionText}
+                                  </p>
+                                </div>
+                              )}
+                              
                               {/* Sub-question AI Feedback */}
-                              <div>
-                                <Label className="text-xs text-muted-foreground">AI Feedback for Part {subScore.sub_id}</Label>
+                              <div className="bg-white/50 rounded p-2">
+                                <Label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                  <Sparkles className="w-3 h-3 text-orange-500" />
+                                  Feedback for Part {subScore.sub_id}
+                                </Label>
                                 <Textarea 
                                   value={subScore.ai_feedback || ""}
                                   onChange={(e) => updateSubQuestionScore(index, subIndex, "ai_feedback", e.target.value)}
-                                  className="mt-1 text-xs"
+                                  className="mt-1 text-xs bg-white"
                                   rows={2}
-                                  placeholder={`Feedback for part ${subScore.sub_id}...`}
+                                  placeholder={`AI feedback for part ${subScore.sub_id}...`}
                                 />
                               </div>
                             </div>
                           );
                         })}
                         
-                        {/* Overall AI Feedback for the question (if any) */}
-                        {qs.ai_feedback && (
-                          <div className="mt-2">
-                            <Label className="text-xs lg:text-sm text-muted-foreground">Overall AI Feedback</Label>
-                            <Textarea 
-                              value={qs.ai_feedback}
-                              onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                              className="mt-1 text-xs lg:text-sm"
-                              rows={2}
-                            />
-                          </div>
-                        )}
+                        {/* Overall AI Feedback for the question - AFTER all sub-questions */}
+                        <div className="ml-4 mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50/30 rounded-lg border border-blue-200">
+                          <Label className="text-sm font-medium text-blue-700 flex items-center gap-1 mb-2">
+                            <Brain className="w-4 h-4" />
+                            Overall Feedback for Question {qs.question_number}
+                          </Label>
+                          <Textarea 
+                            value={qs.ai_feedback || ""}
+                            onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                            className="text-sm bg-white"
+                            rows={3}
+                            placeholder={`Overall feedback for question ${qs.question_number}...`}
+                          />
+                        </div>
                       </div>
                     ) : (
                       /* No sub-questions - show regular feedback */
