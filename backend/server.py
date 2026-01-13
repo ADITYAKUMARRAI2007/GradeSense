@@ -1987,16 +1987,24 @@ async def get_or_create_student(
     return (user_id, None)
 
 def pdf_to_images(pdf_bytes: bytes) -> List[str]:
-    """Convert PDF pages to base64 images - NO PAGE LIMIT"""
+    """Convert PDF pages to base64 images - NO PAGE LIMIT, optimized for API calls"""
     images = []
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     
     # Process ALL pages - no limit
     for page_num in range(len(doc)):
         page = doc[page_num]
-        # Use 1.5x zoom for balance between quality and token efficiency
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
-        img_bytes = pix.tobytes("jpeg")
+        # Use 1.2x zoom (reduced from 1.5x) for smaller payloads while maintaining readability
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.2, 1.2))
+        
+        # Convert to PIL Image for better JPEG compression
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        
+        # Compress with quality=75 (good balance of quality vs size)
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=75, optimize=True)
+        img_bytes = buffer.getvalue()
+        
         img_base64 = base64.b64encode(img_bytes).decode()
         images.append(img_base64)
     
