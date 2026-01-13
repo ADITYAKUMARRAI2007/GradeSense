@@ -3276,7 +3276,9 @@ async def upload_student_papers(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Model answer is now optional
+    # Get model answer images and pre-extracted text for grading
+    model_answer_imgs = await get_exam_model_answer_images(exam_id)
+    model_answer_txt = await get_exam_model_answer_text(exam_id)
     
     # Update exam status
     await db.exams.update_one(
