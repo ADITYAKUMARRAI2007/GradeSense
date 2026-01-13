@@ -2743,17 +2743,17 @@ Return valid JSON only."""
         logger.error(f"Failed to grade chunk {chunk_idx+1} after retries")
         return []
 
-    # CHUNKED PROCESSING LOGIC
-    CHUNK_SIZE = 10
-    OVERLAP = 2
+    # CHUNKED PROCESSING LOGIC - Optimized for faster processing
+    CHUNK_SIZE = 5  # Reduced to prevent 502 timeouts
+    OVERLAP = 1
     total_student_pages = len(images)
     
-    if total_student_pages > 20:
+    if total_student_pages > 10:
         logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
     
     # Create chunks
     chunks = []
-    if total_student_pages <= 12: # Use simple processing for small docs (limit raised slightly)
+    if total_student_pages <= 6:  # Process as single chunk if 6 or fewer pages
         chunks.append((0, images))
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
