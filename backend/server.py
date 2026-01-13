@@ -225,6 +225,16 @@ async def get_exam_model_answer_images(exam_id: str) -> List[str]:
     
     return []
 
+async def get_exam_model_answer_text(exam_id: str) -> str:
+    """Get pre-extracted model answer text content for faster grading"""
+    file_doc = await db.exam_files.find_one(
+        {"exam_id": exam_id, "file_type": "model_answer"},
+        {"_id": 0, "model_answer_text": 1}
+    )
+    if file_doc and file_doc.get("model_answer_text"):
+        return file_doc["model_answer_text"]
+    return ""
+
 async def get_exam_question_paper_images(exam_id: str) -> List[str]:
     """Get question paper images from separate collection or fallback to exam document"""
     # First try the new separate collection
