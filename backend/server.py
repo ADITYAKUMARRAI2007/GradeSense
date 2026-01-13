@@ -2263,6 +2263,121 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         logger.error(f"Auto-extraction error for {exam_id}: {e}")
         return {"success": False, "message": f"Error during extraction: {str(e)}"}
 
+async def extract_model_answer_content(
+    model_answer_images: List[str],
+    questions: List[dict]
+) -> str:
+    """
+    Extract detailed answer content from model answer images as structured text.
+    This is done ONCE during upload and stored for use during grading.
+    Returns a comprehensive text representation of all model answers.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    
+    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not api_key:
+        logger.error("No API key for model answer content extraction")
+        return ""
+    
+    if not model_answer_images:
+        return ""
+    
+    try:
+        # Build questions context
+        questions_context = ""
+        for q in questions:
+            q_num = q.get("question_number", "?")
+            q_marks = q.get("total_marks", 0)
+            questions_context += f"- Question {q_num} ({q_marks} marks)\n"
+            for sq in q.get("sub_questions", []):
+                sq_id = sq.get("sub_id", "?")
+                sq_marks = sq.get("marks", 0)
+                questions_context += f"  - Part {sq_id} ({sq_marks} marks)\n"
+        
+        # Process in chunks to handle large model answers
+        CHUNK_SIZE = 10  # Pages per extraction chunk
+        all_extracted_content = []
+        
+        for chunk_start in range(0, len(model_answer_images), CHUNK_SIZE):
+            chunk_end = min(chunk_start + CHUNK_SIZE, len(model_answer_images))
+            chunk_images = model_answer_images[chunk_start:chunk_end]
+            
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=f"extract_content_{uuid.uuid4().hex[:8]}",
+                system_message="""You are an expert at extracting and structuring model answer content from exam papers.
+
+Your task is to extract ALL answer content from the provided model answer images and structure it clearly.
+
+For each question/sub-question found:
+1. Identify the question number
+2. Extract the COMPLETE model answer text
+3. Note any marking points, keywords, or criteria mentioned
+4. Include diagrams descriptions if present
+
+Output Format:
+---
+QUESTION [number]:
+[Complete model answer text]
+
+KEY POINTS:
+- [Key point 1]
+- [Key point 2]
+...
+
+MARKING CRITERIA (if visible):
+- [Criteria 1]
+- [Criteria 2]
+---
+
+Be thorough - extract EVERY detail that could be useful for grading student answers."""
+            ).with_model("gemini", "gemini-2.5-flash")
+            
+            image_contents = [ImageContent(image_base64=img) for img in chunk_images]
+            
+            prompt = f"""Extract ALL model answer content from these pages (pages {chunk_start + 1} to {chunk_end}).
+
+Questions in this exam:
+{questions_context}
+
+INSTRUCTIONS:
+1. Extract the COMPLETE answer text for each question found on these pages
+2. Include all steps, formulas, explanations, diagrams descriptions
+3. Note any marking scheme points or keywords
+4. Preserve mathematical notation and special formatting as text
+5. If an answer continues from/to other pages, extract what's visible
+
+Return the structured content for ALL questions visible on these pages."""
+
+            user_message = UserMessage(
+                text=prompt,
+                file_contents=image_contents
+            )
+            
+            # Retry logic
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Extracting model answer content: pages {chunk_start + 1}-{chunk_end} (attempt {attempt + 1})")
+                    response = await chat.send_message_async(user_message)
+                    if response and response.text:
+                        all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response.text}")
+                        break
+                except Exception as e:
+                    logger.error(f"Error extracting content chunk {chunk_start}-{chunk_end}: {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(5 * (attempt + 1))
+        
+        # Combine all extracted content
+        full_content = "\n\n".join(all_extracted_content)
+        logger.info(f"Successfully extracted model answer content: {len(full_content)} characters from {len(model_answer_images)} pages")
+        
+        return full_content
+        
+    except Exception as e:
+        logger.error(f"Error in extract_model_answer_content: {e}")
+        return ""
+
 async def grade_with_ai(
     images: List[str],
     model_answer_images: List[str],
