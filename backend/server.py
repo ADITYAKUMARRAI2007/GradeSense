@@ -3350,10 +3350,11 @@ async def upload_student_papers(
             # Grade with AI using the grading mode from exam
             scores = await grade_with_ai(
                 images=images,
-                model_answer_images=exam.get("model_answer_images", []),
+                model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100)
+                total_marks=exam.get("total_marks", 100),
+                model_answer_text=model_answer_txt  # NEW: Use pre-extracted text
             )
             
             total_score = sum(s.obtained_marks for s in scores)
