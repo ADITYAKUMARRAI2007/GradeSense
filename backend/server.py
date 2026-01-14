@@ -1440,6 +1440,9 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     # Get model answer images from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
     
+    # Get pre-extracted model answer text for efficient grading
+    model_answer_text = await get_exam_model_answer_text(exam_id)
+    
     regraded_count = 0
     errors = []
     
@@ -1457,7 +1460,8 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100)
+                total_marks=exam.get("total_marks", 100),
+                model_answer_text=model_answer_text
             )
             
             # Calculate total score using exam's total_marks
