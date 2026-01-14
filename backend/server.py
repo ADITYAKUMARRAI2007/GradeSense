@@ -2465,9 +2465,14 @@ async def grade_with_ai(
     model_answer_images: List[str],
     questions: List[dict],
     grading_mode: str,
-    total_marks: float
+    total_marks: float,
+    model_answer_text: str = ""  # NEW: Pre-extracted model answer content
 ) -> List[QuestionScore]:
-    """Grade answer paper using Gemini 2.5 Pro with the GradeSense Master Instruction Set"""
+    """Grade answer paper using GPT-4o-mini with the GradeSense Master Instruction Set.
+    
+    If model_answer_text is provided, uses text-based grading (faster, more reliable).
+    Falls back to image-based grading if text is not available.
+    """
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
@@ -2475,9 +2480,26 @@ async def grade_with_ai(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
+    # Apply rotation correction to student images
+    logger.info("Applying rotation correction to student images...")
+    corrected_images = correct_all_images_rotation(images)
+    
+    # Determine grading mode: text-based (preferred) or image-based (fallback)
+    use_text_based_grading = bool(model_answer_text and len(model_answer_text) > 100)
+    
+    if use_text_based_grading:
+        logger.info(f"Using TEXT-BASED grading (model answer: {len(model_answer_text)} chars)")
+    else:
+        logger.info(f"Using IMAGE-BASED grading (model answer: {len(model_answer_images)} images)")
+    
     # Create content hash for deterministic grading (same paper = same grade)
-    paper_hash = get_paper_hash(images, model_answer_images, questions, grading_mode)
-    content_hash = paper_hash[:16] # Keep for session ID compatibility
+    hash_content = "".join(corrected_images).encode() + str(questions).encode() + grading_mode.encode()
+    if use_text_based_grading:
+        hash_content += model_answer_text.encode()
+    else:
+        hash_content += "".join(model_answer_images).encode()
+    paper_hash = hashlib.sha256(hash_content).hexdigest()
+    content_hash = paper_hash[:16]
 
     # Check cache (Memory)
     if paper_hash in grading_cache:
@@ -2489,10 +2511,8 @@ async def grade_with_ai(
         cached_result = await db.grading_results.find_one({"paper_hash": paper_hash})
         if cached_result and "results" in cached_result:
             logger.info(f"Cache hit (db) for paper {paper_hash}")
-            # Deserialize results
             import json
             results_data = json.loads(cached_result["results"])
-            # Convert back to QuestionScore objects
             return [QuestionScore(**s) for s in results_data]
     except Exception as e:
         logger.error(f"Error checking grading cache: {e}")
