@@ -17,6 +17,7 @@ import io
 from PIL import Image
 import asyncio
 import hashlib
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -38,6 +39,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Cache structure (memory-based cache)
+grading_cache = {}
+model_answer_cache = {}
 
 # ============== MODELS ==============
 
@@ -140,6 +145,7 @@ class QuestionScore(BaseModel):
     sub_scores: List[SubQuestionScore] = []  # For sub-question scores
     error_annotations: List[dict] = []  # Error locations for visual annotations
     question_text: Optional[str] = None  # The question text
+    status: str = "graded"  # graded, not_attempted, not_found, error
 
 class Submission(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -208,6 +214,21 @@ class FeedbackSubmit(BaseModel):
 
 # ============== FILE HELPER FUNCTIONS ==============
 
+def get_paper_hash(student_images, model_answer_images, questions, grading_mode):
+    # Use sha256 for stable hashing of images instead of hash() which is randomized per process
+    content = {
+        "student": [hashlib.sha256(img.encode()).hexdigest() for img in student_images],
+        "model": [hashlib.sha256(img.encode()).hexdigest() for img in model_answer_images],
+        "questions": str(questions),
+        "mode": grading_mode
+    }
+    return hashlib.sha256(json.dumps(content, sort_keys=True, default=str).encode()).hexdigest()
+
+def get_model_answer_hash(images):
+    # Use sha256 for stable hashing
+    image_hashes = [hashlib.sha256(img.encode()).hexdigest() for img in images]
+    return hashlib.sha256(json.dumps(image_hashes).encode()).hexdigest()
+
 async def get_exam_model_answer_images(exam_id: str) -> List[str]:
     """Get model answer images from separate collection or fallback to exam document"""
     # First try the new separate collection
@@ -224,16 +245,6 @@ async def get_exam_model_answer_images(exam_id: str) -> List[str]:
         return exam["model_answer_images"]
     
     return []
-
-async def get_exam_model_answer_text(exam_id: str) -> str:
-    """Get pre-extracted model answer text content for faster grading"""
-    file_doc = await db.exam_files.find_one(
-        {"exam_id": exam_id, "file_type": "model_answer"},
-        {"_id": 0, "model_answer_text": 1}
-    )
-    if file_doc and file_doc.get("model_answer_text"):
-        return file_doc["model_answer_text"]
-    return ""
 
 async def get_exam_question_paper_images(exam_id: str) -> List[str]:
     """Get question paper images from separate collection or fallback to exam document"""
@@ -1180,17 +1191,15 @@ async def upload_more_papers(
                 continue
             
             # Grade with AI
-            # Get model answer images and pre-extracted text from separate collection
+            # Get model answer images from separate collection
             model_answer_imgs = await get_exam_model_answer_images(exam_id)
-            model_answer_txt = await get_exam_model_answer_text(exam_id)
             
             scores = await grade_with_ai(
                 images=images,
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_txt  # NEW: Use pre-extracted text
+                total_marks=exam.get("total_marks", 100)
             )
             
             total_score = sum(s.obtained_marks for s in scores)
@@ -1424,9 +1433,8 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     if not submissions:
         return {"message": "No submissions to regrade", "regraded_count": 0}
     
-    # Get model answer images and pre-extracted text from separate collection
+    # Get model answer images from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
-    model_answer_txt = await get_exam_model_answer_text(exam_id)
     
     regraded_count = 0
     errors = []
@@ -1445,8 +1453,7 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_txt  # NEW: Use pre-extracted text
+                total_marks=exam.get("total_marks", 100)
             )
             
             # Calculate total score using exam's total_marks
@@ -1829,7 +1836,7 @@ Important:
 - Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         # Use first page only (usually has student info)
         first_page = [file_images[0]]
@@ -2035,7 +2042,7 @@ Important:
 - Maintain the original formatting and numbering
 - Extract exactly what's written, don't paraphrase
 """
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in question_paper_images]
@@ -2093,6 +2100,12 @@ async def extract_questions_from_model_answer(
     """Extract question text from model answer images using AI"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
+    # Check cache
+    cache_key = get_model_answer_hash(model_answer_images)
+    if cache_key in model_answer_cache:
+        logger.info(f"Cache hit (memory) for model answer extraction")
+        return model_answer_cache[cache_key]
+
     api_key = os.environ.get('EMERGENT_LLM_KEY')
     if not api_key:
         return []
@@ -2126,7 +2139,7 @@ Important:
 - Look through ALL pages carefully
 - Return questions in order (Q1, Q2, Q3, etc.)
 """
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images]
@@ -2166,8 +2179,13 @@ Return ONLY the JSON with ALL {num_questions} questions, no other text."""
                 
                 import json
                 result = json.loads(response_text)
-                logger.info(f"Successfully extracted {len(result.get('questions', []))} questions from model answer")
-                return result.get("questions", [])
+                questions = result.get("questions", [])
+
+                logger.info(f"Successfully extracted {len(questions)} questions from model answer")
+
+                # Cache result
+                model_answer_cache[cache_key] = questions
+                return questions
                 
             except Exception as e:
                 error_str = str(e).lower()
@@ -2277,134 +2295,14 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         logger.error(f"Auto-extraction error for {exam_id}: {e}")
         return {"success": False, "message": f"Error during extraction: {str(e)}"}
 
-async def extract_model_answer_content(
-    model_answer_images: List[str],
-    questions: List[dict]
-) -> str:
-    """
-    Extract detailed answer content from model answer images as structured text.
-    This is done ONCE during upload and stored for use during grading.
-    Returns a comprehensive text representation of all model answers.
-    """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-    
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
-    if not api_key:
-        logger.error("No API key for model answer content extraction")
-        return ""
-    
-    if not model_answer_images:
-        return ""
-    
-    try:
-        # Build questions context
-        questions_context = ""
-        for q in questions:
-            q_num = q.get("question_number", "?")
-            q_marks = q.get("total_marks", 0)
-            questions_context += f"- Question {q_num} ({q_marks} marks)\n"
-            for sq in q.get("sub_questions", []):
-                sq_id = sq.get("sub_id", "?")
-                sq_marks = sq.get("marks", 0)
-                questions_context += f"  - Part {sq_id} ({sq_marks} marks)\n"
-        
-        # Process in chunks to handle large model answers
-        CHUNK_SIZE = 10  # Pages per extraction chunk
-        all_extracted_content = []
-        
-        for chunk_start in range(0, len(model_answer_images), CHUNK_SIZE):
-            chunk_end = min(chunk_start + CHUNK_SIZE, len(model_answer_images))
-            chunk_images = model_answer_images[chunk_start:chunk_end]
-            
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=f"extract_content_{uuid.uuid4().hex[:8]}",
-                system_message="""You are an expert at extracting and structuring model answer content from exam papers.
-
-Your task is to extract ALL answer content from the provided model answer images and structure it clearly.
-
-For each question/sub-question found:
-1. Identify the question number
-2. Extract the COMPLETE model answer text
-3. Note any marking points, keywords, or criteria mentioned
-4. Include diagrams descriptions if present
-
-Output Format:
----
-QUESTION [number]:
-[Complete model answer text]
-
-KEY POINTS:
-- [Key point 1]
-- [Key point 2]
-...
-
-MARKING CRITERIA (if visible):
-- [Criteria 1]
-- [Criteria 2]
----
-
-Be thorough - extract EVERY detail that could be useful for grading student answers."""
-            ).with_model("gemini", "gemini-2.5-flash")
-            
-            image_contents = [ImageContent(image_base64=img) for img in chunk_images]
-            
-            prompt = f"""Extract ALL model answer content from these pages (pages {chunk_start + 1} to {chunk_end}).
-
-Questions in this exam:
-{questions_context}
-
-INSTRUCTIONS:
-1. Extract the COMPLETE answer text for each question found on these pages
-2. Include all steps, formulas, explanations, diagrams descriptions
-3. Note any marking scheme points or keywords
-4. Preserve mathematical notation and special formatting as text
-5. If an answer continues from/to other pages, extract what's visible
-
-Return the structured content for ALL questions visible on these pages."""
-
-            user_message = UserMessage(
-                text=prompt,
-                file_contents=image_contents
-            )
-            
-            # Retry logic
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    logger.info(f"Extracting model answer content: pages {chunk_start + 1}-{chunk_end} (attempt {attempt + 1})")
-                    response = await chat.send_message_async(user_message)
-                    if response and response.text:
-                        all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response.text}")
-                        break
-                except Exception as e:
-                    logger.error(f"Error extracting content chunk {chunk_start}-{chunk_end}: {e}")
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(5 * (attempt + 1))
-        
-        # Combine all extracted content
-        full_content = "\n\n".join(all_extracted_content)
-        logger.info(f"Successfully extracted model answer content: {len(full_content)} characters from {len(model_answer_images)} pages")
-        
-        return full_content
-        
-    except Exception as e:
-        logger.error(f"Error in extract_model_answer_content: {e}")
-        return ""
-
 async def grade_with_ai(
     images: List[str],
     model_answer_images: List[str],
     questions: List[dict],
     grading_mode: str,
-    total_marks: float,
-    model_answer_text: str = ""  # NEW: Pre-extracted model answer content
+    total_marks: float
 ) -> List[QuestionScore]:
-    """Grade answer paper using Gemini 2.5 Flash with the GradeSense Master Instruction Set.
-    
-    If model_answer_text is provided, uses text-based grading (faster, no timeout).
-    Falls back to image-based grading if text is not available.
-    """
+    """Grade answer paper using Gemini 2.5 Pro with the GradeSense Master Instruction Set"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
@@ -2412,22 +2310,27 @@ async def grade_with_ai(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
-    # Determine grading mode: text-based (preferred) or image-based (fallback)
-    use_text_based_grading = bool(model_answer_text and len(model_answer_text) > 100)
-    
-    if use_text_based_grading:
-        logger.info(f"Using TEXT-BASED grading (model answer: {len(model_answer_text)} chars)")
-    else:
-        logger.info(f"Using IMAGE-BASED grading (model answer: {len(model_answer_images)} images)")
-    
     # Create content hash for deterministic grading (same paper = same grade)
-    content_to_hash = "".join(images).encode() + str(questions).encode() + grading_mode.encode()
-    if use_text_based_grading:
-        content_to_hash += model_answer_text.encode()
-    else:
-        content_to_hash += "".join(model_answer_images).encode()
-    
-    content_hash = hashlib.sha256(content_to_hash).hexdigest()[:16]
+    paper_hash = get_paper_hash(images, model_answer_images, questions, grading_mode)
+    content_hash = paper_hash[:16] # Keep for session ID compatibility
+
+    # Check cache (Memory)
+    if paper_hash in grading_cache:
+        logger.info(f"Cache hit (memory) for paper {paper_hash}")
+        return grading_cache[paper_hash]
+
+    # Check cache (Database)
+    try:
+        cached_result = await db.grading_results.find_one({"paper_hash": paper_hash})
+        if cached_result and "results" in cached_result:
+            logger.info(f"Cache hit (db) for paper {paper_hash}")
+            # Deserialize results
+            import json
+            results_data = json.loads(cached_result["results"])
+            # Convert back to QuestionScore objects
+            return [QuestionScore(**s) for s in results_data]
+    except Exception as e:
+        logger.error(f"Error checking grading cache: {e}")
     
     # ============== GRADESENSE MASTER GRADING MODE SPECIFICATIONS ==============
     mode_instructions = {
@@ -2730,50 +2633,18 @@ Your measure of success: When the same paper graded by you and by an expert teac
             api_key=api_key,
             session_id=f"grading_{content_hash}_{chunk_idx}",
             system_message=master_system_prompt
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
 
-        # Prepare student images only (model answer is now text-based when available)
+        # Prepare images: ALL model answer images + Chunk of student images
         chunk_all_images = []
+        if model_answer_images:
+            for img in model_answer_images:
+                chunk_all_images.append(ImageContent(image_base64=img))
         
-        # TEXT-BASED GRADING: Only send student images, model answer is in prompt text
-        if use_text_based_grading:
-            # Only add student images
-            for img in chunk_imgs:
-                chunk_all_images.append(ImageContent(image_base64=img))
-            model_images_included = 0
-            logger.info(f"Chunk {chunk_idx+1}: TEXT-BASED grading with {len(chunk_imgs)} student images")
-        else:
-            # IMAGE-BASED GRADING (fallback): Include model answer images
-            total_model_pages = len(model_answer_images) if model_answer_images else 0
+        for img in chunk_imgs:
+            chunk_all_images.append(ImageContent(image_base64=img))
             
-            if total_model_pages <= 8:
-                model_imgs_to_use = model_answer_images if model_answer_images else []
-            elif total_model_pages > 0:
-                MODEL_WINDOW_SIZE = 8
-                chunk_ratio = start_page_num / max(1, len(images))
-                model_start = int(chunk_ratio * (total_model_pages - MODEL_WINDOW_SIZE))
-                model_start = max(0, min(model_start, total_model_pages - MODEL_WINDOW_SIZE))
-                model_end = min(model_start + MODEL_WINDOW_SIZE, total_model_pages)
-                
-                first_pages = model_answer_images[:2] if total_model_pages > 2 else []
-                window_pages = model_answer_images[model_start:model_end]
-                
-                model_imgs_to_use = first_pages.copy()
-                for img in window_pages:
-                    if img not in model_imgs_to_use:
-                        model_imgs_to_use.append(img)
-                
-                logger.info(f"Chunk {chunk_idx+1}: Using {len(model_imgs_to_use)} model answer pages (of {total_model_pages})")
-            else:
-                model_imgs_to_use = []
-            
-            for img in model_imgs_to_use:
-                chunk_all_images.append(ImageContent(image_base64=img))
-            
-            for img in chunk_imgs:
-                chunk_all_images.append(ImageContent(image_base64=img))
-                
-            model_images_included = len(model_imgs_to_use)
+        model_images_included = len(model_answer_images) if model_answer_images else 0
         
         # Build prompt
         partial_instruction = ""
@@ -2789,49 +2660,7 @@ This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {sta
 - Do NOT guess marks for questions you cannot see.
 """
 
-        # TEXT-BASED GRADING PROMPT (preferred - faster, no timeout)
-        if use_text_based_grading:
-            prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
-
-## MODEL ANSWER REFERENCE (Pre-Extracted Text)
-Below is the complete model answer content. Use this as your grading reference:
-
---- MODEL ANSWER START ---
-{model_answer_text}
---- MODEL ANSWER END ---
-
-## PHASE 1: STUDENT PAPER EVALUATION
-
-**Questions to Grade:**
-{questions_text}
-
-**Images Provided:** {len(chunk_imgs)} pages of STUDENT'S ANSWER PAPER (Pages {start_page_num+1}-{start_page_num+len(chunk_imgs)})
-{partial_instruction}
-
-**IMPORTANT**: Examine EVERY page of the student's answer and grade ALL questions found.
-
-## GRADING MODE: {grading_mode.upper()}
-Apply the {grading_mode} mode specifications strictly.
-
-## CRITICAL REQUIREMENTS:
-1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
-2. **MODEL ANSWER IS REFERENCE**: Compare student answers against the model answer text provided above
-3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
-4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
-5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
-6. **FEEDBACK QUALITY**: Provide constructive, specific feedback that helps learning
-7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
-
-## PHASE 2: OUTPUT
-Grade each question providing:
-- Exact marks with breakdown
-- What was done well
-- What needs improvement
-- Error annotations if applicable
-
-Return valid JSON only."""
-
-        elif model_answer_images:
+        if model_answer_images:
             prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
 
 ## PHASE 1: PRE-GRADING ANALYSIS
@@ -2930,21 +2759,27 @@ Return valid JSON only."""
                 logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay * (2**attempt))
+                else:
+                    # Return fallback on final failure
+                    logger.error(f"Failed to grade chunk {chunk_idx+1} after retries. Using fallback.")
+                    # Create consistent fallback for questions likely in this chunk
+                    # Since we don't know exactly which questions are in this chunk, we return empty
+                    # and let aggregation handle it as "not found"
+                    return []
 
-        logger.error(f"Failed to grade chunk {chunk_idx+1} after retries")
         return []
 
-    # CHUNKED PROCESSING LOGIC - Optimized for faster processing
-    CHUNK_SIZE = 5  # Reduced to prevent 502 timeouts
-    OVERLAP = 1
+    # CHUNKED PROCESSING LOGIC
+    CHUNK_SIZE = 10
+    OVERLAP = 2
     total_student_pages = len(images)
     
-    if total_student_pages > 10:
+    if total_student_pages > 20:
         logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
     
     # Create chunks
     chunks = []
-    if total_student_pages <= 6:  # Process as single chunk if 6 or fewer pages
+    if total_student_pages <= 12: # Use simple processing for small docs (limit raised slightly)
         chunks.append((0, images))
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
@@ -2957,135 +2792,104 @@ Return valid JSON only."""
     logger.info(f"Processing student paper in {len(chunks)} chunk(s)")
 
     # Store aggregated results
-    final_scores_map = {} # question_number -> QuestionScore object
+    # Use deterministic aggregation: Use the FIRST valid score (>=0) encountered
+    # This prevents aggregation jitter when multiple chunks see the same question
 
+    question_scores = {} # q_id -> Score data
+
+    all_chunk_results = []
     for idx, (start_idx, chunk_imgs) in enumerate(chunks):
         chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
+        all_chunk_results.append(chunk_scores_data)
 
-        # Aggregate logic
-        for q in questions:
-            q_num = q["question_number"]
-            
-            # Find score in this chunk
-            score_data = next((s for s in chunk_scores_data if s["question_number"] == q_num), None)
-            
-            # Create default if not found in chunk (treat as -1/Not Seen)
-            if not score_data:
-                score_data = {"question_number": q_num, "obtained_marks": -1.0, "ai_feedback": "Not seen in this chunk", "sub_scores": []}
-            
-            # If not in final map, add it
-            if q_num not in final_scores_map:
-                # Convert dict to object for easier handling, but be careful with sub_scores
-                # We'll use a temporary dict structure for aggregation and convert to Pydantic at the end
-                final_scores_map[q_num] = {
-                    "question_number": q_num,
-                    "max_marks": q["max_marks"],
-                    "obtained_marks": score_data.get("obtained_marks", -1.0),
-                    "ai_feedback": score_data.get("ai_feedback", ""),
-                    "error_annotations": score_data.get("error_annotations", []),
-                    "sub_scores": score_data.get("sub_scores", []),
-                    "question_text": q.get("question_text") or q.get("rubric")
-                }
-            else:
-                existing = final_scores_map[q_num]
-                new_obtained = score_data.get("obtained_marks", -1.0)
-                
-                # Merge sub-scores
-                if q.get("sub_questions"):
-                    existing_subs = existing.get("sub_scores", [])
-                    new_subs = score_data.get("sub_scores", [])
-
-                    merged_subs = []
-                    # Create map of existing subs
-                    existing_sub_map = {s["sub_id"]: s for s in existing_subs}
-
-                    # Merge new subs
-                    for ns in new_subs:
-                        s_id = ns["sub_id"]
-                        if s_id in existing_sub_map:
-                            es = existing_sub_map[s_id]
-                            # Take max marks (treating -1 as lowest)
-                            es_marks = es.get("obtained_marks", -1.0)
-                            ns_marks = ns.get("obtained_marks", -1.0)
-
-                            if ns_marks > es_marks:
-                                es["obtained_marks"] = ns_marks
-                                es["ai_feedback"] = ns.get("ai_feedback", es.get("ai_feedback"))
-                        else:
-                            existing_sub_map[s_id] = ns
-
-                    existing["sub_scores"] = list(existing_sub_map.values())
-
-                    # Recalculate total obtained marks from sub-scores
-                    # Sum only positive marks (ignore -1s)
-                    total_sub = sum(max(0.0, s.get("obtained_marks", 0.0)) for s in existing["sub_scores"])
-                    existing["obtained_marks"] = total_sub
-                    
-                else:
-                    # No sub-questions: take max score
-                    if new_obtained > existing["obtained_marks"]:
-                        existing["obtained_marks"] = new_obtained
-                        existing["ai_feedback"] = score_data.get("ai_feedback", existing["ai_feedback"])
-                        # Keep annotations from the better chunk
-                        if score_data.get("error_annotations"):
-                            existing["error_annotations"] = score_data.get("error_annotations")
-
-    # Convert final map to QuestionScore objects
+    # Deterministic Aggregation
     final_scores = []
+
     for q in questions:
         q_num = q["question_number"]
-        if q_num in final_scores_map:
-            data = final_scores_map[q_num]
+        best_score_data = None
+
+        # Look for first valid score across chunks
+        for chunk_result in all_chunk_results:
+            score_data = next((s for s in chunk_result if s["question_number"] == q_num), None)
             
-            # Clean up -1.0 marks to 0.0
-            if data["obtained_marks"] < 0:
-                data["obtained_marks"] = 0.0
-                data["ai_feedback"] += " (Question not found in any page)"
+            if score_data and score_data.get("obtained_marks", -1.0) >= 0:
+                best_score_data = score_data
+                break # Deterministic: Use first valid score found
 
-            # Clean up sub-scores
-            final_sub_scores = []
-            if q.get("sub_questions"):
-                # Ensure all sub-questions are present
-                current_subs = data.get("sub_scores", [])
-                current_sub_map = {s["sub_id"]: s for s in current_subs}
+        # If no valid score found, use the last one (error state or not found) or default
+        if not best_score_data:
+             best_score_data = {
+                 "question_number": q_num,
+                 "obtained_marks": -1.0,
+                 "ai_feedback": "Question not found in any page (or grading failed)",
+                 "sub_scores": []
+             }
 
-                for sq in q["sub_questions"]:
-                    sq_data = current_sub_map.get(sq["sub_id"])
-                    if sq_data:
-                        marks = sq_data.get("obtained_marks", -1.0)
-                        if marks < 0: marks = 0.0
-
-                        final_sub_scores.append(SubQuestionScore(
-                            sub_id=sq["sub_id"],
-                            max_marks=sq["max_marks"],
-                            obtained_marks=min(marks, sq["max_marks"]), # Cap at max
-                            ai_feedback=sq_data.get("ai_feedback", "")
-                        ))
-                    else:
-                        final_sub_scores.append(SubQuestionScore(
-                            sub_id=sq["sub_id"],
-                            max_marks=sq["max_marks"],
-                            obtained_marks=0.0,
-                            ai_feedback="Not attempted/found"
-                        ))
+        # Process status and normalize
+        status = "graded"
+        if best_score_data.get("obtained_marks", -1.0) < 0:
+            status = "not_found"
+            best_score_data["obtained_marks"] = 0.0
+        elif best_score_data.get("obtained_marks") == 0 and "blank" in best_score_data.get("ai_feedback", "").lower():
+            status = "not_attempted"
             
-            final_scores.append(QuestionScore(
-                question_number=q_num,
-                max_marks=q["max_marks"],
-                obtained_marks=min(data["obtained_marks"], q["max_marks"]), # Cap at max
-                ai_feedback=data["ai_feedback"],
-                sub_scores=[s.model_dump() for s in final_sub_scores],
-                error_annotations=data.get("error_annotations", []),
-                question_text=q.get("question_text") or q.get("rubric")
-            ))
-        else:
-            # Should not happen if loop covers all questions
-             final_scores.append(QuestionScore(
-                question_number=q_num,
-                max_marks=q["max_marks"],
-                obtained_marks=0.0,
-                ai_feedback="Error: Question not processed"
-            ))
+        # Handle sub-scores
+        final_sub_scores = []
+        if q.get("sub_questions"):
+            current_subs = best_score_data.get("sub_scores", [])
+            current_sub_map = {s["sub_id"]: s for s in current_subs}
+
+            for sq in q["sub_questions"]:
+                sq_data = current_sub_map.get(sq["sub_id"])
+                if sq_data:
+                    marks = sq_data.get("obtained_marks", -1.0)
+                    if marks < 0: marks = 0.0
+
+                    final_sub_scores.append(SubQuestionScore(
+                        sub_id=sq["sub_id"],
+                        max_marks=sq["max_marks"],
+                        obtained_marks=min(marks, sq["max_marks"]),
+                        ai_feedback=sq_data.get("ai_feedback", "")
+                    ))
+                else:
+                    final_sub_scores.append(SubQuestionScore(
+                        sub_id=sq["sub_id"],
+                        max_marks=sq["max_marks"],
+                        obtained_marks=0.0,
+                        ai_feedback="Not attempted/found"
+                    ))
+
+        qs_obj = QuestionScore(
+            question_number=q_num,
+            max_marks=q["max_marks"],
+            obtained_marks=min(best_score_data["obtained_marks"], q["max_marks"]),
+            ai_feedback=best_score_data["ai_feedback"],
+            sub_scores=[s.model_dump() for s in final_sub_scores],
+            error_annotations=best_score_data.get("error_annotations", []),
+            question_text=q.get("question_text") or q.get("rubric"),
+            status=status
+        )
+        final_scores.append(qs_obj)
+
+    # Store in Cache and DB
+    try:
+        # Update memory cache
+        grading_cache[paper_hash] = final_scores
+
+        # Update DB cache
+        results_json = json.dumps([s.model_dump() for s in final_scores])
+        await db.grading_results.update_one(
+            {"paper_hash": paper_hash},
+            {"$set": {
+                "paper_hash": paper_hash,
+                "results": results_json,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"Error saving grading cache: {e}")
 
     return final_scores
 
@@ -3152,27 +2956,6 @@ async def upload_model_answer(
         force_extraction = True
         
     result = await auto_extract_questions(exam_id, force=force_extraction)
-    
-    # NEW: Extract model answer content as TEXT for faster grading
-    # This is done ONCE during upload and stored for use during grading
-    logger.info(f"Extracting model answer content as text for exam {exam_id}...")
-    
-    # Get questions for context
-    updated_exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
-    questions = updated_exam.get("questions", [])
-    
-    model_answer_text = await extract_model_answer_content(images, questions)
-    
-    if model_answer_text:
-        # Store the extracted text in exam_files collection
-        await db.exam_files.update_one(
-            {"exam_id": exam_id, "file_type": "model_answer"},
-            {"$set": {
-                "model_answer_text": model_answer_text,
-                "text_extracted_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        logger.info(f"Stored model answer text: {len(model_answer_text)} characters")
 
     message = "Model answer uploaded successfully."
     if result.get("success"):
@@ -3180,17 +2963,13 @@ async def upload_model_answer(
             message = f"✨ Model answer uploaded! Questions kept from {result.get('source').replace('_', ' ')}."
         else:
             message = f"✨ Model answer uploaded & {result.get('count')} questions auto-extracted from {result.get('source').replace('_', ' ')}!"
-    
-    if model_answer_text:
-        message += " Answer content extracted for fast grading."
 
     return {
         "message": message,
         "pages": len(images),
         "auto_extracted": result.get("success", False),
         "extracted_count": result.get("count", 0),
-        "source": result.get("source", ""),
-        "text_extracted": bool(model_answer_text)
+        "source": result.get("source", "")
     }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
@@ -3276,9 +3055,7 @@ async def upload_student_papers(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Get model answer images and pre-extracted text for grading
-    model_answer_imgs = await get_exam_model_answer_images(exam_id)
-    model_answer_txt = await get_exam_model_answer_text(exam_id)
+    # Model answer is now optional
     
     # Update exam status
     await db.exams.update_one(
@@ -3350,11 +3127,10 @@ async def upload_student_papers(
             # Grade with AI using the grading mode from exam
             scores = await grade_with_ai(
                 images=images,
-                model_answer_images=model_answer_imgs,
+                model_answer_images=exam.get("model_answer_images", []),
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_txt  # NEW: Use pre-extracted text
+                total_marks=exam.get("total_marks", 100)
             )
             
             total_score = sum(s.obtained_marks for s in scores)
@@ -3959,7 +3735,7 @@ Only return the JSON array, no other text."""
                 api_key=llm_key,
                 session_id=f"misconceptions_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert at analyzing student misconceptions and learning patterns."
-            ).with_model("gemini", "gemini-2.5-flash")
+            ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -4218,7 +3994,7 @@ Keep response concise (under 200 words). Format as JSON:
                 api_key=llm_key,
                 session_id=f"student_analysis_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert educational analyst providing personalized student guidance."
-            ).with_model("gemini", "gemini-2.5-flash")
+            ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -4342,7 +4118,7 @@ Only return the JSON array."""
             api_key=llm_key,
             session_id=f"review_packet_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert educator creating practice questions to help students improve."
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         user_message = UserMessage(text=generation_prompt)
         ai_response = await chat.send_message(user_message)
@@ -4429,7 +4205,7 @@ Only return the JSON object."""
             api_key=llm_key,
             session_id=f"infer_topics_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert at analyzing exam questions and categorizing them by topic."
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         user_message = UserMessage(text=inference_prompt)
         ai_response = await chat.send_message(user_message)
