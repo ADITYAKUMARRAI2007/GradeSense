@@ -1849,6 +1849,37 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
         "updated_count": updated_count,
         "source": source
     }
+
+@api_router.post("/exams/{exam_id}/re-extract-questions")
+async def re_extract_question_structure(exam_id: str, user: User = Depends(get_current_user)):
+    """
+    Re-extract COMPLETE question structure (with force=True).
+    Use this when initial extraction was incorrect or incomplete.
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can re-extract questions")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Force re-extraction
+    result = await auto_extract_questions(exam_id, force=True)
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=500, 
+            detail=result.get("message", "Failed to re-extract questions")
+        )
+    
+    return {
+        "message": result.get("message"),
+        "count": result.get("count", 0),
+        "total_marks": result.get("total_marks", 0),
+        "source": result.get("source", ""),
+        "questions": exam.get("questions", [])
+    }
     result = await db.exams.update_one(
         {"exam_id": exam_id},
         {"$set": {"questions": questions}}
