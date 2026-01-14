@@ -2312,7 +2312,7 @@ Important:
 - Look through ALL pages carefully
 - Return questions in order (Q1, Q2, Q3, etc.)
 """
-        ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images]
