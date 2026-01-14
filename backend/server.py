@@ -2732,11 +2732,47 @@ CRITICAL RULES:
 Return ONLY a JSON array of questions, nothing else."""
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
-        # Create image contents
-        image_contents = [ImageContent(image_base64=img) for img in paper_images]
-        logger.info(f"Extracting complete question structure from {len(image_contents)} pages ({paper_type})")
+        # Create image contents - CHUNK if too many pages
+        CHUNK_SIZE = 10  # Process 10 pages at a time to avoid timeouts
+        all_images = paper_images
         
-        prompt = f"""Analyze this {paper_type.replace('_', ' ')} and extract the COMPLETE question structure.
+        if len(all_images) > CHUNK_SIZE:
+            logger.info(f"Large document ({len(all_images)} pages) - processing in chunks of {CHUNK_SIZE}")
+            all_extracted_questions = []
+            
+            for chunk_start in range(0, len(all_images), CHUNK_SIZE):
+                chunk_end = min(chunk_start + CHUNK_SIZE, len(all_images))
+                chunk_images = all_images[chunk_start:chunk_end]
+                
+                logger.info(f"Processing pages {chunk_start+1}-{chunk_end} ({len(chunk_images)} pages)")
+                
+                image_contents = [ImageContent(image_base64=img) for img in chunk_images]
+                
+                prompt = f"""Analyze this {paper_type.replace('_', ' ')} (Pages {chunk_start+1}-{chunk_end}) and extract the question structure.
+
+Instructions:
+- Identify ALL questions visible in these pages
+- For each question, identify ALL sub-parts with their marks
+- Detect the numbering style (a,b,c vs i,ii,iii)
+- Extract marks for each part
+- If a question spans multiple chunks, extract what's visible here
+
+Return ONLY the JSON array of questions."""
+        
+                user_message = UserMessage(text=prompt, file_contents=image_contents)
+                
+                chunk_questions = await self._extract_with_retry(chat, user_message, chunk_start, chunk_end)
+                if chunk_questions:
+                    all_extracted_questions.extend(chunk_questions)
+            
+            logger.info(f"✅ Extracted {len(all_extracted_questions)} questions from {len(all_images)} pages (chunked)")
+            return all_extracted_questions
+        else:
+            # Small document - process all at once
+            image_contents = [ImageContent(image_base64=img) for img in paper_images]
+            logger.info(f"Extracting complete question structure from {len(image_contents)} pages ({paper_type})")
+        
+            prompt = f"""Analyze this {paper_type.replace('_', ' ')} and extract the COMPLETE question structure.
 
 Instructions:
 - Identify ALL questions (Q1, Q2, Q3...)
