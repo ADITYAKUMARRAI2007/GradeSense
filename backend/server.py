@@ -2215,7 +2215,7 @@ Important:
 - Maintain the original formatting and numbering
 - Extract exactly what's written, don't paraphrase
 """
-        ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in question_paper_images]
