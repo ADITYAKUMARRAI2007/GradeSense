@@ -2240,25 +2240,63 @@ Return ONLY the JSON, no other text."""
                 logger.info(f"Question extraction attempt {attempt + 1}/{max_retries}")
                 ai_response = await chat.send_message(user_message)
                 
-                # Parse response
+                # Parse response with robust JSON extraction
                 import json
+                import re
                 response_text = ai_response.strip()
+                
+                # Strategy 1: Direct parse
+                try:
+                    result = json.loads(response_text)
+                    logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
+                    return result.get("questions", [])
+                except json.JSONDecodeError:
+                    pass
+                
+                # Strategy 2: Remove code blocks
                 if response_text.startswith("```"):
                     response_text = response_text.split("```")[1]
                     if response_text.startswith("json"):
                         response_text = response_text[4:]
+                    response_text = response_text.strip()
+                    try:
+                        result = json.loads(response_text)
+                        logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
+                        return result.get("questions", [])
+                    except json.JSONDecodeError:
+                        pass
                 
-                result = json.loads(response_text)
-                logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
-                return result.get("questions", [])
+                # Strategy 3: Find JSON object in text
+                json_match = re.search(r'\{[^{}]*"questions"[^{}]*\[[^\]]*\][^{}]*\}', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group())
+                        logger.info(f"Successfully extracted {len(result.get('questions', []))} questions (pattern match)")
+                        return result.get("questions", [])
+                    except json.JSONDecodeError:
+                        pass
+                
+                # If all strategies fail, log and retry
+                logger.warning(f"Failed to parse JSON from response (attempt {attempt + 1}). Response preview: {response_text[:200]}")
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.info(f"Retrying question extraction in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"All JSON parsing strategies failed after {max_retries} attempts")
+                    return []
                 
             except Exception as e:
                 error_str = str(e).lower()
-                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str):
+                logger.error(f"Error during question extraction attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str or "rate limit" in error_str):
                     wait_time = retry_delay * (2 ** attempt)
                     logger.info(f"Retrying question extraction in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
                 else:
+                    if attempt >= max_retries - 1:
+                        logger.error(f"Question extraction failed after {max_retries} attempts")
                     raise e
         
         return []
