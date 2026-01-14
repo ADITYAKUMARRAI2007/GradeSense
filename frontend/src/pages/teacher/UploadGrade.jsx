@@ -365,6 +365,7 @@ export default function UploadGrade({ user }) {
   const onModelAnswerDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length > 0) {
       setModelAnswerFile(acceptedFiles[0]);
+      setPaperUploaded(true);
     }
   }, []);
 
@@ -378,6 +379,7 @@ export default function UploadGrade({ user }) {
   const onQuestionPaperDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length > 0) {
       setQuestionPaperFile(acceptedFiles[0]);
+      setPaperUploaded(true);
     }
   }, []);
 
