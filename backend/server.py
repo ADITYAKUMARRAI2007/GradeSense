@@ -2649,8 +2649,14 @@ Return ONLY the JSON array of questions."""
 
 async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str, Any]:
     """
-    Auto-extract questions from question paper (priority) or model answer.
-
+    Auto-extract COMPLETE question structure from question paper (priority) or model answer.
+    
+    Extracts:
+    - Question numbers
+    - Sub-questions with proper IDs
+    - Marks for each part
+    - Question text
+    
     Priority:
     1. Question Paper (if exists)
     2. Model Answer (if exists)
@@ -2670,68 +2676,61 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
 
         target_source = None
         images_to_use = []
-        extraction_func = None
 
         if qp_imgs:
             target_source = "question_paper"
             images_to_use = qp_imgs
-            extraction_func = extract_questions_from_question_paper
         elif ma_imgs:
             target_source = "model_answer"
             images_to_use = ma_imgs
-            extraction_func = extract_questions_from_model_answer
         else:
             return {"success": False, "message": "No documents available for extraction"}
 
         # Check if already extracted
         current_source = exam.get("extraction_source")
-        questions_exist = any(q.get("rubric") for q in exam.get("questions", []))
+        questions_exist = len(exam.get("questions", [])) > 0 and any(q.get("rubric") for q in exam.get("questions", []))
 
         if not force and questions_exist and current_source == target_source:
             logger.info(f"Skipping extraction for {exam_id}: Already extracted from {current_source}")
             return {
                 "success": True,
                 "message": f"Questions already extracted from {target_source.replace('_', ' ')}",
-                "count": len([q for q in exam.get("questions", []) if q.get("rubric")]),
+                "count": len(exam.get("questions", [])),
                 "source": target_source,
                 "skipped": True
             }
 
-        logger.info(f"Auto-extracting questions for {exam_id} from {target_source} (Force={force})")
+        logger.info(f"Auto-extracting COMPLETE question structure for {exam_id} from {target_source} (Force={force})")
 
-        # Perform extraction
-        extracted_questions = await extraction_func(
+        # Perform NEW structure extraction
+        extracted_questions = await extract_question_structure_from_paper(
             images_to_use,
-            len(exam.get("questions", []))
+            paper_type=target_source
         )
 
         if not extracted_questions:
-            logger.warning(f"Extraction returned no questions for {exam_id} from {target_source}")
-            return {"success": False, "message": f"Failed to extract questions from {target_source.replace('_', ' ')}"}
+            logger.warning(f"Structure extraction returned no questions for {exam_id} from {target_source}")
+            return {"success": False, "message": f"Failed to extract question structure from {target_source.replace('_', ' ')}"}
 
-        # Update questions in database
-        questions = exam.get("questions", [])
-        updated_count = 0
+        # Calculate total marks from extracted structure
+        total_marks = sum(q.get("max_marks", 0) for q in extracted_questions)
 
-        for i, q in enumerate(questions):
-            if i < len(extracted_questions):
-                q["rubric"] = extracted_questions[i]
-                q["question_text"] = extracted_questions[i]
-                updated_count += 1
-
+        # REPLACE entire questions array with extracted structure
         await db.exams.update_one(
             {"exam_id": exam_id},
             {"$set": {
-                "questions": questions,
-                "extraction_source": target_source
+                "questions": extracted_questions,
+                "extraction_source": target_source,
+                "total_marks": total_marks  # Update total marks based on extraction
             }}
         )
 
-        logger.info(f"Successfully extracted {updated_count} questions from {target_source}")
+        logger.info(f"✅ Successfully extracted {len(extracted_questions)} questions with complete structure from {target_source}")
         return {
             "success": True,
-            "message": f"Successfully extracted {updated_count} questions from {target_source.replace('_', ' ')}",
-            "count": updated_count,
+            "message": f"Successfully extracted {len(extracted_questions)} questions with structure from {target_source.replace('_', ' ')}",
+            "count": len(extracted_questions),
+            "total_marks": total_marks,
             "source": target_source,
             "skipped": False
         }
