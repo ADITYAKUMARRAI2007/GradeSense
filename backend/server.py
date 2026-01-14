@@ -3263,16 +3263,14 @@ async def upload_model_answer(
     
     # Store images in separate collection to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
-    model_answer_data = base64.b64encode(pdf_bytes).decode()
     
-    # Store the file data separately
+    # Store the file data separately (images only, no raw PDF to save space)
     await db.exam_files.update_one(
         {"exam_id": exam_id, "file_type": "model_answer"},
         {"$set": {
             "exam_id": exam_id,
             "file_type": "model_answer",
             "file_id": file_id,
-            "file_data": model_answer_data,
             "images": images,
             "uploaded_at": datetime.now(timezone.utc).isoformat()
         }},
