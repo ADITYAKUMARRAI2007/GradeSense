@@ -325,6 +325,113 @@ export default function ManageExams({ user }) {
     }
   };
 
+  // Validation function for questions
+  const validateQuestions = (questions) => {
+    const warnings = [];
+    const errors = [];
+    let totalMarks = 0;
+    const questionNumbers = new Set();
+    
+    questions.forEach((q, idx) => {
+      const qNum = q.question_number;
+      
+      if (!qNum) {
+        errors.push(`Question at index ${idx + 1} is missing question_number`);
+        return;
+      }
+      
+      if (questionNumbers.has(qNum)) {
+        errors.push(`Duplicate question number: Q${qNum}`);
+      }
+      questionNumbers.add(qNum);
+      
+      const qMarks = q.max_marks || 0;
+      if (qMarks <= 0) {
+        errors.push(`Q${qNum}: Missing or invalid max_marks`);
+      }
+      
+      totalMarks += qMarks;
+      
+      if (q.sub_questions && q.sub_questions.length > 0) {
+        const subTotal = q.sub_questions.reduce((sum, sub) => sum + (sub.max_marks || 0), 0);
+        if (Math.abs(subTotal - qMarks) > 0.1) {
+          warnings.push(`Q${qNum}: Sub-questions (${subTotal}) ≠ Total (${qMarks})`);
+        }
+        
+        q.sub_questions.forEach(sub => {
+          if (sub.sub_questions && sub.sub_questions.length > 0) {
+            const nestedTotal = sub.sub_questions.reduce((sum, ssub) => sum + (ssub.max_marks || 0), 0);
+            if (Math.abs(nestedTotal - sub.max_marks) > 0.1) {
+              warnings.push(`Q${qNum}(${sub.sub_id}): Nested marks (${nestedTotal}) ≠ Parent (${sub.max_marks})`);
+            }
+          }
+        });
+      }
+    });
+    
+    if (questionNumbers.size > 0) {
+      const maxNum = Math.max(...questionNumbers);
+      const expected = new Set(Array.from({length: maxNum}, (_, i) => i + 1));
+      const missing = [...expected].filter(n => !questionNumbers.has(n));
+      if (missing.length > 0) {
+        warnings.push(`Missing question numbers: ${missing.join(', ')}`);
+      }
+    }
+    
+    setValidationResult({
+      valid: errors.length === 0,
+      errors,
+      warnings,
+      totalMarks,
+      questionCount: questions.length
+    });
+  };
+
+  // Handle edit questions
+  const handleEditQuestions = (exam) => {
+    setSelectedExam(exam);
+    setEditingQuestions(exam.questions || []);
+    validateQuestions(exam.questions || []);
+    setEditQuestionsDialogOpen(true);
+  };
+
+  // Handle re-extract questions
+  const handleReExtractQuestions = async (examId) => {
+    try {
+      setReExtracting(true);
+      const response = await axios.post(`${API}/exams/${examId}/re-extract-questions`);
+      toast.success(response.data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to re-extract questions");
+    } finally {
+      setReExtracting(false);
+    }
+  };
+
+  // Handle save questions
+  const handleSaveQuestions = async () => {
+    if (!validationResult || validationResult.errors.length > 0) {
+      toast.error("Please fix errors before saving");
+      return;
+    }
+    
+    try {
+      setSavingQuestions(true);
+      await axios.put(`${API}/exams/${selectedExam.exam_id}`, {
+        questions: editingQuestions,
+        total_marks: validationResult.totalMarks
+      });
+      toast.success("Questions updated successfully");
+      setEditQuestionsDialogOpen(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to save questions");
+    } finally {
+      setSavingQuestions(false);
+    }
+  };
+
   // Upload Model Answer Paper
   const handleUploadModelAnswer = async (event) => {
     const file = event.target.files?.[0];
