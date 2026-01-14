@@ -3,6 +3,10 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from motor import motor_asyncio
+import motor.motor_asyncio
+import gridfs
+from gridfs import GridFS
 import os
 import logging
 from pathlib import Path
@@ -18,6 +22,7 @@ from PIL import Image
 import asyncio
 import hashlib
 import json
+import pickle
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
