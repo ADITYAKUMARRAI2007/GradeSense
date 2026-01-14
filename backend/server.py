@@ -2020,7 +2020,7 @@ async def get_or_create_student(
     return (user_id, None)
 
 def pdf_to_images(pdf_bytes: bytes) -> List[str]:
-    """Convert PDF pages to base64 images - NO PAGE LIMIT"""
+    """Convert PDF pages to base64 images with compression - NO PAGE LIMIT"""
     images = []
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     
@@ -2030,11 +2030,21 @@ def pdf_to_images(pdf_bytes: bytes) -> List[str]:
         # Use 1.5x zoom for balance between quality and token efficiency
         pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
         img_bytes = pix.tobytes("jpeg")
-        img_base64 = base64.b64encode(img_bytes).decode()
+        
+        # Compress the image to save storage (40-60% reduction)
+        img = Image.open(io.BytesIO(img_bytes))
+        
+        # Compress with quality=60 (good balance of quality vs size)
+        compressed_buffer = io.BytesIO()
+        img.save(compressed_buffer, format="JPEG", quality=60, optimize=True)
+        compressed_bytes = compressed_buffer.getvalue()
+        
+        # Convert to base64
+        img_base64 = base64.b64encode(compressed_bytes).decode()
         images.append(img_base64)
     
     doc.close()
-    logger.info(f"Converted PDF with {len(images)} pages to images")
+    logger.info(f"Converted PDF with {len(images)} pages to compressed images")
     return images
 
 def detect_and_correct_rotation(image_base64: str) -> str:
