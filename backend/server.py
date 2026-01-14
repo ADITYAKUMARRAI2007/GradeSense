@@ -3003,6 +3003,21 @@ Return valid JSON only."""
                 return res.get("scores", [])
 
             except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Check for rate limiting
+                if "429" in str(e) or "rate limit" in error_msg or "quota" in error_msg:
+                    wait_time = 60 * (attempt + 1)  # Exponential: 60s, 120s, 180s
+                    logger.warning(f"Rate limit hit on chunk {chunk_idx+1}. Waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
+                    if attempt < max_retries - 1:
+                        continue  # Retry immediately after wait
+                    else:
+                        raise HTTPException(
+                            status_code=429,
+                            detail="API rate limit exceeded. Please try again in a few minutes or upgrade your plan."
+                        )
+                
                 logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay * (2**attempt))
