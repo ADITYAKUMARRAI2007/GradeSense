@@ -1201,6 +1201,46 @@ export default function UploadGrade({ user }) {
               <CardDescription>Upload student answer sheets for grading</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Validation: Require paper upload and questions */}
+              {!paperUploaded && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-red-900">⚠️ Cannot Proceed to Grading</p>
+                      <p className="text-sm text-red-800">
+                        You must upload either a <strong>Question Paper</strong> or <strong>Model Answer</strong> in Step 2 before proceeding to grade student papers.
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setStep(2)}
+                        className="mt-2 border-red-300 text-red-700 hover:bg-red-50"
+                      >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Go Back to Step 2
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(formData.questions.length === 0 && !questionsSkipped) && paperUploaded && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-yellow-900">⚠️ No Questions Defined</p>
+                      <p className="text-sm text-yellow-800">
+                        Questions should be auto-extracted from the uploaded paper. If extraction failed, you can add them manually in Step 4 or after exam creation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {paperUploaded && (
+              <>
               {/* File Format Instructions */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
