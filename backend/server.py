@@ -1844,7 +1844,7 @@ Important:
 - Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Use first page only (usually has student info)
         first_page = [file_images[0]]
