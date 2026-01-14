@@ -912,9 +912,86 @@ export default function UploadGrade({ user }) {
           <Card className="animate-fade-in">
             <CardHeader>
               <CardTitle>Step 4: Question Configuration</CardTitle>
-              <CardDescription>Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed.</CardDescription>
+              <CardDescription>
+                {showManualEntry || questionsSkipped
+                  ? "Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed."
+                  : "Choose how you want to configure questions for this exam."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!showManualEntry && !questionsSkipped && (
+                <div className="space-y-6">
+                  <div className="text-center py-8">
+                    <h3 className="text-lg font-semibold mb-4">How would you like to add questions?</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+                      <Card className="p-6 cursor-pointer hover:border-primary transition-colors" onClick={() => setShowManualEntry(true)}>
+                        <div className="text-center space-y-3">
+                          <div className="h-12 w-12 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                            <Plus className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <h4 className="font-semibold">Enter Manually</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Manually configure questions, marks, and sub-questions now
+                          </p>
+                        </div>
+                      </Card>
+                      
+                      <Card className="p-6 cursor-pointer hover:border-primary transition-colors" 
+                        onClick={() => {
+                          setQuestionsSkipped(true);
+                          setFormData(prev => ({...prev, questions: []}));
+                        }}
+                      >
+                        <div className="text-center space-y-3">
+                          <div className="h-12 w-12 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                            <CheckCircle className="h-6 w-6 text-green-600" />
+                          </div>
+                          <h4 className="font-semibold">Auto-Extract from Papers</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Questions will be automatically extracted from uploaded question paper or model answer
+                          </p>
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            Recommended
+                          </Badge>
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
+
+                  {paperUploaded ? (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        <CheckCircle className="inline h-4 w-4 mr-2" />
+                        <strong>Paper uploaded!</strong> Questions will be extracted automatically. You can edit them later in Manage Exams.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        <AlertCircle className="inline h-4 w-4 mr-2" />
+                        <strong>Note:</strong> Make sure to upload question paper or model answer in Step 2 for auto-extraction to work.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between pt-4 border-t">
+                    <Button variant="outline" onClick={() => setStep(3)}>
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back
+                    </Button>
+                    {questionsSkipped && (
+                      <Button onClick={handleSaveQuestionsAndContinue} disabled={loading}>
+                        {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        Continue to Upload Papers
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {(showManualEntry || questionsSkipped) && (
+              <div>
               {formData.questions.map((question, index) => (
                 <div key={index} className="p-4 bg-muted/50 rounded-lg space-y-3">
                   <div className="flex items-start justify-between gap-4">
