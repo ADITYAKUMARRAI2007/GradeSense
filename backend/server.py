@@ -129,10 +129,10 @@ class ExamCreate(BaseModel):
     subject_id: str
     exam_type: str
     exam_name: str
-    total_marks: float
+    total_marks: float = 100  # Default to 100, will be updated after extraction
     exam_date: str
     grading_mode: str
-    questions: List[dict] = []
+    questions: List[dict] = []  # Now optional, will be populated by auto-extraction
 
 class SubQuestionScore(BaseModel):
     sub_id: str
