@@ -3236,6 +3236,30 @@ async def upload_model_answer(
         force_extraction = True
         
     result = await auto_extract_questions(exam_id, force=force_extraction)
+    
+    # RE-EXTRACT model answer text if questions were just populated
+    if result.get("success") and result.get("count", 0) > 0:
+        logger.info(f"Questions populated ({result.get('count')}). Re-extracting model answer text with question context...")
+        
+        # Fetch updated exam with questions
+        exam_updated = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+        
+        # Re-extract with proper question context
+        model_answer_text_updated = await extract_model_answer_content(
+            model_answer_images=images,
+            questions=exam_updated.get("questions", [])
+        )
+        
+        # Update with better extraction
+        if model_answer_text_updated and len(model_answer_text_updated) > len(model_answer_text):
+            await db.exam_files.update_one(
+                {"exam_id": exam_id, "file_type": "model_answer"},
+                {"$set": {
+                    "model_answer_text": model_answer_text_updated,
+                    "text_extracted_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            logger.info(f"Updated model answer text ({len(model_answer_text_updated)} chars) with question context")
 
     message = "Model answer uploaded successfully."
     if result.get("success"):
