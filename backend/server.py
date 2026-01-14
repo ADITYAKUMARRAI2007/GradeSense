@@ -3436,17 +3436,28 @@ async def upload_question_paper(
     
     images = pdf_to_images(pdf_bytes)
     
-    # Store images in separate collection to avoid MongoDB 16MB document limit
+    # Store images in GridFS to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
     
-    # Store the file data separately (images only, no raw PDF to save space)
+    # Serialize images and store in GridFS
+    images_data = pickle.dumps(images)
+    gridfs_id = fs.put(
+        images_data,
+        filename=f"question_paper_{exam_id}_{file_id}",
+        content_type="application/python-pickle",
+        exam_id=exam_id,
+        file_type="question_paper"
+    )
+    
+    # Store only metadata and GridFS reference in MongoDB
     await db.exam_files.update_one(
         {"exam_id": exam_id, "file_type": "question_paper"},
         {"$set": {
             "exam_id": exam_id,
             "file_type": "question_paper",
             "file_id": file_id,
-            "images": images,
+            "gridfs_id": str(gridfs_id),
+            "page_count": len(images),
             "uploaded_at": datetime.now(timezone.utc).isoformat()
         }},
         upsert=True
