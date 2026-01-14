@@ -2826,7 +2826,7 @@ Your measure of success: When the same paper graded by you and by an expert teac
             api_key=api_key,
             session_id=f"grading_{content_hash}_{chunk_idx}",
             system_message=master_system_prompt
-        ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
 
         # Prepare images based on grading mode
         chunk_all_images = []
