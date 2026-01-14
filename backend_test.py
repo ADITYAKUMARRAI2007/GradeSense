@@ -3894,6 +3894,11 @@ print('Rotation test submission created');
         self.test_llm_model_migration_verification()
         self.test_consistency_features()
         
+        # NEW FEATURE TEST: Rotation Correction and Text-Based Grading
+        print("\n🔄 NEW FEATURE TEST: Rotation Correction and Text-Based Grading")
+        print("-" * 60)
+        self.test_rotation_correction_and_text_grading()
+        
         # P0 CRITICAL TEST: Upload More Papers to Existing Exam
         print("\n🚨 P0 CRITICAL TEST: Upload More Papers to Existing Exam")
         print("-" * 60)
