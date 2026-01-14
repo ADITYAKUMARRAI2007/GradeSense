@@ -62,6 +62,13 @@ export default function ManageExams({ user }) {
   const [regradeDialogOpen, setRegradeDialogOpen] = useState(false);
   const [uploadingModelAnswer, setUploadingModelAnswer] = useState(false);
   const [uploadingQuestionPaper, setUploadingQuestionPaper] = useState(false);
+  
+  // New state for question editing
+  const [editQuestionsDialogOpen, setEditQuestionsDialogOpen] = useState(false);
+  const [editingQuestions, setEditingQuestions] = useState([]);
+  const [savingQuestions, setSavingQuestions] = useState(false);
+  const [reExtracting, setReExtracting] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'application/pdf': ['.pdf'] },
