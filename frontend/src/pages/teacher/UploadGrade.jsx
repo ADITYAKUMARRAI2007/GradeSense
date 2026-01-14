@@ -1187,6 +1187,8 @@ export default function UploadGrade({ user }) {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
+              </div>
+              )}
             </CardContent>
           </Card>
         )}
