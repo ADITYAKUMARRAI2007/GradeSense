@@ -4006,7 +4006,7 @@ Only return the JSON array, no other text."""
                 api_key=llm_key,
                 session_id=f"misconceptions_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert at analyzing student misconceptions and learning patterns."
-            ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
