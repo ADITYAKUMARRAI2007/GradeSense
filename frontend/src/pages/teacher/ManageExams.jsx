@@ -1263,6 +1263,117 @@ export default function ManageExams({ user }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Questions Dialog */}
+      <Dialog open={editQuestionsDialogOpen} onOpenChange={setEditQuestionsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Question Structure - {selectedExam?.exam_name}</DialogTitle>
+            <CardDescription>
+              Modify question numbers, marks, and sub-questions. Changes are validated automatically.
+            </CardDescription>
+          </DialogHeader>
+          
+          {/* Validation Messages */}
+          {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
+            <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
+              {validationResult.errors.map((err, i) => (
+                <div key={`err-${i}`} className="text-red-600 text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <span>{err}</span>
+                </div>
+              ))}
+              {validationResult.warnings.map((warn, i) => (
+                <div key={`warn-${i}`} className="text-yellow-600 text-sm flex items-center gap-2">
+                  <AlertCircleIcon className="h-4 w-4 flex-shrink-0" />
+                  <span>{warn}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Summary Stats */}
+          <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-lg">
+            <div className="text-sm">
+              <span className="font-medium">{validationResult?.questionCount || 0}</span> Questions
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">{validationResult?.totalMarks || 0}</span> Total Marks
+            </div>
+            <div className={`text-sm ${validationResult?.valid ? 'text-green-600' : 'text-red-600'}`}>
+              {validationResult?.valid ? '✓ Valid' : '✗ Has Errors'}
+            </div>
+          </div>
+          
+          {/* Questions Editor - Scrollable */}
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {editingQuestions.map((q, qIdx) => (
+              <QuestionEditor
+                key={qIdx}
+                question={q}
+                onChange={(updated) => {
+                  const newQuestions = [...editingQuestions];
+                  newQuestions[qIdx] = updated;
+                  setEditingQuestions(newQuestions);
+                  validateQuestions(newQuestions);
+                }}
+                onRemove={() => {
+                  const newQuestions = editingQuestions.filter((_, i) => i !== qIdx);
+                  setEditingQuestions(newQuestions);
+                  validateQuestions(newQuestions);
+                }}
+              />
+            ))}
+            
+            <Button
+              variant="outline"
+              onClick={() => {
+                const newQuestions = [
+                  ...editingQuestions,
+                  {
+                    question_number: editingQuestions.length + 1,
+                    max_marks: 10,
+                    rubric: "",
+                    question_text: "",
+                    sub_questions: []
+                  }
+                ];
+                setEditingQuestions(newQuestions);
+                validateQuestions(newQuestions);
+              }}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add New Question
+            </Button>
+          </div>
+          
+          {/* Footer Actions */}
+          <div className="flex justify-between items-center pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setEditQuestionsDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveQuestions}
+              disabled={savingQuestions || (validationResult && validationResult.errors.length > 0)}
+            >
+              {savingQuestions ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
