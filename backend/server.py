@@ -1194,12 +1194,16 @@ async def upload_more_papers(
             # Get model answer images from separate collection
             model_answer_imgs = await get_exam_model_answer_images(exam_id)
             
+            # Get pre-extracted model answer text for efficient grading
+            model_answer_text = await get_exam_model_answer_text(exam_id)
+            
             scores = await grade_with_ai(
                 images=images,
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100)
+                total_marks=exam.get("total_marks", 100),
+                model_answer_text=model_answer_text
             )
             
             total_score = sum(s.obtained_marks for s in scores)
