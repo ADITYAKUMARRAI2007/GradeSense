@@ -2006,6 +2006,171 @@ def pdf_to_images(pdf_bytes: bytes) -> List[str]:
     logger.info(f"Converted PDF with {len(images)} pages to images")
     return images
 
+def detect_and_correct_rotation(image_base64: str) -> str:
+    """
+    Detect if an image is rotated and correct it.
+    Uses PIL to analyze image orientation and rotate if needed.
+    """
+    from PIL import Image
+    import io
+    import base64
+    
+    try:
+        # Decode base64 to image
+        img_bytes = base64.b64decode(image_base64)
+        img = Image.open(io.BytesIO(img_bytes))
+        
+        # Check EXIF orientation tag if available
+        try:
+            from PIL import ExifTags
+            for orientation in ExifTags.TAGS.keys():
+                if ExifTags.TAGS[orientation] == 'Orientation':
+                    break
+            exif = img._getexif()
+            if exif is not None:
+                orientation_value = exif.get(orientation)
+                if orientation_value == 3:
+                    img = img.rotate(180, expand=True)
+                elif orientation_value == 6:
+                    img = img.rotate(270, expand=True)
+                elif orientation_value == 8:
+                    img = img.rotate(90, expand=True)
+        except (AttributeError, KeyError, IndexError):
+            pass
+        
+        # Heuristic: Check if image is landscape but contains portrait text
+        # Most answer sheets are portrait, so if width > height significantly, it might be rotated
+        width, height = img.size
+        if width > height * 1.3:  # Landscape orientation
+            # Rotate 90 degrees counter-clockwise to make it portrait
+            img = img.rotate(90, expand=True)
+            logger.info(f"Rotated landscape image to portrait")
+        
+        # Convert back to base64
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        return base64.b64encode(buffer.getvalue()).decode()
+        
+    except Exception as e:
+        logger.error(f"Error in rotation detection: {e}")
+        return image_base64  # Return original if detection fails
+
+def correct_all_images_rotation(images: List[str]) -> List[str]:
+    """Apply rotation correction to all images in a list."""
+    corrected = []
+    for idx, img in enumerate(images):
+        corrected_img = detect_and_correct_rotation(img)
+        corrected.append(corrected_img)
+    return corrected
+
+async def get_exam_model_answer_text(exam_id: str) -> str:
+    """Get pre-extracted model answer text content for faster grading."""
+    try:
+        file_doc = await db.exam_files.find_one(
+            {"exam_id": exam_id, "file_type": "model_answer"},
+            {"_id": 0, "model_answer_text": 1}
+        )
+        if file_doc and file_doc.get("model_answer_text"):
+            return file_doc["model_answer_text"]
+    except Exception as e:
+        logger.error(f"Error getting model answer text: {e}")
+    return ""
+
+async def extract_model_answer_content(
+    model_answer_images: List[str],
+    questions: List[dict]
+) -> str:
+    """
+    Extract detailed answer content from model answer images as structured text.
+    This is done ONCE during upload and stored for use during grading.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    
+    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not api_key:
+        logger.error("No API key for model answer content extraction")
+        return ""
+    
+    if not model_answer_images:
+        return ""
+    
+    try:
+        # Build questions context
+        questions_context = ""
+        for q in questions:
+            q_num = q.get("question_number", "?")
+            q_marks = q.get("total_marks", 0)
+            questions_context += f"- Question {q_num} ({q_marks} marks)\n"
+            for sq in q.get("sub_questions", []):
+                sq_id = sq.get("sub_id", "?")
+                sq_marks = sq.get("marks", 0)
+                questions_context += f"  - Part {sq_id} ({sq_marks} marks)\n"
+        
+        # Process in chunks for large model answers
+        CHUNK_SIZE = 8
+        all_extracted_content = []
+        
+        for chunk_start in range(0, len(model_answer_images), CHUNK_SIZE):
+            chunk_end = min(chunk_start + CHUNK_SIZE, len(model_answer_images))
+            chunk_images = model_answer_images[chunk_start:chunk_end]
+            
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=f"extract_content_{uuid.uuid4().hex[:8]}",
+                system_message="""You are an expert at extracting model answer content from exam papers.
+
+Your task is to extract ALL answer content and structure it clearly.
+
+For each question/sub-question:
+1. Identify the question number
+2. Extract the COMPLETE model answer text
+3. Note any marking points or criteria
+
+Output Format:
+---
+QUESTION [number]:
+[Complete model answer text]
+
+KEY POINTS:
+- [Key point 1]
+- [Key point 2]
+---
+
+Be thorough - extract EVERY detail useful for grading."""
+            ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+            
+            image_contents = [ImageContent(image_base64=img) for img in chunk_images]
+            
+            prompt = f"""Extract ALL model answer content from pages {chunk_start + 1} to {chunk_end}.
+
+Questions in this exam:
+{questions_context}
+
+Extract complete answers for ALL questions visible on these pages."""
+
+            user_message = UserMessage(text=prompt, file_contents=image_contents)
+            
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Extracting model answer content: pages {chunk_start + 1}-{chunk_end} (attempt {attempt + 1})")
+                    response = await chat.send_message(user_message)
+                    if response:
+                        all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response}")
+                        break
+                except Exception as e:
+                    logger.error(f"Error extracting content chunk: {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(5 * (attempt + 1))
+        
+        full_content = "\n\n".join(all_extracted_content)
+        logger.info(f"Extracted model answer content: {len(full_content)} chars from {len(model_answer_images)} pages")
+        return full_content
+        
+    except Exception as e:
+        logger.error(f"Error in extract_model_answer_content: {e}")
+        return ""
+
 async def extract_questions_from_question_paper(
     question_paper_images: List[str],
     num_questions: int
