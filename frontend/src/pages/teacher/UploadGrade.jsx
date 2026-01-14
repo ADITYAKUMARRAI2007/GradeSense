@@ -1321,7 +1321,7 @@ export default function UploadGrade({ user }) {
                 </Button>
                 <Button 
                   onClick={handleStartGrading} 
-                  disabled={studentFiles.length === 0 || processing}
+                  disabled={studentFiles.length === 0 || processing || !paperUploaded}
                   data-testid="start-grading-btn"
                 >
                   {processing ? (
@@ -1331,6 +1331,8 @@ export default function UploadGrade({ user }) {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
+              </>
+              )}
             </CardContent>
           </Card>
         )}
