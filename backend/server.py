@@ -3029,16 +3029,47 @@ Return valid JSON only."""
                 logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                 ai_resp = await chunk_chat.send_message(user_msg)
 
-                # Parse
+                # Robust JSON parsing with multiple strategies
                 import json
+                import re
                 resp_text = ai_resp.strip()
+                
+                # Strategy 1: Direct parse
+                try:
+                    res = json.loads(resp_text)
+                    return res.get("scores", [])
+                except json.JSONDecodeError:
+                    pass
+                
+                # Strategy 2: Remove code blocks
                 if resp_text.startswith("```"):
                     resp_text = resp_text.split("```")[1]
                     if resp_text.startswith("json"):
                         resp_text = resp_text[4:]
-
-                res = json.loads(resp_text)
-                return res.get("scores", [])
+                    resp_text = resp_text.strip()
+                    try:
+                        res = json.loads(resp_text)
+                        return res.get("scores", [])
+                    except json.JSONDecodeError:
+                        pass
+                
+                # Strategy 3: Find JSON in response
+                json_match = re.search(r'\{[^{}]*"scores"[^{}]*\[[^\]]*\][^{}]*\}', resp_text, re.DOTALL)
+                if json_match:
+                    try:
+                        res = json.loads(json_match.group())
+                        return res.get("scores", [])
+                    except json.JSONDecodeError:
+                        pass
+                
+                # All strategies failed
+                logger.warning(f"Failed to parse grading JSON (attempt {attempt + 1}). Response preview: {resp_text[:200]}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (2 ** attempt))
+                    continue
+                else:
+                    logger.error(f"All JSON parsing strategies failed for chunk {chunk_idx+1}")
+                    return []
 
             except Exception as e:
                 error_msg = str(e).lower()
