@@ -1136,6 +1136,16 @@ async def upload_more_papers(
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
+            
+            # Check file size - limit to 30MB for safety
+            file_size_mb = len(pdf_bytes) / (1024 * 1024)
+            if len(pdf_bytes) > 30 * 1024 * 1024:
+                errors.append({
+                    "filename": file.filename,
+                    "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
+                })
+                continue
+            
             images = pdf_to_images(pdf_bytes)
             
             if not images:
