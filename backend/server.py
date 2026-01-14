@@ -3241,9 +3241,13 @@ async def upload_model_answer(
     # Read and convert PDF to images
     pdf_bytes = await file.read()
     
-    # Check file size - limit to 15MB for safety
-    if len(pdf_bytes) > 15 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large. Maximum size is 15MB.")
+    # Check file size - limit to 30MB for safety
+    file_size_mb = len(pdf_bytes) / (1024 * 1024)
+    if len(pdf_bytes) > 30 * 1024 * 1024:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the PDF or reducing scan quality."
+        )
     
     images = pdf_to_images(pdf_bytes)
     
