@@ -3,10 +3,6 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from motor import motor_asyncio
-import motor.motor_asyncio
-import gridfs
-from gridfs import GridFS
 import os
 import logging
 from pathlib import Path
@@ -22,7 +18,6 @@ from PIL import Image
 import asyncio
 import hashlib
 import json
-import pickle
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -31,13 +26,6 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
-
-# GridFS for storing large files (model answers, question papers)
-# Using synchronous GridFS since Motor doesn't have async GridFS yet
-from pymongo import MongoClient
-sync_client = MongoClient(mongo_url)
-sync_db = sync_client[os.environ['DB_NAME']]
-fs = GridFS(sync_db)
 
 # Create the main app
 app = FastAPI(title="GradeSense API")
@@ -129,10 +117,10 @@ class ExamCreate(BaseModel):
     subject_id: str
     exam_type: str
     exam_name: str
-    total_marks: float = 100  # Default to 100, will be updated after extraction
+    total_marks: float
     exam_date: str
     grading_mode: str
-    questions: List[dict] = []  # Now optional, will be populated by auto-extraction
+    questions: List[dict] = []
 
 class SubQuestionScore(BaseModel):
     sub_id: str
@@ -242,29 +230,16 @@ def get_model_answer_hash(images):
     return hashlib.sha256(json.dumps(image_hashes).encode()).hexdigest()
 
 async def get_exam_model_answer_images(exam_id: str) -> List[str]:
-    """Get model answer images from GridFS or fallback to old storage"""
-    # First try GridFS storage (new method)
+    """Get model answer images from separate collection or fallback to exam document"""
+    # First try the new separate collection
     file_doc = await db.exam_files.find_one(
         {"exam_id": exam_id, "file_type": "model_answer"},
-        {"_id": 0, "gridfs_id": 1, "images": 1}
+        {"_id": 0, "images": 1}
     )
+    if file_doc and file_doc.get("images"):
+        return file_doc["images"]
     
-    if file_doc:
-        # Try GridFS first (new storage)
-        if file_doc.get("gridfs_id"):
-            try:
-                from bson import ObjectId
-                gridfs_file = fs.get(ObjectId(file_doc["gridfs_id"]))
-                images = pickle.loads(gridfs_file.read())
-                return images
-            except Exception as e:
-                logger.error(f"Error retrieving from GridFS: {e}")
-        
-        # Fallback to direct images storage (old method, still supported)
-        if file_doc.get("images"):
-            return file_doc["images"]
-    
-    # Fallback to very old storage in exam document
+    # Fallback to old storage in exam document
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "model_answer_images": 1})
     if exam and exam.get("model_answer_images"):
         return exam["model_answer_images"]
@@ -272,103 +247,21 @@ async def get_exam_model_answer_images(exam_id: str) -> List[str]:
     return []
 
 async def get_exam_question_paper_images(exam_id: str) -> List[str]:
-    """Get question paper images from GridFS or fallback to old storage"""
-    # First try GridFS storage (new method)
+    """Get question paper images from separate collection or fallback to exam document"""
+    # First try the new separate collection
     file_doc = await db.exam_files.find_one(
         {"exam_id": exam_id, "file_type": "question_paper"},
-        {"_id": 0, "gridfs_id": 1, "images": 1}
+        {"_id": 0, "images": 1}
     )
+    if file_doc and file_doc.get("images"):
+        return file_doc["images"]
     
-    if file_doc:
-        # Try GridFS first (new storage)
-        if file_doc.get("gridfs_id"):
-            try:
-                from bson import ObjectId
-                gridfs_file = fs.get(ObjectId(file_doc["gridfs_id"]))
-                images = pickle.loads(gridfs_file.read())
-                return images
-            except Exception as e:
-                logger.error(f"Error retrieving from GridFS: {e}")
-        
-        # Fallback to direct images storage (old method, still supported)
-        if file_doc.get("images"):
-            return file_doc["images"]
-    
-    # Fallback to very old storage in exam document
+    # Fallback to old storage in exam document
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "question_paper_images": 1})
     if exam and exam.get("question_paper_images"):
         return exam["question_paper_images"]
     
     return []
-
-def validate_question_structure(questions: List[dict]) -> Dict[str, Any]:
-    """
-    Validate question structure for consistency.
-    Returns validation result with warnings/errors.
-    """
-    warnings = []
-    errors = []
-    
-    if not questions:
-        errors.append("No questions found")
-        return {"valid": False, "errors": errors, "warnings": warnings}
-    
-    total_marks = 0
-    question_numbers = set()
-    
-    for idx, q in enumerate(questions):
-        q_num = q.get("question_number")
-        
-        # Check for missing question number
-        if not q_num:
-            errors.append(f"Question at index {idx} is missing question_number")
-            continue
-        
-        # Check for duplicate question numbers
-        if q_num in question_numbers:
-            errors.append(f"Duplicate question number: Q{q_num}")
-        question_numbers.add(q_num)
-        
-        # Check for missing marks
-        q_marks = q.get("max_marks", 0)
-        if q_marks <= 0:
-            errors.append(f"Q{q_num}: Missing or invalid max_marks")
-        
-        total_marks += q_marks
-        
-        # Validate sub-questions
-        sub_questions = q.get("sub_questions", [])
-        if sub_questions:
-            sub_total = 0
-            for sub in sub_questions:
-                sub_marks = sub.get("max_marks", 0)
-                sub_total += sub_marks
-                
-                # Check nested sub-questions
-                if "sub_questions" in sub and sub["sub_questions"]:
-                    nested_total = sum(ssub.get("max_marks", 0) for ssub in sub["sub_questions"])
-                    if abs(nested_total - sub_marks) > 0.1:
-                        warnings.append(f"Q{q_num}({sub.get('sub_id')}): Sub-question marks ({nested_total}) don't match parent ({sub_marks})")
-            
-            # Check if sub-question marks match parent
-            if abs(sub_total - q_marks) > 0.1:
-                warnings.append(f"Q{q_num}: Sub-question total ({sub_total}) doesn't match question total ({q_marks})")
-    
-    # Check for missing question numbers in sequence
-    if question_numbers:
-        max_num = max(question_numbers)
-        expected = set(range(1, max_num + 1))
-        missing = expected - question_numbers
-        if missing:
-            warnings.append(f"Missing question numbers: {sorted(missing)}")
-    
-    return {
-        "valid": len(errors) == 0,
-        "errors": errors,
-        "warnings": warnings,
-        "total_marks": total_marks,
-        "question_count": len(questions)
-    }
 
 async def exam_has_model_answer(exam_id: str) -> bool:
     """Check if exam has model answer uploaded"""
@@ -1243,16 +1136,6 @@ async def upload_more_papers(
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
-            
-            # Check file size - limit to 30MB for safety
-            file_size_mb = len(pdf_bytes) / (1024 * 1024)
-            if len(pdf_bytes) > 30 * 1024 * 1024:
-                errors.append({
-                    "filename": file.filename,
-                    "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
-                })
-                continue
-            
             images = pdf_to_images(pdf_bytes)
             
             if not images:
@@ -1311,16 +1194,12 @@ async def upload_more_papers(
             # Get model answer images from separate collection
             model_answer_imgs = await get_exam_model_answer_images(exam_id)
             
-            # Get pre-extracted model answer text for efficient grading
-            model_answer_text = await get_exam_model_answer_text(exam_id)
-            
             scores = await grade_with_ai(
                 images=images,
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_text
+                total_marks=exam.get("total_marks", 100)
             )
             
             total_score = sum(s.obtained_marks for s in scores)
@@ -1557,9 +1436,6 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     # Get model answer images from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
     
-    # Get pre-extracted model answer text for efficient grading
-    model_answer_text = await get_exam_model_answer_text(exam_id)
-    
     regraded_count = 0
     errors = []
     
@@ -1577,8 +1453,7 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_text
+                total_marks=exam.get("total_marks", 100)
             )
             
             # Calculate total score using exam's total_marks
@@ -1903,10 +1778,39 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
     
     for i, q in enumerate(questions):
         if i < len(extracted_questions):
-            q["rubric"] = extracted_questions[i]
-            q["question_text"] = extracted_questions[i]  # Also set question_text field
+            extracted_item = extracted_questions[i]
+
+            if isinstance(extracted_item, str):
+                q["rubric"] = extracted_item
+                q["question_text"] = extracted_item
+            elif isinstance(extracted_item, dict):
+                # Structured extraction
+                q["rubric"] = extracted_item.get("rubric", "")
+                q["question_text"] = extracted_item.get("question_text", "")
+
+                # Handle sub-questions if present in extraction
+                extracted_subs = extracted_item.get("sub_questions", [])
+                if extracted_subs:
+                    existing_subs = q.get("sub_questions", [])
+                    existing_sub_map = {}
+                    for s in existing_subs:
+                        sid = s.get("sub_id") if isinstance(s, dict) else s.sub_id
+                        existing_sub_map[sid] = s
+
+                    for ext_sub in extracted_subs:
+                        sub_id = ext_sub.get("sub_id")
+                        if sub_id in existing_sub_map:
+                            existing_sub = existing_sub_map[sub_id]
+                            if isinstance(existing_sub, dict):
+                                existing_sub["rubric"] = ext_sub.get("rubric")
+                            else:
+                                existing_sub.rubric = ext_sub.get("rubric")
+
             updated_count += 1
     
+    # Validate extraction
+    validate_extraction(questions)
+
     # Update exam in database
     await db.exams.update_one(
         {"exam_id": exam_id},
@@ -1917,46 +1821,6 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
         "message": f"Successfully extracted {updated_count} questions from {source}",
         "updated_count": updated_count,
         "source": source
-    }
-
-@api_router.post("/exams/{exam_id}/re-extract-questions")
-async def re_extract_question_structure(exam_id: str, user: User = Depends(get_current_user)):
-    """
-    Re-extract COMPLETE question structure (with force=True).
-    Use this when initial extraction was incorrect or incomplete.
-    """
-    if user.role != "teacher":
-        raise HTTPException(status_code=403, detail="Only teachers can re-extract questions")
-    
-    # Verify exam belongs to teacher
-    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
-    if not exam:
-        raise HTTPException(status_code=404, detail="Exam not found")
-    
-    # Force re-extraction
-    result = await auto_extract_questions(exam_id, force=True)
-    
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=500, 
-            detail=result.get("message", "Failed to re-extract questions")
-        )
-    
-    return {
-        "message": result.get("message"),
-        "count": result.get("count", 0),
-        "total_marks": result.get("total_marks", 0),
-        "source": result.get("source", ""),
-        "questions": exam.get("questions", [])
-    }
-    result = await db.exams.update_one(
-        {"exam_id": exam_id},
-        {"$set": {"questions": questions}}
-    )
-    
-    return {
-        "message": f"Successfully extracted and updated {updated_count} questions",
-        "questions_updated": updated_count
     }
 
 # ============== FILE UPLOAD & GRADING ==============
@@ -1992,15 +1856,14 @@ Important:
 - Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         # Use first page only (usually has student info)
-        from emergentintegrations.llm.chat import ImageContent
-        first_page_image = ImageContent(image_base64=file_images[0])
+        first_page = [file_images[0]]
         
         user_message = UserMessage(
             text="Extract the student ID/roll number and name from this answer sheet.",
-            file_contents=[first_page_image]
+            file_contents=first_page
         )
         
         response = await chat.send_message(user_message)
@@ -2146,7 +2009,7 @@ async def get_or_create_student(
     return (user_id, None)
 
 def pdf_to_images(pdf_bytes: bytes) -> List[str]:
-    """Convert PDF pages to base64 images with compression - NO PAGE LIMIT"""
+    """Convert PDF pages to base64 images - NO PAGE LIMIT"""
     images = []
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     
@@ -2156,192 +2019,17 @@ def pdf_to_images(pdf_bytes: bytes) -> List[str]:
         # Use 1.5x zoom for balance between quality and token efficiency
         pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
         img_bytes = pix.tobytes("jpeg")
-        
-        # Compress the image to save storage (40-60% reduction)
-        img = Image.open(io.BytesIO(img_bytes))
-        
-        # Compress with quality=60 (good balance of quality vs size)
-        compressed_buffer = io.BytesIO()
-        img.save(compressed_buffer, format="JPEG", quality=60, optimize=True)
-        compressed_bytes = compressed_buffer.getvalue()
-        
-        # Convert to base64
-        img_base64 = base64.b64encode(compressed_bytes).decode()
+        img_base64 = base64.b64encode(img_bytes).decode()
         images.append(img_base64)
     
     doc.close()
-    logger.info(f"Converted PDF with {len(images)} pages to compressed images")
+    logger.info(f"Converted PDF with {len(images)} pages to images")
     return images
-
-def detect_and_correct_rotation(image_base64: str) -> str:
-    """
-    Detect if an image is rotated and correct it.
-    Uses PIL to analyze image orientation and rotate if needed.
-    """
-    from PIL import Image
-    import io
-    import base64
-    
-    try:
-        # Decode base64 to image
-        img_bytes = base64.b64decode(image_base64)
-        img = Image.open(io.BytesIO(img_bytes))
-        
-        # Check EXIF orientation tag if available
-        try:
-            from PIL import ExifTags
-            for orientation in ExifTags.TAGS.keys():
-                if ExifTags.TAGS[orientation] == 'Orientation':
-                    break
-            exif = img._getexif()
-            if exif is not None:
-                orientation_value = exif.get(orientation)
-                if orientation_value == 3:
-                    img = img.rotate(180, expand=True)
-                elif orientation_value == 6:
-                    img = img.rotate(270, expand=True)
-                elif orientation_value == 8:
-                    img = img.rotate(90, expand=True)
-        except (AttributeError, KeyError, IndexError):
-            pass
-        
-        # Heuristic: Check if image is landscape but contains portrait text
-        # Most answer sheets are portrait, so if width > height significantly, it might be rotated
-        width, height = img.size
-        if width > height * 1.3:  # Landscape orientation
-            # Rotate 90 degrees counter-clockwise to make it portrait
-            img = img.rotate(90, expand=True)
-            logger.info(f"Rotated landscape image to portrait")
-        
-        # Convert back to base64
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        return base64.b64encode(buffer.getvalue()).decode()
-        
-    except Exception as e:
-        logger.error(f"Error in rotation detection: {e}")
-        return image_base64  # Return original if detection fails
-
-def correct_all_images_rotation(images: List[str]) -> List[str]:
-    """Apply rotation correction to all images in a list."""
-    corrected = []
-    for idx, img in enumerate(images):
-        corrected_img = detect_and_correct_rotation(img)
-        corrected.append(corrected_img)
-    return corrected
-
-async def get_exam_model_answer_text(exam_id: str) -> str:
-    """Get pre-extracted model answer text content for faster grading."""
-    try:
-        file_doc = await db.exam_files.find_one(
-            {"exam_id": exam_id, "file_type": "model_answer"},
-            {"_id": 0, "model_answer_text": 1}
-        )
-        if file_doc and file_doc.get("model_answer_text"):
-            return file_doc["model_answer_text"]
-    except Exception as e:
-        logger.error(f"Error getting model answer text: {e}")
-    return ""
-
-async def extract_model_answer_content(
-    model_answer_images: List[str],
-    questions: List[dict]
-) -> str:
-    """
-    Extract detailed answer content from model answer images as structured text.
-    This is done ONCE during upload and stored for use during grading.
-    """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-    
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
-    if not api_key:
-        logger.error("No API key for model answer content extraction")
-        return ""
-    
-    if not model_answer_images:
-        return ""
-    
-    try:
-        # Build questions context
-        questions_context = ""
-        for q in questions:
-            q_num = q.get("question_number", "?")
-            q_marks = q.get("total_marks", 0)
-            questions_context += f"- Question {q_num} ({q_marks} marks)\n"
-            for sq in q.get("sub_questions", []):
-                sq_id = sq.get("sub_id", "?")
-                sq_marks = sq.get("marks", 0)
-                questions_context += f"  - Part {sq_id} ({sq_marks} marks)\n"
-        
-        # Process in chunks for large model answers
-        CHUNK_SIZE = 8
-        all_extracted_content = []
-        
-        for chunk_start in range(0, len(model_answer_images), CHUNK_SIZE):
-            chunk_end = min(chunk_start + CHUNK_SIZE, len(model_answer_images))
-            chunk_images = model_answer_images[chunk_start:chunk_end]
-            
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=f"extract_content_{uuid.uuid4().hex[:8]}",
-                system_message="""You are an expert at extracting model answer content from exam papers.
-
-Your task is to extract ALL answer content and structure it clearly.
-
-For each question/sub-question:
-1. Identify the question number
-2. Extract the COMPLETE model answer text
-3. Note any marking points or criteria
-
-Output Format:
----
-QUESTION [number]:
-[Complete model answer text]
-
-KEY POINTS:
-- [Key point 1]
-- [Key point 2]
----
-
-Be thorough - extract EVERY detail useful for grading."""
-            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
-            
-            image_contents = [ImageContent(image_base64=img) for img in chunk_images]
-            
-            prompt = f"""Extract ALL model answer content from pages {chunk_start + 1} to {chunk_end}.
-
-Questions in this exam:
-{questions_context}
-
-Extract complete answers for ALL questions visible on these pages."""
-
-            user_message = UserMessage(text=prompt, file_contents=image_contents)
-            
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    logger.info(f"Extracting model answer content: pages {chunk_start + 1}-{chunk_end} (attempt {attempt + 1})")
-                    response = await chat.send_message(user_message)
-                    if response:
-                        all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response}")
-                        break
-                except Exception as e:
-                    logger.error(f"Error extracting content chunk: {e}")
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(5 * (attempt + 1))
-        
-        full_content = "\n\n".join(all_extracted_content)
-        logger.info(f"Extracted model answer content: {len(full_content)} chars from {len(model_answer_images)} pages")
-        return full_content
-        
-    except Exception as e:
-        logger.error(f"Error in extract_model_answer_content: {e}")
-        return ""
 
 async def extract_questions_from_question_paper(
     question_paper_images: List[str],
     num_questions: int
-) -> List[str]:
+) -> List[Dict[str, Any]]:
     """Extract question text from question paper images using AI"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
@@ -2354,27 +2042,73 @@ async def extract_questions_from_question_paper(
             api_key=api_key,
             session_id=f"extract_qp_{uuid.uuid4().hex[:8]}",
             system_message="""You are an expert at extracting question text from exam question papers.
-            
-Extract ALL question text from the provided question paper images.
-Return a JSON array with the complete text for each question, including any sub-parts.
 
-Return this exact JSON format:
+Extract ALL question text from the provided question paper images.
+Return a JSON array with structured objects for each question.
+
+CRITICAL INSTRUCTIONS FOR SUB-QUESTIONS:
+
+1. For questions WITH sub-parts (a, b, c or i, ii, iii):
+   - The parent question's rubric should be EMPTY or contain only a brief intro
+   - Each sub-question's rubric MUST contain its FULL text
+   - DO NOT put all text in the parent question
+
+2. Text distribution example:
+   Original: "Q5: (a) Explain photosynthesis. (b) Draw a diagram of a leaf."
+
+   WRONG:
+   {
+     question_text: "Q5: (a) Explain photosynthesis. (b) Draw a diagram of a leaf.",
+     rubric: "Explain photosynthesis. Draw a diagram of a leaf.",
+     sub_questions: [
+       { sub_id: "a", rubric: "" },
+       { sub_id: "b", rubric: "" }
+     ]
+   }
+
+   CORRECT:
+   {
+     question_text: "Q5:",
+     rubric: "",
+     sub_questions: [
+       { sub_id: "a", rubric: "Explain photosynthesis." },
+       { sub_id: "b", rubric: "Draw a diagram of a leaf." }
+     ]
+   }
+
+3. For questions WITHOUT sub-parts:
+   - Put the full text in the parent question's rubric field
+   - sub_questions array should be empty []
+
+4. Parsing rules:
+   - (a), (b), (c) or (i), (ii), (iii) indicate sub-parts
+   - Split text at each sub-part marker
+   - Include the marker with its text: "(a) Explain..." not just "Explain..."
+
+5. Nested sub-parts like (a)(i), (a)(ii):
+   - These belong to sub-question "a"
+   - Include them in sub_id "a"'s rubric: "(a) (i) First part (ii) Second part"
+
+Required JSON structure for each question:
 {
   "questions": [
-    "Full text of question 1 here (include all sub-parts if any)",
-    "Full text of question 2 here",
-    ...
+    {
+      "question_number": "string",
+      "question_text": "Brief identifier only, e.g. 'Q5:' - NOT full text",
+      "rubric": "Empty if has sub-parts, full text if no sub-parts",
+      "max_marks": number,
+      "sub_questions": [
+        {
+          "sub_id": "a",
+          "rubric": "FULL TEXT of sub-part (a) goes here",
+          "max_marks": number
+        }
+      ]
+    }
   ]
 }
-
-Important:
-- Extract ONLY questions, not instructions or headers
-- Include question numbers
-- Include all sub-parts (a, b, c, etc.) in the same string
-- Maintain the original formatting and numbering
-- Extract exactly what's written, don't paraphrase
 """
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in question_paper_images]
@@ -2398,63 +2132,25 @@ Return ONLY the JSON, no other text."""
                 logger.info(f"Question extraction attempt {attempt + 1}/{max_retries}")
                 ai_response = await chat.send_message(user_message)
                 
-                # Parse response with robust JSON extraction
+                # Parse response
                 import json
-                import re
                 response_text = ai_response.strip()
-                
-                # Strategy 1: Direct parse
-                try:
-                    result = json.loads(response_text)
-                    logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
-                    return result.get("questions", [])
-                except json.JSONDecodeError:
-                    pass
-                
-                # Strategy 2: Remove code blocks
                 if response_text.startswith("```"):
                     response_text = response_text.split("```")[1]
                     if response_text.startswith("json"):
                         response_text = response_text[4:]
-                    response_text = response_text.strip()
-                    try:
-                        result = json.loads(response_text)
-                        logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
-                        return result.get("questions", [])
-                    except json.JSONDecodeError:
-                        pass
                 
-                # Strategy 3: Find JSON object in text
-                json_match = re.search(r'\{[^{}]*"questions"[^{}]*\[[^\]]*\][^{}]*\}', response_text, re.DOTALL)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group())
-                        logger.info(f"Successfully extracted {len(result.get('questions', []))} questions (pattern match)")
-                        return result.get("questions", [])
-                    except json.JSONDecodeError:
-                        pass
-                
-                # If all strategies fail, log and retry
-                logger.warning(f"Failed to parse JSON from response (attempt {attempt + 1}). Response preview: {response_text[:200]}")
-                if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)
-                    logger.info(f"Retrying question extraction in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    logger.error(f"All JSON parsing strategies failed after {max_retries} attempts")
-                    return []
+                result = json.loads(response_text)
+                logger.info(f"Successfully extracted {len(result.get('questions', []))} questions")
+                return result.get("questions", [])
                 
             except Exception as e:
                 error_str = str(e).lower()
-                logger.error(f"Error during question extraction attempt {attempt + 1}: {e}")
-                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str or "rate limit" in error_str):
+                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "gateway" in error_str):
                     wait_time = retry_delay * (2 ** attempt)
                     logger.info(f"Retrying question extraction in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
                 else:
-                    if attempt >= max_retries - 1:
-                        logger.error(f"Question extraction failed after {max_retries} attempts")
                     raise e
         
         return []
@@ -2509,7 +2205,7 @@ Important:
 - Look through ALL pages carefully
 - Return questions in order (Q1, Q2, Q3, etc.)
 """
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images]
@@ -2572,191 +2268,109 @@ Return ONLY the JSON with ALL {num_questions} questions, no other text."""
         logger.error(f"Error extracting questions: {e}")
         return []
 
-async def extract_question_structure_from_paper(
-    paper_images: List[str],
-    paper_type: str = "question_paper"
-) -> List[dict]:
-    """
-    Extract COMPLETE question structure including:
-    - Question numbers
-    - Sub-questions with IDs (a, b, c OR i, ii, iii)
-    - Sub-sub-questions if any
-    - Marks for each question/sub-question
-    - Question text
-    
-    Returns a list of question dictionaries matching the exam structure.
-    """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-    
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
-    if not api_key:
-        logger.error("EMERGENT_LLM_KEY not configured")
-        return []
-    
-    try:
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"extract_struct_{uuid.uuid4().hex[:8]}",
-            system_message=f"""You are an expert at analyzing exam {paper_type.replace('_', ' ')}s and extracting complete question structure.
+def distribute_text_to_subquestions(question: Dict[str, Any]):
+    """Fallback: If sub-questions are empty, parse parent text and distribute"""
+    import re
 
-Your task is to extract:
-1. ALL questions with their numbers (Q1, Q2, Q3, etc.)
-2. Sub-questions with their IDs (a, b, c OR i, ii, iii)
-3. Sub-sub-questions if they exist (like Q1(a)(i), Q1(a)(ii))
-4. Marks allocated to each question and sub-question
-5. Brief question text for each
+    full_text = question.get("rubric", "") or question.get("question_text", "")
+    if not full_text:
+        return
 
-Return a JSON array where each question has this structure:
-{{
-  "question_number": 1,
-  "max_marks": 12,
-  "rubric": "Brief question text here",
-  "question_text": "Brief question text here",
-  "sub_questions": [
-    {{
-      "sub_id": "a",
-      "max_marks": 2,
-      "rubric": "Part (a) text here"
-    }},
-    {{
-      "sub_id": "b", 
-      "max_marks": 10,
-      "rubric": "Part (b) text here",
-      "sub_questions": [
-        {{
-          "sub_id": "i",
-          "max_marks": 5,
-          "rubric": "Part (b)(i) text here"
-        }},
-        {{
-          "sub_id": "ii",
-          "max_marks": 5,
-          "rubric": "Part (b)(ii) text here"
-        }}
-      ]
-    }}
-  ]
-}}
+    # Capture the full marker including parentheses: (a), (i), etc.
+    pattern = r'(\((?:[a-z]|[ivx]+)\))'
+    parts = re.split(pattern, full_text)
 
-CRITICAL RULES:
-1. Extract EVERY question you see
-2. Detect if sub-questions use letters (a,b,c) or roman numerals (i,ii,iii)
-3. If a question has no sub-parts, leave sub_questions as empty array []
-4. Sum of sub-question marks MUST equal parent question marks
-5. Extract marks carefully - look for [10 marks], (5 marks), etc.
-6. Keep question text brief but meaningful
+    # Distribute to sub-questions
+    current_sub_id = None
+    sub_questions = question.get("sub_questions", [])
 
-Return ONLY a JSON array of questions, nothing else."""
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
-        
-        # Create image contents
-        image_contents = [ImageContent(image_base64=img) for img in paper_images]
-        logger.info(f"Extracting complete question structure from {len(image_contents)} pages ({paper_type})")
-        
-        prompt = f"""Analyze this {paper_type.replace('_', ' ')} and extract the COMPLETE question structure.
+    # Helper to check if a valid sub_id exists in our list
+    valid_sub_ids = set()
+    for sub in sub_questions:
+        sid = sub.get("sub_id") if isinstance(sub, dict) else sub.sub_id
+        valid_sub_ids.add(sid)
 
-Instructions:
-- Identify ALL questions (Q1, Q2, Q3...)
-- For each question, identify ALL sub-parts with their marks
-- Detect the numbering style (a,b,c vs i,ii,iii)
-- Extract marks for each part
-- Be thorough - don't miss any questions or sub-questions
+    found_any = False
 
-Return ONLY the JSON array of questions."""
-        
-        user_message = UserMessage(text=prompt, file_contents=image_contents)
-        
-        # Retry logic
-        max_retries = 3
-        retry_delay = 5
-        
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Structure extraction attempt {attempt + 1}/{max_retries}")
-                ai_response = await chat.send_message(user_message)
-                
-                # Robust JSON parsing
-                import json
-                import re
-                response_text = ai_response.strip()
-                
-                # Strategy 1: Direct parse
-                try:
-                    result = json.loads(response_text)
-                    if isinstance(result, list):
-                        logger.info(f"✅ Extracted structure for {len(result)} questions")
-                        return result
-                    elif isinstance(result, dict) and "questions" in result:
-                        logger.info(f"✅ Extracted structure for {len(result['questions'])} questions")
-                        return result["questions"]
-                except json.JSONDecodeError:
-                    pass
-                
-                # Strategy 2: Remove code blocks
-                if response_text.startswith("```"):
-                    response_text = response_text.split("```")[1]
-                    if response_text.startswith("json"):
-                        response_text = response_text[4:]
-                    response_text = response_text.strip()
-                    try:
-                        result = json.loads(response_text)
-                        if isinstance(result, list):
-                            logger.info(f"✅ Extracted structure for {len(result)} questions (code block)")
-                            return result
-                        elif isinstance(result, dict) and "questions" in result:
-                            return result["questions"]
-                    except json.JSONDecodeError:
-                        pass
-                
-                # Strategy 3: Find JSON array in text
-                json_match = re.search(r'\[\s*\{.*?\}\s*\]', response_text, re.DOTALL)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group())
-                        logger.info(f"✅ Extracted structure for {len(result)} questions (pattern match)")
-                        return result
-                    except json.JSONDecodeError:
-                        pass
-                
-                # All strategies failed
-                logger.warning(f"Failed to parse structure JSON (attempt {attempt + 1}). Response preview: {response_text[:200]}")
-                if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)
-                    logger.info(f"Retrying structure extraction in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    logger.error(f"All JSON parsing strategies failed after {max_retries} attempts")
-                    return []
-                
-            except Exception as e:
-                error_str = str(e).lower()
-                logger.error(f"Error during structure extraction attempt {attempt + 1}: {e}")
-                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "rate limit" in error_str):
-                    wait_time = retry_delay * (2 ** attempt)
-                    logger.info(f"Retrying structure extraction in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    if attempt >= max_retries - 1:
-                        logger.error(f"Structure extraction failed after {max_retries} attempts")
-                    raise e
-        
-        return []
-        
-    except Exception as e:
-        logger.error(f"Error extracting question structure: {e}")
-        return []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+
+        # Check if this part is a marker
+        marker_match = re.match(r'^\(([a-z]|[ivx]+)\)$', part)
+        if marker_match:
+            potential_id = marker_match.group(1)
+
+            if potential_id in valid_sub_ids:
+                current_sub_id = potential_id
+                # Initialize the rubric with the marker
+                for sub in sub_questions:
+                    sid = sub.get("sub_id") if isinstance(sub, dict) else sub.sub_id
+                    if sid == current_sub_id:
+                        if isinstance(sub, dict):
+                            sub["rubric"] = part
+                        else:
+                            sub.rubric = part
+                        found_any = True
+                        break
+            else:
+                # It's a marker but not for a top-level sub-question (e.g. (i) inside (a))
+                # Append it to the current sub-question if active
+                if current_sub_id:
+                    for sub in sub_questions:
+                        sid = sub.get("sub_id") if isinstance(sub, dict) else sub.sub_id
+                        if sid == current_sub_id:
+                            existing = sub.get("rubric", "") if isinstance(sub, dict) else sub.rubric
+                            new_text = f"{existing} {part}"
+                            if isinstance(sub, dict):
+                                sub["rubric"] = new_text
+                            else:
+                                sub.rubric = new_text
+                            break
+        else:
+            # It's text content
+            if current_sub_id:
+                for sub in sub_questions:
+                    sid = sub.get("sub_id") if isinstance(sub, dict) else sub.sub_id
+                    if sid == current_sub_id:
+                        existing = sub.get("rubric", "") if isinstance(sub, dict) else sub.rubric
+                        new_text = f"{existing} {part}"
+                        if isinstance(sub, dict):
+                            sub["rubric"] = new_text
+                        else:
+                            sub.rubric = new_text
+                        break
+
+    # Clear parent rubric since it's now distributed
+    if found_any:
+        question["rubric"] = ""
+
+def validate_extraction(questions: List[Dict[str, Any]]):
+    """Validate extraction and fix empty sub-questions if possible"""
+    for q in questions:
+        # q is likely a dict from mongodb
+        sub_questions = q.get("sub_questions", [])
+        if sub_questions and len(sub_questions) > 0:
+            # Has sub-parts - check they have content
+            has_empty_sub = False
+            for sub in sub_questions:
+                rubric = sub.get("rubric") if isinstance(sub, dict) else sub.rubric
+                if not rubric or rubric.strip() == "":
+                    has_empty_sub = True
+                    q_num = q.get("question_number")
+                    sub_id = sub.get("sub_id") if isinstance(sub, dict) else sub.sub_id
+                    logger.warning(f"Q{q_num} sub-part {sub_id} has empty rubric")
+
+            # Attempt to fix: parse parent rubric and distribute
+            parent_rubric = q.get("rubric")
+            if has_empty_sub and parent_rubric:
+                distribute_text_to_subquestions(q)
 
 async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str, Any]:
     """
-    Auto-extract COMPLETE question structure from question paper (priority) or model answer.
-    
-    Extracts:
-    - Question numbers
-    - Sub-questions with proper IDs
-    - Marks for each part
-    - Question text
-    
+    Auto-extract questions from question paper (priority) or model answer.
+
     Priority:
     1. Question Paper (if exists)
     2. Model Answer (if exists)
@@ -2776,61 +2390,109 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
 
         target_source = None
         images_to_use = []
+        extraction_func = None
 
         if qp_imgs:
             target_source = "question_paper"
             images_to_use = qp_imgs
+            extraction_func = extract_questions_from_question_paper
         elif ma_imgs:
             target_source = "model_answer"
             images_to_use = ma_imgs
+            extraction_func = extract_questions_from_model_answer
         else:
             return {"success": False, "message": "No documents available for extraction"}
 
         # Check if already extracted
         current_source = exam.get("extraction_source")
-        questions_exist = len(exam.get("questions", [])) > 0 and any(q.get("rubric") for q in exam.get("questions", []))
+        questions_exist = any(q.get("rubric") for q in exam.get("questions", []))
 
         if not force and questions_exist and current_source == target_source:
             logger.info(f"Skipping extraction for {exam_id}: Already extracted from {current_source}")
             return {
                 "success": True,
                 "message": f"Questions already extracted from {target_source.replace('_', ' ')}",
-                "count": len(exam.get("questions", [])),
+                "count": len([q for q in exam.get("questions", []) if q.get("rubric")]),
                 "source": target_source,
                 "skipped": True
             }
 
-        logger.info(f"Auto-extracting COMPLETE question structure for {exam_id} from {target_source} (Force={force})")
+        logger.info(f"Auto-extracting questions for {exam_id} from {target_source} (Force={force})")
 
-        # Perform NEW structure extraction
-        extracted_questions = await extract_question_structure_from_paper(
+        # Perform extraction
+        extracted_questions = await extraction_func(
             images_to_use,
-            paper_type=target_source
+            len(exam.get("questions", []))
         )
 
         if not extracted_questions:
-            logger.warning(f"Structure extraction returned no questions for {exam_id} from {target_source}")
-            return {"success": False, "message": f"Failed to extract question structure from {target_source.replace('_', ' ')}"}
+            logger.warning(f"Extraction returned no questions for {exam_id} from {target_source}")
+            return {"success": False, "message": f"Failed to extract questions from {target_source.replace('_', ' ')}"}
 
-        # Calculate total marks from extracted structure
-        total_marks = sum(q.get("max_marks", 0) for q in extracted_questions)
+        # Update questions in database
+        questions = exam.get("questions", [])
+        updated_count = 0
 
-        # REPLACE entire questions array with extracted structure
+        for i, q in enumerate(questions):
+            if i < len(extracted_questions):
+                extracted_item = extracted_questions[i]
+
+                if isinstance(extracted_item, str):
+                    q["rubric"] = extracted_item
+                    q["question_text"] = extracted_item
+                elif isinstance(extracted_item, dict):
+                    # Structured extraction
+                    q["rubric"] = extracted_item.get("rubric", "")
+                    q["question_text"] = extracted_item.get("question_text", "")
+
+                    # Handle sub-questions if present in extraction
+                    extracted_subs = extracted_item.get("sub_questions", [])
+                    if extracted_subs:
+                        # Map extracted sub-questions to existing structure
+                        # Existing questions have sub_questions list
+                        existing_subs = q.get("sub_questions", [])
+
+                        # Create a map for easy lookup
+                        # existing_subs can be dicts (if from db) or objects (if Pydantic)
+                        # but exam.get("questions") returns list of dicts typically when fetched with find_one and no Pydantic validation wrapper in this context
+
+                        # Just in case, handle both dict and object for robustness
+                        existing_sub_map = {}
+                        for s in existing_subs:
+                            sid = s.get("sub_id") if isinstance(s, dict) else s.sub_id
+                            existing_sub_map[sid] = s
+
+                        for ext_sub in extracted_subs:
+                            sub_id = ext_sub.get("sub_id")
+                            if sub_id in existing_sub_map:
+                                existing_sub = existing_sub_map[sub_id]
+                                if isinstance(existing_sub, dict):
+                                    existing_sub["rubric"] = ext_sub.get("rubric")
+                                else:
+                                    existing_sub.rubric = ext_sub.get("rubric")
+                            else:
+                                # Optional: Add new sub-question if it doesn't exist?
+                                # For now, we only update existing ones to match schema
+                                pass
+
+                updated_count += 1
+
+        # Validate extraction and fix empty sub-questions
+        validate_extraction(questions)
+
         await db.exams.update_one(
             {"exam_id": exam_id},
             {"$set": {
-                "questions": extracted_questions,
-                "extraction_source": target_source,
-                "total_marks": total_marks  # Update total marks based on extraction
+                "questions": questions,
+                "extraction_source": target_source
             }}
         )
 
-        logger.info(f"✅ Successfully extracted {len(extracted_questions)} questions with complete structure from {target_source}")
+        logger.info(f"Successfully extracted {updated_count} questions from {target_source}")
         return {
             "success": True,
-            "message": f"Successfully extracted {len(extracted_questions)} questions with structure from {target_source.replace('_', ' ')}",
-            "count": len(extracted_questions),
-            "total_marks": total_marks,
+            "message": f"Successfully extracted {updated_count} questions from {target_source.replace('_', ' ')}",
+            "count": updated_count,
             "source": target_source,
             "skipped": False
         }
@@ -2844,14 +2506,9 @@ async def grade_with_ai(
     model_answer_images: List[str],
     questions: List[dict],
     grading_mode: str,
-    total_marks: float,
-    model_answer_text: str = ""  # NEW: Pre-extracted model answer content
+    total_marks: float
 ) -> List[QuestionScore]:
-    """Grade answer paper using GPT-4o-mini with the GradeSense Master Instruction Set.
-    
-    If model_answer_text is provided, uses text-based grading (faster, more reliable).
-    Falls back to image-based grading if text is not available.
-    """
+    """Grade answer paper using Gemini 2.5 Pro with the GradeSense Master Instruction Set"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
@@ -2859,26 +2516,9 @@ async def grade_with_ai(
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
-    # Apply rotation correction to student images
-    logger.info("Applying rotation correction to student images...")
-    corrected_images = correct_all_images_rotation(images)
-    
-    # Determine grading mode: text-based (preferred) or image-based (fallback)
-    use_text_based_grading = bool(model_answer_text and len(model_answer_text) > 100)
-    
-    if use_text_based_grading:
-        logger.info(f"Using TEXT-BASED grading (model answer: {len(model_answer_text)} chars)")
-    else:
-        logger.info(f"Using IMAGE-BASED grading (model answer: {len(model_answer_images)} images)")
-    
     # Create content hash for deterministic grading (same paper = same grade)
-    hash_content = "".join(corrected_images).encode() + str(questions).encode() + grading_mode.encode()
-    if use_text_based_grading:
-        hash_content += model_answer_text.encode()
-    else:
-        hash_content += "".join(model_answer_images).encode()
-    paper_hash = hashlib.sha256(hash_content).hexdigest()
-    content_hash = paper_hash[:16]
+    paper_hash = get_paper_hash(images, model_answer_images, questions, grading_mode)
+    content_hash = paper_hash[:16] # Keep for session ID compatibility
 
     # Check cache (Memory)
     if paper_hash in grading_cache:
@@ -2890,8 +2530,10 @@ async def grade_with_ai(
         cached_result = await db.grading_results.find_one({"paper_hash": paper_hash})
         if cached_result and "results" in cached_result:
             logger.info(f"Cache hit (db) for paper {paper_hash}")
+            # Deserialize results
             import json
             results_data = json.loads(cached_result["results"])
+            # Convert back to QuestionScore objects
             return [QuestionScore(**s) for s in results_data]
     except Exception as e:
         logger.error(f"Error checking grading cache: {e}")
@@ -3197,26 +2839,18 @@ Your measure of success: When the same paper graded by you and by an expert teac
             api_key=api_key,
             session_id=f"grading_{content_hash}_{chunk_idx}",
             system_message=master_system_prompt
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
 
-        # Prepare images based on grading mode
+        # Prepare images: ALL model answer images + Chunk of student images
         chunk_all_images = []
+        if model_answer_images:
+            for img in model_answer_images:
+                chunk_all_images.append(ImageContent(image_base64=img))
         
-        if use_text_based_grading:
-            # TEXT-BASED: Only send student images, model answer is in prompt text
-            for img in chunk_imgs:
-                chunk_all_images.append(ImageContent(image_base64=img))
-            model_images_included = 0
-            logger.info(f"Chunk {chunk_idx+1}: TEXT-BASED grading with {len(chunk_imgs)} student images")
-        else:
-            # IMAGE-BASED: Include model answer images
-            if model_answer_images:
-                for img in model_answer_images:
-                    chunk_all_images.append(ImageContent(image_base64=img))
-            for img in chunk_imgs:
-                chunk_all_images.append(ImageContent(image_base64=img))
-            model_images_included = len(model_answer_images) if model_answer_images else 0
-            logger.info(f"Chunk {chunk_idx+1}: IMAGE-BASED grading with {model_images_included} model + {len(chunk_imgs)} student images")
+        for img in chunk_imgs:
+            chunk_all_images.append(ImageContent(image_base64=img))
+            
+        model_images_included = len(model_answer_images) if model_answer_images else 0
         
         # Build prompt
         partial_instruction = ""
@@ -3232,52 +2866,7 @@ This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {sta
 - Do NOT guess marks for questions you cannot see.
 """
 
-        # TEXT-BASED GRADING PROMPT (preferred - faster, more reliable)
-        if use_text_based_grading:
-            prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
-
-## MODEL ANSWER REFERENCE (Pre-Extracted Text)
-Below is the complete model answer content. Use this as your grading reference:
-
---- MODEL ANSWER START ---
-{model_answer_text}
---- MODEL ANSWER END ---
-
-## STUDENT PAPER EVALUATION
-
-**Questions to Grade:**
-{questions_text}
-
-**Images Provided:** {len(chunk_imgs)} pages of STUDENT'S ANSWER PAPER (Pages {start_page_num+1}-{start_page_num+len(chunk_imgs)})
-{partial_instruction}
-
-**IMPORTANT**: 
-- The images may contain rotated or sideways text - read carefully in all orientations
-- Examine EVERY page and grade ALL questions found
-- Compare student answers against the model answer text above
-
-## GRADING MODE: {grading_mode.upper()}
-Apply the {grading_mode} mode specifications strictly.
-
-## CRITICAL REQUIREMENTS:
-1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
-2. **MODEL ANSWER IS REFERENCE**: Compare against the model answer text provided above
-3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
-4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
-5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
-6. **FEEDBACK QUALITY**: Provide constructive, specific feedback
-7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
-8. **HANDLE ROTATION**: If text appears sideways, still read and grade it
-
-## OUTPUT
-Grade each question providing:
-- Exact marks with breakdown
-- What was done well
-- What needs improvement
-
-Return valid JSON only."""
-
-        elif model_answer_images:
+        if model_answer_images:
             prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
 
 ## PHASE 1: PRE-GRADING ANALYSIS
@@ -3361,64 +2950,18 @@ Return valid JSON only."""
                 logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                 ai_resp = await chunk_chat.send_message(user_msg)
 
-                # Robust JSON parsing with multiple strategies
+                # Parse
                 import json
-                import re
                 resp_text = ai_resp.strip()
-                
-                # Strategy 1: Direct parse
-                try:
-                    res = json.loads(resp_text)
-                    return res.get("scores", [])
-                except json.JSONDecodeError:
-                    pass
-                
-                # Strategy 2: Remove code blocks
                 if resp_text.startswith("```"):
                     resp_text = resp_text.split("```")[1]
                     if resp_text.startswith("json"):
                         resp_text = resp_text[4:]
-                    resp_text = resp_text.strip()
-                    try:
-                        res = json.loads(resp_text)
-                        return res.get("scores", [])
-                    except json.JSONDecodeError:
-                        pass
-                
-                # Strategy 3: Find JSON in response
-                json_match = re.search(r'\{[^{}]*"scores"[^{}]*\[[^\]]*\][^{}]*\}', resp_text, re.DOTALL)
-                if json_match:
-                    try:
-                        res = json.loads(json_match.group())
-                        return res.get("scores", [])
-                    except json.JSONDecodeError:
-                        pass
-                
-                # All strategies failed
-                logger.warning(f"Failed to parse grading JSON (attempt {attempt + 1}). Response preview: {resp_text[:200]}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                else:
-                    logger.error(f"All JSON parsing strategies failed for chunk {chunk_idx+1}")
-                    return []
+
+                res = json.loads(resp_text)
+                return res.get("scores", [])
 
             except Exception as e:
-                error_msg = str(e).lower()
-                
-                # Check for rate limiting
-                if "429" in str(e) or "rate limit" in error_msg or "quota" in error_msg:
-                    wait_time = 60 * (attempt + 1)  # Exponential: 60s, 120s, 180s
-                    logger.warning(f"Rate limit hit on chunk {chunk_idx+1}. Waiting {wait_time}s before retry...")
-                    await asyncio.sleep(wait_time)
-                    if attempt < max_retries - 1:
-                        continue  # Retry immediately after wait
-                    else:
-                        raise HTTPException(
-                            status_code=429,
-                            detail="API rate limit exceeded. Please try again in a few minutes or upgrade your plan."
-                        )
-                
                 logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay * (2**attempt))
@@ -3573,38 +3116,25 @@ async def upload_model_answer(
     # Read and convert PDF to images
     pdf_bytes = await file.read()
     
-    # Check file size - limit to 30MB for safety
-    file_size_mb = len(pdf_bytes) / (1024 * 1024)
-    if len(pdf_bytes) > 30 * 1024 * 1024:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the PDF or reducing scan quality."
-        )
+    # Check file size - limit to 15MB for safety
+    if len(pdf_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 15MB.")
     
     images = pdf_to_images(pdf_bytes)
     
-    # Store images in GridFS to avoid MongoDB 16MB document limit
+    # Store images in separate collection to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
+    model_answer_data = base64.b64encode(pdf_bytes).decode()
     
-    # Serialize images and store in GridFS
-    images_data = pickle.dumps(images)
-    gridfs_id = fs.put(
-        images_data,
-        filename=f"model_answer_{exam_id}_{file_id}",
-        content_type="application/python-pickle",
-        exam_id=exam_id,
-        file_type="model_answer"
-    )
-    
-    # Store only metadata and GridFS reference in MongoDB
+    # Store the file data separately
     await db.exam_files.update_one(
         {"exam_id": exam_id, "file_type": "model_answer"},
         {"$set": {
             "exam_id": exam_id,
             "file_type": "model_answer",
             "file_id": file_id,
-            "gridfs_id": str(gridfs_id),
-            "page_count": len(images),
+            "file_data": model_answer_data,
+            "images": images,
             "uploaded_at": datetime.now(timezone.utc).isoformat()
         }},
         upsert=True
@@ -3620,24 +3150,6 @@ async def upload_model_answer(
         }}
     )
     
-    # Extract model answer content as text for efficient grading
-    logger.info(f"Extracting model answer content as text for exam {exam_id}")
-    model_answer_text = await extract_model_answer_content(
-        model_answer_images=images,
-        questions=exam.get("questions", [])
-    )
-    
-    # Store the extracted text in the exam_files collection
-    if model_answer_text:
-        await db.exam_files.update_one(
-            {"exam_id": exam_id, "file_type": "model_answer"},
-            {"$set": {
-                "model_answer_text": model_answer_text,
-                "text_extracted_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        logger.info(f"Stored model answer text ({len(model_answer_text)} chars) for exam {exam_id}")
-    
     # Check if question paper exists
     qp_imgs = await get_exam_question_paper_images(exam_id)
     
@@ -3650,63 +3162,20 @@ async def upload_model_answer(
         force_extraction = True
         
     result = await auto_extract_questions(exam_id, force=force_extraction)
-    
-    # RE-EXTRACT model answer text if questions were just populated
-    if result.get("success") and result.get("count", 0) > 0:
-        logger.info(f"Questions populated ({result.get('count')}). Re-extracting model answer text with question context...")
-        
-        # Fetch updated exam with questions
-        exam_updated = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
-        
-        # Re-extract with proper question context
-        model_answer_text_updated = await extract_model_answer_content(
-            model_answer_images=images,
-            questions=exam_updated.get("questions", [])
-        )
-        
-        # Update with better extraction
-        if model_answer_text_updated and len(model_answer_text_updated) > len(model_answer_text):
-            await db.exam_files.update_one(
-                {"exam_id": exam_id, "file_type": "model_answer"},
-                {"$set": {
-                    "model_answer_text": model_answer_text_updated,
-                    "text_extracted_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            logger.info(f"Updated model answer text ({len(model_answer_text_updated)} chars) with question context")
-            # Use the updated text for response
-            model_answer_text = model_answer_text_updated
 
-    # Determine extraction success
-    text_chars = len(model_answer_text) if model_answer_text else 0
-    extraction_success = text_chars > 500  # Consider successful if >500 chars
-    
     message = "Model answer uploaded successfully."
     if result.get("success"):
         if result.get("skipped"):
             message = f"✨ Model answer uploaded! Questions kept from {result.get('source').replace('_', ' ')}."
         else:
             message = f"✨ Model answer uploaded & {result.get('count')} questions auto-extracted from {result.get('source').replace('_', ' ')}!"
-    
-    # Add extraction status to message
-    if extraction_success:
-        message += f" ✅ Model answer content extracted successfully ({text_chars} characters)."
-    elif text_chars > 0:
-        message += f" ⚠️ Model answer extraction returned minimal content ({text_chars} characters). Grading may use image-based mode."
-    else:
-        message += " ❌ Model answer content extraction failed. Grading will use image-based mode (slower, less accurate)."
 
     return {
         "message": message,
         "pages": len(images),
         "auto_extracted": result.get("success", False),
         "extracted_count": result.get("count", 0),
-        "source": result.get("source", ""),
-        "text_extraction": {
-            "success": extraction_success,
-            "characters": text_chars,
-            "status": "success" if extraction_success else ("partial" if text_chars > 0 else "failed")
-        }
+        "source": result.get("source", "")
     }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
@@ -3726,38 +3195,25 @@ async def upload_question_paper(
     # Read and convert PDF to images
     pdf_bytes = await file.read()
     
-    # Check file size - limit to 30MB for safety
-    file_size_mb = len(pdf_bytes) / (1024 * 1024)
-    if len(pdf_bytes) > 30 * 1024 * 1024:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the PDF or reducing scan quality."
-        )
+    # Check file size - limit to 15MB for safety
+    if len(pdf_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 15MB.")
     
     images = pdf_to_images(pdf_bytes)
     
-    # Store images in GridFS to avoid MongoDB 16MB document limit
+    # Store images in separate collection to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
+    question_paper_data = base64.b64encode(pdf_bytes).decode()
     
-    # Serialize images and store in GridFS
-    images_data = pickle.dumps(images)
-    gridfs_id = fs.put(
-        images_data,
-        filename=f"question_paper_{exam_id}_{file_id}",
-        content_type="application/python-pickle",
-        exam_id=exam_id,
-        file_type="question_paper"
-    )
-    
-    # Store only metadata and GridFS reference in MongoDB
+    # Store the file data separately
     await db.exam_files.update_one(
         {"exam_id": exam_id, "file_type": "question_paper"},
         {"$set": {
             "exam_id": exam_id,
             "file_type": "question_paper",
             "file_id": file_id,
-            "gridfs_id": str(gridfs_id),
-            "page_count": len(images),
+            "file_data": question_paper_data,
+            "images": images,
             "uploaded_at": datetime.now(timezone.utc).isoformat()
         }},
         upsert=True
@@ -3820,16 +3276,6 @@ async def upload_student_papers(
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
-            
-            # Check file size - limit to 30MB for safety
-            file_size_mb = len(pdf_bytes) / (1024 * 1024)
-            if len(pdf_bytes) > 30 * 1024 * 1024:
-                errors.append({
-                    "filename": file.filename,
-                    "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
-                })
-                continue
-            
             images = pdf_to_images(pdf_bytes)
             
             if not images:
@@ -3885,19 +3331,12 @@ async def upload_student_papers(
                 continue
             
             # Grade with AI using the grading mode from exam
-            # Get model answer images from separate collection
-            model_answer_imgs = await get_exam_model_answer_images(exam_id)
-            
-            # Get pre-extracted model answer text for efficient grading
-            model_answer_text = await get_exam_model_answer_text(exam_id)
-            
             scores = await grade_with_ai(
                 images=images,
-                model_answer_images=model_answer_imgs,
+                model_answer_images=exam.get("model_answer_images", []),
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_text
+                total_marks=exam.get("total_marks", 100)
             )
             
             total_score = sum(s.obtained_marks for s in scores)
@@ -4502,7 +3941,7 @@ Only return the JSON array, no other text."""
                 api_key=llm_key,
                 session_id=f"misconceptions_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert at analyzing student misconceptions and learning patterns."
-            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -4761,7 +4200,7 @@ Keep response concise (under 200 words). Format as JSON:
                 api_key=llm_key,
                 session_id=f"student_analysis_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert educational analyst providing personalized student guidance."
-            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -4885,7 +4324,7 @@ Only return the JSON array."""
             api_key=llm_key,
             session_id=f"review_packet_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert educator creating practice questions to help students improve."
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         user_message = UserMessage(text=generation_prompt)
         ai_response = await chat.send_message(user_message)
@@ -4972,7 +4411,7 @@ Only return the JSON object."""
             api_key=llm_key,
             session_id=f"infer_topics_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert at analyzing exam questions and categorizing them by topic."
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-pro", temperature=0, top_p=1, seed=42)
         
         user_message = UserMessage(text=inference_prompt)
         ai_response = await chat.send_message(user_message)
