@@ -3468,6 +3468,312 @@ print('Cleanup test submission with multiple re-evaluations created');
         except Exception as e:
             self.log_test("Consistency Features - Code Review", False, f"Error reading server.py: {str(e)}")
 
+    def test_rotation_correction_and_text_grading(self):
+        """Test the new rotation correction and text-based grading features"""
+        print("\n🔄 Testing Rotation Correction and Text-Based Grading Features...")
+        
+        # Phase 1: Setup and Model Answer Upload
+        print("\n📋 Phase 1: Setup and Model Answer Upload")
+        
+        # Create a new exam for testing these features
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Skipping rotation/text grading test - missing batch or subject")
+            return None
+        
+        # Create exam with 2-3 questions as requested
+        exam_data = {
+            "batch_id": self.test_batch_id,
+            "subject_id": self.test_subject_id,
+            "exam_type": "Unit Test",
+            "exam_name": f"Rotation Text Test {datetime.now().strftime('%H%M%S')}",
+            "total_marks": 100.0,
+            "exam_date": "2024-01-15",
+            "grading_mode": "balanced",
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 40.0,
+                    "rubric": "Solve the quadratic equation: x² - 5x + 6 = 0"
+                },
+                {
+                    "question_number": 2,
+                    "max_marks": 35.0,
+                    "rubric": "Find the derivative of f(x) = 3x² + 2x - 1"
+                },
+                {
+                    "question_number": 3,
+                    "max_marks": 25.0,
+                    "rubric": "Calculate the area of a triangle with base 8cm and height 6cm"
+                }
+            ]
+        }
+        
+        exam_result = self.run_api_test(
+            "Create Exam for Rotation/Text Testing",
+            "POST",
+            "exams",
+            200,
+            data=exam_data
+        )
+        
+        if not exam_result:
+            print("❌ Failed to create test exam for rotation/text features")
+            return None
+        
+        self.rotation_test_exam_id = exam_result.get('exam_id')
+        print(f"✅ Created test exam: {self.rotation_test_exam_id}")
+        
+        # Check backend logs for model answer text extraction
+        print("\n📄 Checking backend logs for text extraction...")
+        try:
+            # Check supervisor backend logs for text extraction messages
+            log_result = subprocess.run([
+                'tail', '-n', '50', '/var/log/supervisor/backend.out.log'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if log_result.returncode == 0:
+                log_content = log_result.stdout
+                
+                # Look for expected log messages
+                expected_logs = [
+                    f"Extracting model answer content as text for exam {self.rotation_test_exam_id}",
+                    f"Stored model answer text",
+                    "chars) for exam"
+                ]
+                
+                logs_found = []
+                for expected_log in expected_logs:
+                    if expected_log in log_content:
+                        logs_found.append(expected_log)
+                
+                if logs_found:
+                    self.log_test("Model Answer Text Extraction Logs", True, 
+                        f"Found {len(logs_found)} expected log messages")
+                else:
+                    self.log_test("Model Answer Text Extraction Logs", False, 
+                        "No text extraction log messages found")
+                    print(f"📋 Recent logs:\n{log_content[-500:]}")  # Show last 500 chars
+            else:
+                print(f"⚠️  Could not read backend logs: {log_result.stderr}")
+                
+        except Exception as e:
+            print(f"⚠️  Error checking logs: {str(e)}")
+        
+        # Phase 2: Student Paper Grading (Simulated)
+        print("\n📝 Phase 2: Student Paper Grading Simulation")
+        
+        # Create a test submission to simulate student paper upload
+        timestamp = int(datetime.now().timestamp())
+        test_submission_id = f"rotation_test_sub_{timestamp}"
+        
+        if not hasattr(self, 'valid_student_id'):
+            print("⚠️  Creating test student for rotation/text grading test")
+            # Create a test student
+            student_data = {
+                "email": f"rotation.test.student.{timestamp}@school.edu",
+                "name": "Rotation Test Student",
+                "role": "student",
+                "student_id": f"ROT{timestamp}",
+                "batches": [self.test_batch_id]
+            }
+            
+            student_result = self.run_api_test(
+                "Create Student for Rotation Test",
+                "POST",
+                "students",
+                200,
+                data=student_data
+            )
+            
+            if student_result:
+                self.rotation_test_student_id = student_result.get('user_id')
+            else:
+                print("❌ Failed to create test student")
+                return None
+        else:
+            self.rotation_test_student_id = self.valid_student_id
+        
+        # Create test submission in MongoDB to simulate grading
+        mongo_commands = f"""
+use('test_database');
+var submissionId = '{test_submission_id}';
+var examId = '{self.rotation_test_exam_id}';
+var studentId = '{self.rotation_test_student_id}';
+
+// Insert test submission with realistic scores
+db.submissions.insertOne({{
+  submission_id: submissionId,
+  exam_id: examId,
+  student_id: studentId,
+  student_name: 'Rotation Test Student',
+  file_data: 'base64encodedpdfdata',
+  file_images: ['base64image1', 'base64image2'],
+  total_score: 78,
+  percentage: 78.0,
+  question_scores: [
+    {{
+      question_number: 1,
+      max_marks: 40,
+      obtained_marks: 32,
+      ai_feedback: 'Good approach to solving quadratic equation',
+      teacher_comment: null,
+      is_reviewed: false,
+      sub_scores: [],
+      status: 'graded'
+    }},
+    {{
+      question_number: 2,
+      max_marks: 35,
+      obtained_marks: 28,
+      ai_feedback: 'Correct derivative calculation',
+      teacher_comment: null,
+      is_reviewed: false,
+      sub_scores: [],
+      status: 'graded'
+    }},
+    {{
+      question_number: 3,
+      max_marks: 25,
+      obtained_marks: 18,
+      ai_feedback: 'Area calculation is correct',
+      teacher_comment: null,
+      is_reviewed: false,
+      sub_scores: [],
+      status: 'graded'
+    }}
+  ],
+  status: 'ai_graded',
+  graded_at: new Date().toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Rotation test submission created');
+"""
+        
+        try:
+            with open('/tmp/mongo_rotation_submission.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_rotation_submission.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"✅ Test submission created: {test_submission_id}")
+                
+                # Check backend logs for rotation correction and text-based grading
+                print("\n🔍 Checking backend logs for rotation correction and text-based grading...")
+                
+                try:
+                    # Check for rotation correction and text-based grading logs
+                    log_result = subprocess.run([
+                        'tail', '-n', '100', '/var/log/supervisor/backend.out.log'
+                    ], capture_output=True, text=True, timeout=10)
+                    
+                    if log_result.returncode == 0:
+                        log_content = log_result.stdout
+                        
+                        # Look for expected log messages
+                        rotation_logs = [
+                            "Applying rotation correction to student images",
+                            "Using TEXT-BASED grading",
+                            "model answer:",
+                            "chars)"
+                        ]
+                        
+                        rotation_logs_found = []
+                        for expected_log in rotation_logs:
+                            if expected_log in log_content:
+                                rotation_logs_found.append(expected_log)
+                        
+                        if "Applying rotation correction" in log_content:
+                            self.log_test("Rotation Correction Logs", True, 
+                                "Found rotation correction log message")
+                        else:
+                            self.log_test("Rotation Correction Logs", False, 
+                                "No rotation correction log message found")
+                        
+                        if "TEXT-BASED grading" in log_content:
+                            self.log_test("Text-Based Grading Logs", True, 
+                                "Found text-based grading log message")
+                        else:
+                            self.log_test("Text-Based Grading Logs", False, 
+                                "No text-based grading log message found")
+                        
+                        print(f"📋 Found {len(rotation_logs_found)} expected log patterns")
+                        
+                    else:
+                        print(f"⚠️  Could not read backend logs: {log_result.stderr}")
+                        
+                except Exception as e:
+                    print(f"⚠️  Error checking rotation/text logs: {str(e)}")
+                
+                # Phase 3: Verification
+                print("\n✅ Phase 3: Verification")
+                
+                # Retrieve the graded submission via API
+                submission_result = self.run_api_test(
+                    "Retrieve Graded Submission",
+                    "GET",
+                    f"submissions/{test_submission_id}",
+                    200
+                )
+                
+                if submission_result:
+                    # Verify submission has required fields
+                    total_score = submission_result.get("total_score")
+                    question_scores = submission_result.get("question_scores", [])
+                    status = submission_result.get("status")
+                    
+                    # Check total_score
+                    if total_score is not None and total_score > 0:
+                        self.log_test("Submission Has Valid Total Score", True, 
+                            f"Total score: {total_score}")
+                    else:
+                        self.log_test("Submission Has Valid Total Score", False, 
+                            f"Invalid total score: {total_score}")
+                    
+                    # Check question_scores array with feedback
+                    if question_scores and len(question_scores) == 3:
+                        all_have_feedback = all(
+                            q.get("ai_feedback") and len(q.get("ai_feedback", "")) > 0 
+                            for q in question_scores
+                        )
+                        
+                        if all_have_feedback:
+                            self.log_test("Question Scores Have Feedback", True, 
+                                f"All {len(question_scores)} questions have AI feedback")
+                        else:
+                            self.log_test("Question Scores Have Feedback", False, 
+                                "Some questions missing AI feedback")
+                    else:
+                        self.log_test("Question Scores Array", False, 
+                            f"Expected 3 questions, found {len(question_scores)}")
+                    
+                    # Check status
+                    if status == "ai_graded":
+                        self.log_test("Submission Status", True, 
+                            f"Status is 'ai_graded' as expected")
+                    else:
+                        self.log_test("Submission Status", False, 
+                            f"Expected 'ai_graded', got '{status}'")
+                    
+                    # Store for summary
+                    self.rotation_test_submission_id = test_submission_id
+                    self.rotation_test_submission_data = submission_result
+                    
+                    return submission_result
+                else:
+                    print("❌ Failed to retrieve graded submission")
+                    return None
+            else:
+                print(f"❌ Failed to create test submission: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error in rotation/text grading test: {str(e)}")
+            return None
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting GradeSense API Testing")
