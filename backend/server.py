@@ -2820,16 +2820,24 @@ Your measure of success: When the same paper graded by you and by an expert teac
             system_message=master_system_prompt
         ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
 
-        # Prepare images: ALL model answer images + Chunk of student images
+        # Prepare images based on grading mode
         chunk_all_images = []
-        if model_answer_images:
-            for img in model_answer_images:
-                chunk_all_images.append(ImageContent(image_base64=img))
         
-        for img in chunk_imgs:
-            chunk_all_images.append(ImageContent(image_base64=img))
-            
-        model_images_included = len(model_answer_images) if model_answer_images else 0
+        if use_text_based_grading:
+            # TEXT-BASED: Only send student images, model answer is in prompt text
+            for img in chunk_imgs:
+                chunk_all_images.append(ImageContent(image_base64=img))
+            model_images_included = 0
+            logger.info(f"Chunk {chunk_idx+1}: TEXT-BASED grading with {len(chunk_imgs)} student images")
+        else:
+            # IMAGE-BASED: Include model answer images
+            if model_answer_images:
+                for img in model_answer_images:
+                    chunk_all_images.append(ImageContent(image_base64=img))
+            for img in chunk_imgs:
+                chunk_all_images.append(ImageContent(image_base64=img))
+            model_images_included = len(model_answer_images) if model_answer_images else 0
+            logger.info(f"Chunk {chunk_idx+1}: IMAGE-BASED grading with {model_images_included} model + {len(chunk_imgs)} student images")
         
         # Build prompt
         partial_instruction = ""
@@ -2845,7 +2853,52 @@ This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {sta
 - Do NOT guess marks for questions you cannot see.
 """
 
-        if model_answer_images:
+        # TEXT-BASED GRADING PROMPT (preferred - faster, more reliable)
+        if use_text_based_grading:
+            prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
+
+## MODEL ANSWER REFERENCE (Pre-Extracted Text)
+Below is the complete model answer content. Use this as your grading reference:
+
+--- MODEL ANSWER START ---
+{model_answer_text}
+--- MODEL ANSWER END ---
+
+## STUDENT PAPER EVALUATION
+
+**Questions to Grade:**
+{questions_text}
+
+**Images Provided:** {len(chunk_imgs)} pages of STUDENT'S ANSWER PAPER (Pages {start_page_num+1}-{start_page_num+len(chunk_imgs)})
+{partial_instruction}
+
+**IMPORTANT**: 
+- The images may contain rotated or sideways text - read carefully in all orientations
+- Examine EVERY page and grade ALL questions found
+- Compare student answers against the model answer text above
+
+## GRADING MODE: {grading_mode.upper()}
+Apply the {grading_mode} mode specifications strictly.
+
+## CRITICAL REQUIREMENTS:
+1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
+2. **MODEL ANSWER IS REFERENCE**: Compare against the model answer text provided above
+3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
+4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
+5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+6. **FEEDBACK QUALITY**: Provide constructive, specific feedback
+7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
+8. **HANDLE ROTATION**: If text appears sideways, still read and grade it
+
+## OUTPUT
+Grade each question providing:
+- Exact marks with breakdown
+- What was done well
+- What needs improvement
+
+Return valid JSON only."""
+
+        elif model_answer_images:
             prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
 
 ## PHASE 1: PRE-GRADING ANALYSIS
