@@ -3343,20 +3343,39 @@ async def upload_model_answer(
                 }}
             )
             logger.info(f"Updated model answer text ({len(model_answer_text_updated)} chars) with question context")
+            # Use the updated text for response
+            model_answer_text = model_answer_text_updated
 
+    # Determine extraction success
+    text_chars = len(model_answer_text) if model_answer_text else 0
+    extraction_success = text_chars > 500  # Consider successful if >500 chars
+    
     message = "Model answer uploaded successfully."
     if result.get("success"):
         if result.get("skipped"):
             message = f"✨ Model answer uploaded! Questions kept from {result.get('source').replace('_', ' ')}."
         else:
             message = f"✨ Model answer uploaded & {result.get('count')} questions auto-extracted from {result.get('source').replace('_', ' ')}!"
+    
+    # Add extraction status to message
+    if extraction_success:
+        message += f" ✅ Model answer content extracted successfully ({text_chars} characters)."
+    elif text_chars > 0:
+        message += f" ⚠️ Model answer extraction returned minimal content ({text_chars} characters). Grading may use image-based mode."
+    else:
+        message += " ❌ Model answer content extraction failed. Grading will use image-based mode (slower, less accurate)."
 
     return {
         "message": message,
         "pages": len(images),
         "auto_extracted": result.get("success", False),
         "extracted_count": result.get("count", 0),
-        "source": result.get("source", "")
+        "source": result.get("source", ""),
+        "text_extraction": {
+            "success": extraction_success,
+            "characters": text_chars,
+            "status": "success" if extraction_success else ("partial" if text_chars > 0 else "failed")
+        }
     }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
