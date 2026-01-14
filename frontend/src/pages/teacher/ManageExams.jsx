@@ -640,6 +640,29 @@ export default function ManageExams({ user }) {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => handleEditQuestions(selectedExam)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <Edit2 className="w-4 h-4 mr-1" />
+                          Edit Questions
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleReExtractQuestions(selectedExam.exam_id)}
+                          disabled={reExtracting}
+                          className="text-indigo-600 hover:text-indigo-700"
+                        >
+                          {reExtracting ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <RotateCw className="w-4 h-4 mr-1" />
+                          )}
+                          Re-extract Questions
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
                           onClick={() => setRegradeDialogOpen(true)}
                           className="text-purple-600 hover:text-purple-700"
                         >
