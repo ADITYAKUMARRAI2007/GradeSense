@@ -1847,11 +1847,12 @@ Important:
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Use first page only (usually has student info)
-        first_page = [file_images[0]]
+        from emergentintegrations.llm.chat import ImageContent
+        first_page_image = ImageContent(image_base64=file_images[0])
         
         user_message = UserMessage(
             text="Extract the student ID/roll number and name from this answer sheet.",
-            file_contents=first_page
+            file_contents=[first_page_image]
         )
         
         response = await chat.send_message(user_message)
