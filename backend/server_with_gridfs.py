@@ -2342,7 +2342,7 @@ async def extract_questions_from_question_paper(
     question_paper_images: List[str],
     num_questions: int
 ) -> List[str]:
-    """Extract question text from question paper images using AI"""
+    """Extract question text from question paper images using AI with improved sub-question handling"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
     api_key = os.environ.get('EMERGENT_LLM_KEY')
@@ -2354,25 +2354,71 @@ async def extract_questions_from_question_paper(
             api_key=api_key,
             session_id=f"extract_qp_{uuid.uuid4().hex[:8]}",
             system_message="""You are an expert at extracting question text from exam question papers.
-            
-Extract ALL question text from the provided question paper images.
-Return a JSON array with the complete text for each question, including any sub-parts.
 
-Return this exact JSON format:
+Extract ALL question text from the provided question paper images.
+Return a JSON array with structured objects for each question.
+
+CRITICAL INSTRUCTIONS FOR SUB-QUESTIONS:
+
+1. For questions WITH sub-parts (a, b, c or i, ii, iii):
+   - The parent question's rubric should be EMPTY or contain only a brief intro
+   - Each sub-question's rubric MUST contain its FULL text
+   - DO NOT put all text in the parent question
+
+2. Text distribution example:
+   Original: "Q5: (a) Explain photosynthesis. (b) Draw a diagram of a leaf."
+
+   WRONG:
+   {
+     question_text: "Q5: (a) Explain photosynthesis. (b) Draw a diagram of a leaf.",
+     rubric: "Explain photosynthesis. Draw a diagram of a leaf.",
+     sub_questions: [
+       { sub_id: "a", rubric: "" },
+       { sub_id: "b", rubric: "" }
+     ]
+   }
+
+   CORRECT:
+   {
+     question_text: "Q5:",
+     rubric: "",
+     sub_questions: [
+       { sub_id: "a", rubric: "Explain photosynthesis." },
+       { sub_id: "b", rubric: "Draw a diagram of a leaf." }
+     ]
+   }
+
+3. For questions WITHOUT sub-parts:
+   - Put the full text in the parent question's rubric field
+   - sub_questions array should be empty []
+
+4. Parsing rules:
+   - (a), (b), (c) or (i), (ii), (iii) indicate sub-parts
+   - Split text at each sub-part marker
+   - Include the marker with its text: "(a) Explain..." not just "Explain..."
+
+5. Nested sub-parts like (a)(i), (a)(ii):
+   - These belong to sub-question "a"
+   - Include them in sub_id "a"'s rubric: "(a) (i) First part (ii) Second part"
+
+Required JSON structure for each question:
 {
   "questions": [
-    "Full text of question 1 here (include all sub-parts if any)",
-    "Full text of question 2 here",
-    ...
+    {
+      "question_number": "string",
+      "question_text": "Brief identifier only, e.g. 'Q5:' - NOT full text",
+      "rubric": "Empty if has sub-parts, full text if no sub-parts",
+      "max_marks": number,
+      "sub_questions": [
+        {
+          "sub_id": "a",
+          "rubric": "FULL TEXT of sub-part (a) goes here",
+          "max_marks": number
+        }
+      ]
+    }
   ]
 }
-
-Important:
-- Extract ONLY questions, not instructions or headers
-- Include question numbers
-- Include all sub-parts (a, b, c, etc.) in the same string
-- Maintain the original formatting and numbering
-- Extract exactly what's written, don't paraphrase
 """
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
