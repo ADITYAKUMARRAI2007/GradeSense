@@ -2759,13 +2759,67 @@ Instructions:
 
 Return ONLY the JSON array of questions."""
         
-                user_message = UserMessage(text=prompt, file_contents=image_contents)
+                chunk_message = UserMessage(text=prompt, file_contents=image_contents)
                 
-                chunk_questions = await self._extract_with_retry(chat, user_message, chunk_start, chunk_end)
+                # Try to extract this chunk
+                max_retries = 2  # Fewer retries per chunk
+                retry_delay = 5
+                chunk_questions = []
+                
+                for attempt in range(max_retries):
+                    try:
+                        logger.info(f"Chunk {chunk_start+1}-{chunk_end} extraction attempt {attempt + 1}/{max_retries}")
+                        ai_response = await chat.send_message(chunk_message)
+                        
+                        import json
+                        import re
+                        response_text = ai_response.strip()
+                        
+                        # Try parsing
+                        try:
+                            result = json.loads(response_text)
+                            if isinstance(result, list):
+                                chunk_questions = result
+                                break
+                            elif isinstance(result, dict) and "questions" in result:
+                                chunk_questions = result["questions"]
+                                break
+                        except:
+                            pass
+                        
+                        # Remove code blocks
+                        if response_text.startswith("```"):
+                            response_text = response_text.split("```")[1]
+                            if response_text.startswith("json"):
+                                response_text = response_text[4:]
+                            response_text = response_text.strip()
+                            try:
+                                result = json.loads(response_text)
+                                if isinstance(result, list):
+                                    chunk_questions = result
+                                    break
+                                elif isinstance(result, dict) and "questions" in result:
+                                    chunk_questions = result["questions"]
+                                    break
+                            except:
+                                pass
+                        
+                        logger.warning(f"Failed to parse chunk {chunk_start+1}-{chunk_end} (attempt {attempt + 1})")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay)
+                            
+                    except Exception as e:
+                        logger.error(f"Error extracting chunk {chunk_start+1}-{chunk_end} (attempt {attempt + 1}): {e}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay)
+                
                 if chunk_questions:
+                    logger.info(f"✅ Extracted {len(chunk_questions)} questions from pages {chunk_start+1}-{chunk_end}")
                     all_extracted_questions.extend(chunk_questions)
+                else:
+                    logger.warning(f"⚠️ Failed to extract questions from pages {chunk_start+1}-{chunk_end}")
             
-            logger.info(f"✅ Extracted {len(all_extracted_questions)} questions from {len(all_images)} pages (chunked)")
+            logger.info(f"✅ Total: Extracted {len(all_extracted_questions)} questions from {len(all_images)} pages (chunked)")
             return all_extracted_questions
         else:
             # Small document - process all at once
