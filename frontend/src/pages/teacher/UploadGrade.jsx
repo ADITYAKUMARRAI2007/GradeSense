@@ -85,6 +85,11 @@ export default function UploadGrade({ user }) {
   // Modal state for format selection
   const [formatModalOpen, setFormatModalOpen] = useState(false);
   const [pendingAddSubQuestion, setPendingAddSubQuestion] = useState(null);
+  
+  // New state for optional question entry
+  const [questionsSkipped, setQuestionsSkipped] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [paperUploaded, setPaperUploaded] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
