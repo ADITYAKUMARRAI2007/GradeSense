@@ -32,6 +32,13 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# GridFS for storing large files (model answers, question papers)
+# Using synchronous GridFS since Motor doesn't have async GridFS yet
+from pymongo import MongoClient
+sync_client = MongoClient(mongo_url)
+sync_db = sync_client[os.environ['DB_NAME']]
+fs = GridFS(sync_db)
+
 # Create the main app
 app = FastAPI(title="GradeSense API")
 
