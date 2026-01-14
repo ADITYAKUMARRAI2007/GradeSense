@@ -2513,7 +2513,7 @@ async def extract_questions_from_model_answer(
     model_answer_images: List[str],
     num_questions: int
 ) -> List[str]:
-    """Extract question text from model answer images using AI"""
+    """Extract question text from model answer images using AI with improved sub-question handling"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
     # Check cache
@@ -2532,28 +2532,65 @@ async def extract_questions_from_model_answer(
             session_id=f"extract_{uuid.uuid4().hex[:8]}",
             system_message="""You are an expert at extracting question text from exam papers.
             
-Extract ONLY the question text (not answers) from the provided images.
-Return a JSON array with the question text for each question.
+Extract ONLY the question text (not answers) from the provided model answer images.
+Return a JSON array with structured objects for each question.
 
-CRITICAL: You MUST extract ALL questions present in the document. Count carefully!
+CRITICAL INSTRUCTIONS FOR SUB-QUESTIONS:
 
-Return this exact JSON format:
+1. For questions WITH sub-parts (a, b, c or i, ii, iii):
+   - The parent question's rubric should be EMPTY or contain only a brief intro
+   - Each sub-question's rubric MUST contain its FULL text
+   - DO NOT put all text in the parent question
+
+2. Text distribution example:
+   Original: "Q5: (a) Explain photosynthesis. (b) Draw a diagram of a leaf."
+
+   WRONG:
+   {
+     question_text: "Q5: (a) Explain photosynthesis. (b) Draw a diagram of a leaf.",
+     rubric: "Explain photosynthesis. Draw a diagram of a leaf.",
+     sub_questions: [
+       { sub_id: "a", rubric: "" },
+       { sub_id: "b", rubric: "" }
+     ]
+   }
+
+   CORRECT:
+   {
+     question_text: "Q5:",
+     rubric: "",
+     sub_questions: [
+       { sub_id: "a", rubric: "Explain photosynthesis." },
+       { sub_id: "b", rubric: "Draw a diagram of a leaf." }
+     ]
+   }
+
+3. For questions WITHOUT sub-parts:
+   - Put the full text in the parent question's rubric field
+   - sub_questions array should be empty []
+
+4. DO NOT include answer content, only question text
+5. Look through ALL pages carefully
+6. Return questions in order (Q1, Q2, Q3, etc.)
+
+Required JSON structure:
 {
   "questions": [
-    "Full text of question 1 here",
-    "Full text of question 2 here",
-    "Full text of question 3 here",
-    ...
+    {
+      "question_number": "string",
+      "question_text": "Brief identifier only",
+      "rubric": "Empty if has sub-parts, full text if no sub-parts",
+      "max_marks": number,
+      "sub_questions": [
+        {
+          "sub_id": "a",
+          "rubric": "FULL TEXT of sub-part (a)",
+          "max_marks": number
+        }
+      ]
+    }
   ]
 }
-
-Important:
-- Extract ALL questions - don't stop at just one!
-- Extract the complete question text including any sub-parts (a, b, c)
-- Do NOT include answer content, only question text
-- Maintain original question numbering if visible
-- Look through ALL pages carefully
-- Return questions in order (Q1, Q2, Q3, etc.)
 """
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
