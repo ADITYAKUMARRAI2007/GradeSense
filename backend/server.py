@@ -2145,7 +2145,7 @@ KEY POINTS:
 ---
 
 Be thorough - extract EVERY detail useful for grading."""
-            ).with_model("openai", "gpt-4o-mini").with_params(temperature=0, seed=42)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             image_contents = [ImageContent(image_base64=img) for img in chunk_images]
             
