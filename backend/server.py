@@ -3182,6 +3182,24 @@ async def upload_model_answer(
         }}
     )
     
+    # Extract model answer content as text for efficient grading
+    logger.info(f"Extracting model answer content as text for exam {exam_id}")
+    model_answer_text = await extract_model_answer_content(
+        model_answer_images=images,
+        questions=exam.get("questions", [])
+    )
+    
+    # Store the extracted text in the exam_files collection
+    if model_answer_text:
+        await db.exam_files.update_one(
+            {"exam_id": exam_id, "file_type": "model_answer"},
+            {"$set": {
+                "model_answer_text": model_answer_text,
+                "text_extracted_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        logger.info(f"Stored model answer text ({len(model_answer_text)} chars) for exam {exam_id}")
+    
     # Check if question paper exists
     qp_imgs = await get_exam_question_paper_images(exam_id)
     
