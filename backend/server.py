@@ -2472,6 +2472,181 @@ Return ONLY the JSON with ALL {num_questions} questions, no other text."""
         logger.error(f"Error extracting questions: {e}")
         return []
 
+async def extract_question_structure_from_paper(
+    paper_images: List[str],
+    paper_type: str = "question_paper"
+) -> List[dict]:
+    """
+    Extract COMPLETE question structure including:
+    - Question numbers
+    - Sub-questions with IDs (a, b, c OR i, ii, iii)
+    - Sub-sub-questions if any
+    - Marks for each question/sub-question
+    - Question text
+    
+    Returns a list of question dictionaries matching the exam structure.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    
+    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    if not api_key:
+        logger.error("EMERGENT_LLM_KEY not configured")
+        return []
+    
+    try:
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"extract_struct_{uuid.uuid4().hex[:8]}",
+            system_message=f"""You are an expert at analyzing exam {paper_type.replace('_', ' ')}s and extracting complete question structure.
+
+Your task is to extract:
+1. ALL questions with their numbers (Q1, Q2, Q3, etc.)
+2. Sub-questions with their IDs (a, b, c OR i, ii, iii)
+3. Sub-sub-questions if they exist (like Q1(a)(i), Q1(a)(ii))
+4. Marks allocated to each question and sub-question
+5. Brief question text for each
+
+Return a JSON array where each question has this structure:
+{{
+  "question_number": 1,
+  "max_marks": 12,
+  "rubric": "Brief question text here",
+  "question_text": "Brief question text here",
+  "sub_questions": [
+    {{
+      "sub_id": "a",
+      "max_marks": 2,
+      "rubric": "Part (a) text here"
+    }},
+    {{
+      "sub_id": "b", 
+      "max_marks": 10,
+      "rubric": "Part (b) text here",
+      "sub_questions": [
+        {{
+          "sub_id": "i",
+          "max_marks": 5,
+          "rubric": "Part (b)(i) text here"
+        }},
+        {{
+          "sub_id": "ii",
+          "max_marks": 5,
+          "rubric": "Part (b)(ii) text here"
+        }}
+      ]
+    }}
+  ]
+}}
+
+CRITICAL RULES:
+1. Extract EVERY question you see
+2. Detect if sub-questions use letters (a,b,c) or roman numerals (i,ii,iii)
+3. If a question has no sub-parts, leave sub_questions as empty array []
+4. Sum of sub-question marks MUST equal parent question marks
+5. Extract marks carefully - look for [10 marks], (5 marks), etc.
+6. Keep question text brief but meaningful
+
+Return ONLY a JSON array of questions, nothing else."""
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+        
+        # Create image contents
+        image_contents = [ImageContent(image_base64=img) for img in paper_images]
+        logger.info(f"Extracting complete question structure from {len(image_contents)} pages ({paper_type})")
+        
+        prompt = f"""Analyze this {paper_type.replace('_', ' ')} and extract the COMPLETE question structure.
+
+Instructions:
+- Identify ALL questions (Q1, Q2, Q3...)
+- For each question, identify ALL sub-parts with their marks
+- Detect the numbering style (a,b,c vs i,ii,iii)
+- Extract marks for each part
+- Be thorough - don't miss any questions or sub-questions
+
+Return ONLY the JSON array of questions."""
+        
+        user_message = UserMessage(text=prompt, file_contents=image_contents)
+        
+        # Retry logic
+        max_retries = 3
+        retry_delay = 5
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Structure extraction attempt {attempt + 1}/{max_retries}")
+                ai_response = await chat.send_message(user_message)
+                
+                # Robust JSON parsing
+                import json
+                import re
+                response_text = ai_response.strip()
+                
+                # Strategy 1: Direct parse
+                try:
+                    result = json.loads(response_text)
+                    if isinstance(result, list):
+                        logger.info(f"✅ Extracted structure for {len(result)} questions")
+                        return result
+                    elif isinstance(result, dict) and "questions" in result:
+                        logger.info(f"✅ Extracted structure for {len(result['questions'])} questions")
+                        return result["questions"]
+                except json.JSONDecodeError:
+                    pass
+                
+                # Strategy 2: Remove code blocks
+                if response_text.startswith("```"):
+                    response_text = response_text.split("```")[1]
+                    if response_text.startswith("json"):
+                        response_text = response_text[4:]
+                    response_text = response_text.strip()
+                    try:
+                        result = json.loads(response_text)
+                        if isinstance(result, list):
+                            logger.info(f"✅ Extracted structure for {len(result)} questions (code block)")
+                            return result
+                        elif isinstance(result, dict) and "questions" in result:
+                            return result["questions"]
+                    except json.JSONDecodeError:
+                        pass
+                
+                # Strategy 3: Find JSON array in text
+                json_match = re.search(r'\[\s*\{.*?\}\s*\]', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group())
+                        logger.info(f"✅ Extracted structure for {len(result)} questions (pattern match)")
+                        return result
+                    except json.JSONDecodeError:
+                        pass
+                
+                # All strategies failed
+                logger.warning(f"Failed to parse structure JSON (attempt {attempt + 1}). Response preview: {response_text[:200]}")
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.info(f"Retrying structure extraction in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"All JSON parsing strategies failed after {max_retries} attempts")
+                    return []
+                
+            except Exception as e:
+                error_str = str(e).lower()
+                logger.error(f"Error during structure extraction attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1 and ("502" in error_str or "503" in error_str or "timeout" in error_str or "rate limit" in error_str):
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.info(f"Retrying structure extraction in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    if attempt >= max_retries - 1:
+                        logger.error(f"Structure extraction failed after {max_retries} attempts")
+                    raise e
+        
+        return []
+        
+    except Exception as e:
+        logger.error(f"Error extracting question structure: {e}")
+        return []
+
 async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str, Any]:
     """
     Auto-extract questions from question paper (priority) or model answer.
