@@ -545,7 +545,14 @@ export default function ReviewPapers({ user }) {
                 {qs.question_text && (
                   <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary">
                     <p className="text-xs text-foreground whitespace-pre-wrap">
-                      <strong>Q{qs.question_number}.</strong> {typeof qs.question_text === 'object' ? JSON.stringify(qs.question_text) : qs.question_text}
+                      <strong>Q{qs.question_number}.</strong> {(() => {
+                        let text = qs.question_text;
+                        // Handle nested object structure
+                        if (typeof text === 'object' && text !== null) {
+                          text = text.rubric || text.question_text || JSON.stringify(text);
+                        }
+                        return typeof text === 'string' ? text : String(text || '');
+                      })()}
                     </p>
                   </div>
                 )}
@@ -942,12 +949,17 @@ export default function ReviewPapers({ user }) {
 
                     {/* Full Question Text - from exam questions or submission */}
                     {(() => {
-                      const questionText = qs.question_text || examQuestion?.rubric || examQuestion?.question_text;
+                      let questionText = qs.question_text || examQuestion?.rubric || examQuestion?.question_text;
                       
-                      // Ensure questionText is a string, not an object
-                      const questionTextString = typeof questionText === 'object' 
-                        ? JSON.stringify(questionText) 
-                        : questionText;
+                      // CRITICAL FIX: Handle nested question objects
+                      // If questionText is an object, extract the actual text from it
+                      if (typeof questionText === 'object' && questionText !== null) {
+                        // Try to extract text from nested structure
+                        questionText = questionText.rubric || questionText.question_text || JSON.stringify(questionText);
+                      }
+                      
+                      // Ensure final questionText is a string
+                      const questionTextString = typeof questionText === 'string' ? questionText : String(questionText || '');
                       
                       // If no question text, show AI's assessment as a fallback
                       if (!questionTextString && qs.ai_feedback && !hasSubQuestions) {
