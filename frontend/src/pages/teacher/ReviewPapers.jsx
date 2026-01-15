@@ -477,18 +477,6 @@ export default function ReviewPapers({ user }) {
                     </div>
                   )}
                   
-                  {/* Mistakes Toggle */}
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="show-annotations-mobile"
-                      checked={showAnnotations}
-                      onCheckedChange={setShowAnnotations}
-                    />
-                    <Label htmlFor="show-annotations-mobile" className="text-xs cursor-pointer flex items-center gap-1">
-                      {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      Mistakes
-                    </Label>
-                  </div>
                 </div>
               </div>
               
