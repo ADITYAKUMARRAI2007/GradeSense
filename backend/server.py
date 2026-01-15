@@ -3031,7 +3031,20 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
                 for q in questions:
                     total_marks += q.get("max_marks", 0)
 
-        logger.info(f"Calculated total marks: {total_marks} (including optional question handling)")
+        logger.info(f"Calculated total marks from extraction: {total_marks} (including optional question handling)")
+
+        # Get the exam to preserve user's original total_marks
+        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+        user_total_marks = exam.get("total_marks") if exam else None
+        
+        # Preserve user's original total_marks if it was set during exam creation
+        # Only update if user didn't set it (default 100) or if it's significantly different
+        final_total_marks = user_total_marks if user_total_marks and user_total_marks != 100 else total_marks
+        
+        if user_total_marks and user_total_marks != total_marks:
+            logger.info(f"⚠️ Total marks mismatch: User set {user_total_marks}, extracted {total_marks}. Using user's value: {final_total_marks}")
+        else:
+            logger.info(f"Using calculated total marks: {final_total_marks}")
 
         # STEP 1: Delete old questions for this exam to prevent duplicates
         delete_result = await db.questions.delete_many({"exam_id": exam_id})
@@ -3059,7 +3072,7 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
                 "questions": extracted_questions,
                 "questions_count": len(extracted_questions),
                 "extraction_source": target_source,
-                "total_marks": total_marks  # Update total marks based on extraction
+                "total_marks": final_total_marks  # Preserve user's total marks if they set it
             }}
         )
 
@@ -3068,7 +3081,8 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
             "success": True,
             "message": f"Successfully extracted {len(extracted_questions)} questions with structure from {target_source.replace('_', ' ')}",
             "count": len(extracted_questions),
-            "total_marks": total_marks,
+            "total_marks": final_total_marks,
+            "extracted_total_marks": total_marks,  # Include calculated marks for reference
             "source": target_source,
             "skipped": False
         }
