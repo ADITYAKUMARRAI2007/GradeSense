@@ -544,7 +544,8 @@ export default function UploadGrade({ user }) {
       }, 500);
       
       const response = await axios.post(`${API}/exams/${examId}/upload-papers`, formDataObj, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 600000  // 10 minutes for large document processing
       });
       
       clearInterval(progressInterval);
