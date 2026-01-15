@@ -723,6 +723,7 @@ test_plan:
     - "Class Insights Page Enhancement"
   test_all: false
   test_priority: "critical_first"
+  upload_grading_flow_tested: true
 
 agent_communication:
     - agent: "main"
