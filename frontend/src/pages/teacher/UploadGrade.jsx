@@ -937,9 +937,11 @@ export default function UploadGrade({ user }) {
                       </Card>
                       
                       <Card className="p-6 cursor-pointer hover:border-primary transition-colors" 
-                        onClick={() => {
+                        onClick={async () => {
                           setQuestionsSkipped(true);
                           setFormData(prev => ({...prev, questions: []}));
+                          // Auto-advance to Step 5 when auto-extract is chosen
+                          await handleSaveQuestionsAndContinue();
                         }}
                       >
                         <div className="text-center space-y-3">
