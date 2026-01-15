@@ -37,7 +37,9 @@ import {
   RotateCw,
   Plus,
   Loader2,
-  AlertCircle as AlertCircleIcon
+  AlertCircle as AlertCircleIcon,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import QuestionEditor from "../../components/QuestionEditor";
 
