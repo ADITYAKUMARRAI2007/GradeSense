@@ -2688,6 +2688,7 @@ Your task is to extract:
 3. Sub-sub-questions if they exist (like Q1(a)(i), Q1(a)(ii))
 4. Marks allocated to each question and sub-question
 5. Brief question text for each
+6. **CRITICAL: Detect optional questions** - Look for instructions like "Attempt any X out of Y", "Answer any 4 questions", etc.
 
 Return a JSON array where each question has this structure:
 {{
@@ -2695,6 +2696,9 @@ Return a JSON array where each question has this structure:
   "max_marks": 12,
   "rubric": "Brief question text here",
   "question_text": "Brief question text here",
+  "is_optional": false,
+  "optional_group": null,
+  "required_count": null,
   "sub_questions": [
     {{
       "sub_id": "a",
@@ -2728,6 +2732,11 @@ CRITICAL RULES:
 4. Sum of sub-question marks MUST equal parent question marks
 5. Extract marks carefully - look for [10 marks], (5 marks), etc.
 6. Keep question text brief but meaningful
+7. **OPTIONAL QUESTIONS DETECTION:**
+   - Look for phrases like "Attempt any X out of Y", "Answer any 4 questions", "Choose any 3"
+   - If found, mark those questions with: is_optional=true, optional_group="group1", required_count=X
+   - Calculate effective_total_marks by considering only the required questions from optional groups
+   - Example: "Answer any 4 out of 6 questions (each 10 marks)" → 6 questions marked as optional, required_count=4, effective_marks=40
 
 Return ONLY a JSON array of questions, nothing else."""
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
