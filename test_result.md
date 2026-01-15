@@ -691,6 +691,68 @@ agent_communication:
       message: "🗑️ NEW FEATURE TESTING COMPLETE - DELETE INDIVIDUAL STUDENT PAPER FEATURE FULLY FUNCTIONAL! Comprehensive testing of the Delete Individual Student Paper Feature completed with 100% success rate. ✅ BACKEND ENDPOINTS VERIFIED: 1) GET /api/exams/{exam_id}/submissions - Returns list of submissions for exam, only accessible by teacher who owns exam, excludes large binary data (file_data, file_images), includes required fields (student_name, total_score, percentage, status) 2) DELETE /api/submissions/{submission_id} - Deletes specific submission, only accessible by teachers, verifies exam belongs to teacher, deletes related re-evaluation requests (cascade), returns success message. ✅ PERMISSION TESTING PASSED: Authentication required (401 without token), student role blocked (403), different teacher blocked (403). ✅ EDGE CASES VERIFIED: Non-existent submission returns 404, already deleted submission returns 404, submission count updates correctly. ✅ CASCADE DELETION CONFIRMED: Related re-evaluation requests automatically deleted when submission is deleted. ✅ PRODUCTION READINESS: All test scenarios passed - fetch submissions, delete submission, permission checks, edge cases, and cleanup verification. Feature is ready for production use."
     - agent: "testing"
       message: "✅ REVIEW PAPERS TEXTAREA EDITING & QUESTION TEXT DISPLAY TESTING COMPLETE! Comprehensive code analysis confirms all reported issues have been resolved. 🔧 TEXTAREA EDITING FIX VERIFIED: Main agent successfully implemented the critical fix by converting DetailContent from function to useMemo (lines 278-1070) with proper dependency array. This prevents component re-mounting that was causing textarea focus loss and editing issues. Both desktop and mobile textareas now have stable value/onChange props wired to updateQuestionScore handler. 📝 QUESTION TEXT DISPLAY ENHANCEMENT VERIFIED: Enhanced fallback logic implemented with three user-friendly scenarios: 1) Blue box with full question text when available 2) Light blue box with AI assessment preview when no question text but has AI feedback 3) Amber warning box with helpful instructions when neither available. 🚫 TESTING LIMITATION: OAuth authentication prevents full E2E automated testing, but comprehensive code review confirms implementation addresses all user-reported issues. The fixes are production-ready and should resolve the textarea editing problems and improve question text display user experience."
+
+
+backend:
+  - task: "Auto-Extracted Questions Database Persistence (Issue #1)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P0 CRITICAL FIX: Modified auto_extract_questions function (lines 2988-3027) to properly save extracted questions to database. CHANGES: 1) Added db.questions.delete_many() to delete old questions for exam and prevent duplicates 2) Created questions_to_insert array with unique question_id and exam_id for each question 3) Used db.questions.insert_many() to batch insert all questions 4) Updated exam document with questions array, questions_count, extraction_source, and total_marks. This fixes the critical bug where extracted questions weren't persisting, causing all grading to fail with 0 scores. NEEDS TESTING: Backend testing agent should verify questions are saved to database after extraction and grading workflow works correctly."
+
+  - task: "Optional Questions Detection and Marks Calculation (Issue #2)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P0 CRITICAL FIX: Enhanced extraction prompt and total marks calculation to handle optional questions. CHANGES: 1) Updated system message in extract_question_structure_from_paper (lines 2680-2733) to detect phrases like 'Attempt any X out of Y' and add is_optional, optional_group, required_count fields 2) Implemented smart total_marks calculation in auto_extract_questions (lines 2987-3020) that groups optional questions and only counts marks for required number of questions from each group. Example: 'Answer any 4 out of 6 questions' will now correctly calculate total_marks based on 4 questions, not all 6. NEEDS TESTING: Backend testing agent should verify optional questions are detected correctly and total_marks calculated accurately."
+
+frontend:
+  - task: "Review Papers UI Default Checkboxes (Issue #3)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P0 CRITICAL FIX: Changed default checkbox states in ReviewPapers.jsx (lines 54-56) from false to true. Now showAnnotations, showModelAnswer, and showQuestionPaper all default to true, making the page show all information by default instead of appearing empty. This fixes the critical UX issue where users thought the page was broken. NEEDS TESTING: Frontend testing agent or screenshot should verify page shows content by default."
+
+  - task: "Manual Entry Form Conditional Logic (Issue #4)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/teacher/UploadGrade.jsx"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "P0 CRITICAL FIX: Fixed conditional logic in UploadGrade.jsx (line 993) from '(showManualEntry || questionsSkipped)' to 'showManualEntry'. This ensures the manual question entry form only displays when user explicitly chooses 'Enter Manually' option, not when they select 'Auto-Extract from Papers'. Fixes the confusing UI bug where manual form showed even when auto-extract was selected. NEEDS TESTING: Frontend testing agent should verify form only shows for manual entry choice."
+
+test_plan:
+  current_focus:
+    - "Auto-Extracted Questions Database Persistence (Issue #1)"
+    - "Optional Questions Detection and Marks Calculation (Issue #2)"
+    - "Review Papers UI Default Checkboxes (Issue #3)"
+    - "Manual Entry Form Conditional Logic (Issue #4)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "critical_first"
+
     - agent: "testing"
       message: "🎯 NEW GRADESENSE MASTER GRADING ENGINE TESTING COMPLETE! Comprehensive verification of the revolutionary ~2000 line Master Instruction Set implementation. ✅ BACKEND COMPILATION VERIFIED: Server.py compiles without errors, backend running successfully, health endpoint responding correctly. ✅ GRADE_WITH_AI FUNCTION COMPREHENSIVE VERIFICATION: Found 11/11 key implementation indicators including GRADESENSE MASTER GRADING MODE SPECIFICATIONS, FUNDAMENTAL PRINCIPLES (SACRED - NEVER VIOLATE), CONSISTENCY IS SACRED, MODEL ANSWER IS YOUR HOLY GRAIL, FAIRNESS ABOVE ALL. All four grading modes (STRICT 🔴, BALANCED ⚖️, CONCEPTUAL 🔵, LENIENT 🟢) with detailed specifications verified. ✅ GRADING MODES TESTING: Successfully created and verified all 4 grading modes with correct storage and retrieval. Each mode has distinct marking rules, thresholds, and behaviors as specified. ✅ LLM MODEL MIGRATION VERIFIED: Found 11 instances of gemini-2.5-pro usage, no remaining GPT-4o references, complete migration achieved. ✅ CONSISTENCY FEATURES VERIFIED: Content hashing implementation (content_hash = hashlib.sha256), deterministic session ID (session_id=f'grading_{content_hash}'), hashlib import present. ✅ ENHANCED OUTPUT FORMAT: Comprehensive JSON structure with detailed feedback, what_done_well, areas_to_improve, error_annotations, confidence scores, and flags confirmed. ✅ CRITICAL ISSUES RESOLVED: Inconsistent grading bug fixed through deterministic mechanisms, same paper will now receive identical scores. The NEW GradeSense Master Grading Engine is fully functional, production-ready, and represents a major advancement in AI-powered educational assessment. All critical features implemented and tested successfully."
     - agent: "main"
