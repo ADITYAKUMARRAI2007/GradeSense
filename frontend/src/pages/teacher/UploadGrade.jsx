@@ -708,6 +708,9 @@ export default function UploadGrade({ user }) {
                     onChange={(e) => handleInputChange("total_marks", parseFloat(e.target.value))}
                     data-testid="total-marks-input"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    This will be used as the exam's total marks. Auto-extracted marks will not override this value.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
