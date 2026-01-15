@@ -4110,6 +4110,23 @@ print('Critical Fix #1 test submission created');
             print("❌ Failed to create test user - stopping tests")
             return False
         
+        # 🔥 CRITICAL FIXES TESTING - Priority Tests
+        print("\n" + "="*80)
+        print("🔥 TESTING 4 CRITICAL FIXES IN GRADESENSE")
+        print("="*80)
+        
+        # Setup basic data needed for critical fix tests
+        print("\n📋 Setting up test data for critical fixes...")
+        self.test_create_batch()
+        self.test_create_subject()
+        
+        # Run the 4 critical fix tests
+        self.test_critical_fix_1_auto_extracted_questions_persistence()
+        self.test_critical_fix_2_optional_questions_marks_calculation()
+        self.test_critical_fix_3_review_papers_ui_checkboxes()
+        self.test_critical_fix_4_manual_entry_form_logic()
+        print("="*80)
+        
         # Test authenticated endpoints
         print("\n📋 Testing Authenticated Endpoints")
         print("-" * 30)
