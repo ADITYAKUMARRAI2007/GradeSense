@@ -1268,7 +1268,6 @@ export default function ReviewPapers({ user }) {
     questionPaperImages,
     showModelAnswer, 
     showQuestionPaper,
-    showAnnotations,
     examQuestions,
     imageZoom,
     zoomedImage,
