@@ -616,9 +616,18 @@ export default function ManageExams({ user }) {
                             </div>
                             <div className="min-w-0">
                               <p className="font-medium truncate">{exam.exam_name}</p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {getBatchName(exam.batch_id)} • {getSubjectName(exam.subject_id)}
-                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+                                <span>{getBatchName(exam.batch_id)} • {getSubjectName(exam.subject_id)}</span>
+                                {exam.results_published ? (
+                                  <Badge variant="success" className="bg-green-500 text-white text-[10px] px-1 py-0">
+                                    Published
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                                    Draft
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
