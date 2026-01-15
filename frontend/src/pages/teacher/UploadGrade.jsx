@@ -506,7 +506,8 @@ export default function UploadGrade({ user }) {
         const formData = new FormData();
         formData.append("file", modelAnswerFile);
         const maResponse = await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
-          headers: { "Content-Type": "multipart/form-data" }
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 600000  // 10 minutes for large document processing
         });
         
         // Show auto-extraction result
