@@ -562,12 +562,15 @@ export default function ReviewPapers({ user }) {
                   <div className="space-y-3 mt-3">
                     {qs.sub_scores.map((subScore, subIndex) => {
                       const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
-                      const subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
+                      let subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
                       
-                      // Ensure subQuestionText is a string
-                      const subQuestionTextString = typeof subQuestionText === 'object'
-                        ? JSON.stringify(subQuestionText)
-                        : subQuestionText;
+                      // CRITICAL FIX: Handle nested sub-question objects
+                      if (typeof subQuestionText === 'object' && subQuestionText !== null) {
+                        subQuestionText = subQuestionText.rubric || subQuestionText.question_text || JSON.stringify(subQuestionText);
+                      }
+                      
+                      // Ensure it's a string
+                      const subQuestionTextString = typeof subQuestionText === 'string' ? subQuestionText : String(subQuestionText || '');
                       
                       return (
                         <div 
@@ -999,12 +1002,15 @@ export default function ReviewPapers({ user }) {
                       <div className="space-y-4 mt-3">
                         {qs.sub_scores.map((subScore, subIndex) => {
                           const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
-                          const subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
+                          let subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
                           
-                          // Ensure subQuestionText is a string, not an object
-                          const subQuestionTextString = typeof subQuestionText === 'object'
-                            ? JSON.stringify(subQuestionText)
-                            : subQuestionText;
+                          // CRITICAL FIX: Handle nested sub-question objects
+                          if (typeof subQuestionText === 'object' && subQuestionText !== null) {
+                            subQuestionText = subQuestionText.rubric || subQuestionText.question_text || JSON.stringify(subQuestionText);
+                          }
+                          
+                          // Ensure it's a string
+                          const subQuestionTextString = typeof subQuestionText === 'string' ? subQuestionText : String(subQuestionText || '');
                           
                           return (
                             <div 
@@ -1251,9 +1257,14 @@ export default function ReviewPapers({ user }) {
                 <p className="text-sm font-medium mb-1">Question {feedbackQuestion.question_number}</p>
                 {feedbackQuestion.question_text && (
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {typeof feedbackQuestion.question_text === 'object' 
-                      ? JSON.stringify(feedbackQuestion.question_text) 
-                      : feedbackQuestion.question_text}
+                    {(() => {
+                      let text = feedbackQuestion.question_text;
+                      // Handle nested object structure
+                      if (typeof text === 'object' && text !== null) {
+                        text = text.rubric || text.question_text || JSON.stringify(text);
+                      }
+                      return typeof text === 'string' ? text : String(text || '');
+                    })()}
                   </p>
                 )}
               </div>
