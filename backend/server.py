@@ -2994,8 +2994,44 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
             logger.warning(f"Structure extraction returned no questions for {exam_id} from {target_source}")
             return {"success": False, "message": f"Failed to extract question structure from {target_source.replace('_', ' ')}"}
 
-        # Calculate total marks from extracted structure
-        total_marks = sum(q.get("max_marks", 0) for q in extracted_questions)
+        # Calculate total marks from extracted structure, handling optional questions
+        total_marks = 0
+        optional_groups = {}
+        
+        for q in extracted_questions:
+            is_optional = q.get("is_optional", False)
+            
+            if is_optional:
+                # Group optional questions together
+                group_id = q.get("optional_group", "default_optional")
+                if group_id not in optional_groups:
+                    optional_groups[group_id] = {
+                        "questions": [],
+                        "required_count": q.get("required_count", 0)
+                    }
+                optional_groups[group_id]["questions"].append(q)
+            else:
+                # Non-optional question - add full marks
+                total_marks += q.get("max_marks", 0)
+        
+        # Calculate marks for optional groups
+        for group_id, group_data in optional_groups.items():
+            questions = group_data["questions"]
+            required_count = group_data["required_count"]
+            
+            if required_count > 0 and len(questions) > 0:
+                # Take marks from the required number of questions (typically all have same marks)
+                # Use the first question's marks as representative
+                marks_per_question = questions[0].get("max_marks", 0)
+                group_effective_marks = marks_per_question * min(required_count, len(questions))
+                total_marks += group_effective_marks
+                logger.info(f"Optional group '{group_id}': {len(questions)} questions, need {required_count}, contributing {group_effective_marks} marks")
+            else:
+                # Fallback: add all marks if no required_count specified
+                for q in questions:
+                    total_marks += q.get("max_marks", 0)
+
+        logger.info(f"Calculated total marks: {total_marks} (including optional question handling)")
 
         # STEP 1: Delete old questions for this exam to prevent duplicates
         delete_result = await db.questions.delete_many({"exam_id": exam_id})
