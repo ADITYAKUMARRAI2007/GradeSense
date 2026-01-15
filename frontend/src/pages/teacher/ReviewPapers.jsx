@@ -51,9 +51,9 @@ export default function ReviewPapers({ user }) {
   const [searchInput, setSearchInput] = useState(""); // Separate state for input
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [showAnnotations, setShowAnnotations] = useState(false);
-  const [showModelAnswer, setShowModelAnswer] = useState(false);
-  const [showQuestionPaper, setShowQuestionPaper] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(true);
+  const [showModelAnswer, setShowModelAnswer] = useState(true);
+  const [showQuestionPaper, setShowQuestionPaper] = useState(true);
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
   const [questionPaperImages, setQuestionPaperImages] = useState([]);
   const [examQuestions, setExamQuestions] = useState([]);

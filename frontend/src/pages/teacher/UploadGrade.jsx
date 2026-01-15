@@ -990,7 +990,7 @@ export default function UploadGrade({ user }) {
                 </div>
               )}
               
-              {(showManualEntry || questionsSkipped) && (
+              {showManualEntry && (
               <div>
               {formData.questions.map((question, index) => (
                 <div key={index} className="p-4 bg-muted/50 rounded-lg space-y-3">
