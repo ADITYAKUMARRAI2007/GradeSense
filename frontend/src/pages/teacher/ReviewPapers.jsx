@@ -939,8 +939,13 @@ export default function ReviewPapers({ user }) {
                     {(() => {
                       const questionText = qs.question_text || examQuestion?.rubric || examQuestion?.question_text;
                       
+                      // Ensure questionText is a string, not an object
+                      const questionTextString = typeof questionText === 'object' 
+                        ? JSON.stringify(questionText) 
+                        : questionText;
+                      
                       // If no question text, show AI's assessment as a fallback
-                      if (!questionText && qs.ai_feedback && !hasSubQuestions) {
+                      if (!questionTextString && qs.ai_feedback && !hasSubQuestions) {
                         return (
                           <div className="mb-3 p-3 bg-blue-50/50 rounded border-l-4 border-blue-300">
                             <p className="text-xs font-medium text-blue-800 mb-1">Question {qs.question_number} (from AI assessment):</p>
@@ -952,10 +957,10 @@ export default function ReviewPapers({ user }) {
                         );
                       }
                       
-                      return questionText ? (
+                      return questionTextString ? (
                         <div className="mb-3 p-2 bg-blue-50 rounded border-l-4 border-blue-500">
                           <p className="text-xs lg:text-sm text-foreground whitespace-pre-wrap">
-                            <strong className="text-blue-700">Q{qs.question_number}:</strong> {questionText}
+                            <strong className="text-blue-700">Q{qs.question_number}:</strong> {questionTextString}
                           </p>
                         </div>
                       ) : !hasSubQuestions ? (
