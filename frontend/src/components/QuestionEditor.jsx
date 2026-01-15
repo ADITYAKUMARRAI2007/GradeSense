@@ -76,7 +76,14 @@ export default function QuestionEditor({ question, onChange, onRemove }) {
           <div>
             <Label>Rubric/Question Text (Optional)</Label>
             <Textarea
-              value={question.rubric || ""}
+              value={(() => {
+                let rubric = question.rubric || "";
+                // Handle nested object structure
+                if (typeof rubric === 'object' && rubric !== null) {
+                  rubric = rubric.rubric || rubric.question_text || "";
+                }
+                return typeof rubric === 'string' ? rubric : String(rubric);
+              })()}
               onChange={(e) => onChange({...question, rubric: e.target.value, question_text: e.target.value})}
               placeholder="Brief guidelines for this question..."
               rows={3}
