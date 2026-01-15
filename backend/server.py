@@ -4279,9 +4279,21 @@ async def get_submissions(
             {"_id": 0, "file_data": 0, "file_images": 0}
         ).to_list(500)
     else:
-        # Students see their own submissions
+        # Students see their own submissions ONLY if results are published
+        # First, get exams where results are published
+        published_exams = await db.exams.find(
+            {"results_published": True},
+            {"_id": 0, "exam_id": 1}
+        ).to_list(1000)
+        
+        published_exam_ids = [e["exam_id"] for e in published_exams]
+        
+        # Get student's submissions for published exams only
         submissions = await db.submissions.find(
-            {"student_id": user.user_id},
+            {
+                "student_id": user.user_id,
+                "exam_id": {"$in": published_exam_ids}
+            },
             {"_id": 0, "file_data": 0, "file_images": 0}
         ).to_list(100)
     
