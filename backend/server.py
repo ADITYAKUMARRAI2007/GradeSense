@@ -5791,6 +5791,49 @@ Return JSON:
         "total_submissions": len(submissions)
     }
 
+
+
+@api_router.post("/exams/{exam_id}/publish-results")
+async def publish_exam_results(exam_id: str, user: User = Depends(get_current_user)):
+    """Publish exam results to make them visible to students"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can publish results")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found or access denied")
+    
+    # Update exam to mark results as published
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {
+            "results_published": True,
+            "published_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Results published successfully", "exam_id": exam_id}
+
+@api_router.post("/exams/{exam_id}/unpublish-results")
+async def unpublish_exam_results(exam_id: str, user: User = Depends(get_current_user)):
+    """Unpublish exam results to hide them from students (for corrections)"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can unpublish results")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found or access denied")
+    
+    # Update exam to mark results as unpublished
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {"results_published": False}}
+    )
+    
+    return {"message": "Results unpublished successfully", "exam_id": exam_id}
+
         "feedback_id": feedback_id,
         "exam_id": exam_id
     }
