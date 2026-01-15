@@ -1040,7 +1040,16 @@ export default function ManageExams({ user }) {
                               <Badge variant="outline">{question.max_marks} marks</Badge>
                             </div>
                             {question.rubric && (
-                              <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{question.rubric}</p>
+                              <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
+                                {(() => {
+                                  let rubric = question.rubric;
+                                  // Handle nested object structure (from new extraction)
+                                  if (typeof rubric === 'object' && rubric !== null) {
+                                    rubric = rubric.rubric || rubric.question_text || JSON.stringify(rubric);
+                                  }
+                                  return typeof rubric === 'string' ? rubric : String(rubric || '');
+                                })()}
+                              </p>
                             )}
                             {question.topic_tags?.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
