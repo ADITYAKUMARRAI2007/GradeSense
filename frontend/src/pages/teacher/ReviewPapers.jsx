@@ -1238,7 +1238,11 @@ export default function ReviewPapers({ user }) {
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium mb-1">Question {feedbackQuestion.question_number}</p>
                 {feedbackQuestion.question_text && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">{feedbackQuestion.question_text}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {typeof feedbackQuestion.question_text === 'object' 
+                      ? JSON.stringify(feedbackQuestion.question_text) 
+                      : feedbackQuestion.question_text}
+                  </p>
                 )}
               </div>
 
