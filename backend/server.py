@@ -1903,8 +1903,20 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
     
     for i, q in enumerate(questions):
         if i < len(extracted_questions):
-            q["rubric"] = extracted_questions[i]
-            q["question_text"] = extracted_questions[i]  # Also set question_text field
+            extracted_q = extracted_questions[i]
+            
+            # CRITICAL FIX: extracted_questions returns objects, not strings
+            # Extract the actual text from the object
+            if isinstance(extracted_q, dict):
+                rubric_text = extracted_q.get("rubric", "")
+                question_text = extracted_q.get("question_text", "") or extracted_q.get("rubric", "")
+            else:
+                # Fallback if it's already a string
+                rubric_text = str(extracted_q)
+                question_text = str(extracted_q)
+            
+            q["rubric"] = rubric_text
+            q["question_text"] = question_text
             updated_count += 1
     
     # Update exam in database
