@@ -119,6 +119,30 @@ export default function ManageExams({ user }) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+
+
+  const publishResults = async (examId) => {
+    try {
+      await axios.post(`${API}/exams/${examId}/publish-results`);
+      toast.success("Results published! Students can now see their scores.");
+      fetchExams();
+    } catch (error) {
+      console.error("Publish error:", error);
+      toast.error("Failed to publish results");
+    }
+  };
+
+  const unpublishResults = async (examId) => {
+    try {
+      await axios.post(`${API}/exams/${examId}/unpublish-results`);
+      toast.success("Results hidden from students");
+      fetchExams();
+    } catch (error) {
+      console.error("Unpublish error:", error);
+      toast.error("Failed to unpublish results");
+    }
+  };
+
     }
   };
 
