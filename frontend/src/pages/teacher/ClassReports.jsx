@@ -573,7 +573,16 @@ export default function ClassReports({ user }) {
                           </div>
                         </div>
                         {question.question_text && (
-                          <p className="text-sm text-muted-foreground line-clamp-1">{question.question_text}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {(() => {
+                              let text = question.question_text;
+                              // Handle nested object structure
+                              if (typeof text === 'object' && text !== null) {
+                                text = text.rubric || text.question_text || JSON.stringify(text);
+                              }
+                              return typeof text === 'string' ? text : String(text || '');
+                            })()}
+                          </p>
                         )}
                       </div>
                     ))}

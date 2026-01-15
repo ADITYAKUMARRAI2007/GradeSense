@@ -1021,7 +1021,14 @@ export default function UploadGrade({ user }) {
                         <Label>Rubric (Optional)</Label>
                         <Input 
                           placeholder="Grading criteria..."
-                          value={question.rubric}
+                          value={(() => {
+                            let rubric = question.rubric;
+                            // Handle nested object structure
+                            if (typeof rubric === 'object' && rubric !== null) {
+                              rubric = rubric.rubric || rubric.question_text || "";
+                            }
+                            return typeof rubric === 'string' ? rubric : String(rubric || '');
+                          })()}
                           onChange={(e) => updateQuestion(index, "rubric", e.target.value)}
                         />
                       </div>
