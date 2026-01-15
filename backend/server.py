@@ -5668,6 +5668,9 @@ async def submit_grading_feedback(feedback: FeedbackSubmit, user: User = Depends
     
     return {
         "message": "Feedback submitted successfully",
+        "feedback_id": feedback_id,
+        "exam_id": exam_id
+    }
 
 @api_router.post("/feedback/{feedback_id}/apply-to-batch")
 async def apply_feedback_to_batch(
