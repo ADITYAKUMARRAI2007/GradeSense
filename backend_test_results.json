@@ -1,13 +1,68 @@
 {
-  "timestamp": "2026-01-14T10:56:41.109649",
-  "total_tests": 223,
-  "passed_tests": 213,
-  "success_rate": 95.51569506726457,
+  "timestamp": "2026-01-15T07:50:15.057125",
+  "total_tests": 231,
+  "passed_tests": 218,
+  "success_rate": 94.37229437229438,
   "test_details": [
     {
       "test": "Health Check",
       "success": true,
       "details": ""
+    },
+    {
+      "test": "Create Batch",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Subject",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Critical Fix #1: Create Exam for Question Extraction",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Critical Fix #1: Trigger Question Extraction",
+      "success": false,
+      "details": "Expected 200, got 520 - No documents available for extraction"
+    },
+    {
+      "test": "Critical Fix #2: Create Exam with Optional Questions",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Critical Fix #2: Verify Total Marks Calculation",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Critical Fix #2: Optional Questions Total Marks",
+      "success": true,
+      "details": "Correct calculation: 20.0 marks (expected 20.0)"
+    },
+    {
+      "test": "Critical Fix #2: Optional Question Fields",
+      "success": true,
+      "details": "All 4 questions marked as optional"
+    },
+    {
+      "test": "Critical Fix #2: Optional Question Metadata",
+      "success": true,
+      "details": "required_count and optional_group fields correctly set"
+    },
+    {
+      "test": "Critical Fix #3: Checkbox Default Values",
+      "success": true,
+      "details": "All checkboxes (showAnnotations, showModelAnswer, showQuestionPaper) default to true"
+    },
+    {
+      "test": "Critical Fix #4: Manual Entry Form Condition",
+      "success": false,
+      "details": "Old logic still present (includes questionsSkipped): Line 922: {!showManualEntry && !questionsSkipped && ("
     },
     {
       "test": "Auth Me",
@@ -16,8 +71,8 @@
     },
     {
       "test": "Create Batch",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Expected 200, got 400 - A batch with this name already exists"
     },
     {
       "test": "Duplicate Batch Prevention",
@@ -175,7 +230,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU105613)",
+      "test": "Create Student with Valid ID (STU074927)",
       "success": true,
       "details": ""
     },
@@ -217,20 +272,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_f24c4b52804f found in batch batch_66891b6f"
+      "details": "Student user_47bfd1865c43 found in batch batch_d202dfa0"
     },
     {
-      "test": "Create Student with Format STU1056141 (John Doe)",
+      "test": "Create Student with Format STU0749281 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL105614 (Alice Smith)",
+      "test": "Create Student with Format ROLL074928 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A105614 (Bob Jones)",
+      "test": "Create Student with Format A074928 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -272,7 +327,7 @@
     {
       "test": "Global Search Structure",
       "success": true,
-      "details": "Results: 5 exams, 3 students, 0 submissions"
+      "details": "Results: 7 exams, 3 students, 0 submissions"
     },
     {
       "test": "Global Search - Student Name",
@@ -417,7 +472,7 @@
     {
       "test": "Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_44dd6be4"
+      "details": "Generated feedback_id: feedback_3c6efd57"
     },
     {
       "test": "Submit General Feedback",
@@ -427,7 +482,7 @@
     {
       "test": "General Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_246a45dc"
+      "details": "Generated feedback_id: feedback_1a1f9a97"
     },
     {
       "test": "Submit Feedback Without Auth (should fail)",
@@ -541,23 +596,8 @@
     },
     {
       "test": "Student Deep Dive: Basic Analysis",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Student Deep Dive Response Structure",
-      "success": true,
-      "details": "All required fields present"
-    },
-    {
-      "test": "Student Info Structure",
-      "success": true,
-      "details": "Student info has correct structure"
-    },
-    {
-      "test": "AI Analysis Structure",
-      "success": true,
-      "details": "AI analysis has correct structure"
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='teachassist-12.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
@@ -592,7 +632,7 @@
     {
       "test": "Topics Mapping Structure",
       "success": true,
-      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations', 'Algebra - Linear Equations']"
+      "details": "Topics correctly mapped: Q1 -> ['Algebra - Equation Solving', 'Algebra - Linear Equations']"
     },
     {
       "test": "Infer Topics: Authentication Required",
@@ -642,7 +682,7 @@
     {
       "test": "Topics Mapping Structure",
       "success": true,
-      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations', 'Algebra - Linear Equations']"
+      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations', 'Algebra - Algebraic Manipulation']"
     },
     {
       "test": "Infer Topics: Authentication Required",
@@ -866,8 +906,8 @@
     },
     {
       "test": "LLM Migration - GPT-4o Removal",
-      "success": false,
-      "details": "Found 9 remaining GPT-4o references"
+      "success": true,
+      "details": "No remaining GPT-4o references found"
     },
     {
       "test": "Consistency Features - Implementation",
@@ -962,7 +1002,7 @@
     {
       "test": "Existing Student Handling",
       "success": true,
-      "details": "Created test student EXIST105638 for upload-more-papers testing"
+      "details": "Created test student EXIST075011 for upload-more-papers testing"
     },
     {
       "test": "Get Exam Submissions - Teacher Access",
@@ -1002,7 +1042,7 @@
     {
       "test": "Submission Exists Before Deletion",
       "success": true,
-      "details": "Submission delete_test_sub_1768388198 found in exam submissions"
+      "details": "Submission delete_test_sub_1768463412 found in exam submissions"
     },
     {
       "test": "Delete Submission - Valid Request",
