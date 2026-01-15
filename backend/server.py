@@ -2988,17 +2988,37 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         # Calculate total marks from extracted structure
         total_marks = sum(q.get("max_marks", 0) for q in extracted_questions)
 
-        # REPLACE entire questions array with extracted structure
+        # STEP 1: Delete old questions for this exam to prevent duplicates
+        delete_result = await db.questions.delete_many({"exam_id": exam_id})
+        logger.info(f"Deleted {delete_result.deleted_count} old questions for exam {exam_id}")
+
+        # STEP 2: Prepare questions for insertion with exam_id and unique question_id
+        questions_to_insert = []
+        for q in extracted_questions:
+            question_doc = {
+                "question_id": f"q_{uuid.uuid4().hex[:12]}",
+                "exam_id": exam_id,
+                **q
+            }
+            questions_to_insert.append(question_doc)
+
+        # STEP 3: Insert questions into the questions collection
+        if questions_to_insert:
+            await db.questions.insert_many(questions_to_insert)
+            logger.info(f"Inserted {len(questions_to_insert)} questions into database")
+
+        # STEP 4: Update exam document with questions array, metadata, and correct counts
         await db.exams.update_one(
             {"exam_id": exam_id},
             {"$set": {
                 "questions": extracted_questions,
+                "questions_count": len(extracted_questions),
                 "extraction_source": target_source,
                 "total_marks": total_marks  # Update total marks based on extraction
             }}
         )
 
-        logger.info(f"✅ Successfully extracted {len(extracted_questions)} questions with complete structure from {target_source}")
+        logger.info(f"✅ Successfully extracted and saved {len(extracted_questions)} questions with complete structure from {target_source}")
         return {
             "success": True,
             "message": f"Successfully extracted {len(extracted_questions)} questions with structure from {target_source.replace('_', ' ')}",
