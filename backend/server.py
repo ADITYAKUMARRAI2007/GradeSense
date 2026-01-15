@@ -3390,6 +3390,16 @@ Return your response in this exact JSON format:
   "grading_notes": "Any overall observations about the paper"
 }}
 
+**CRITICAL - SUB-QUESTION HANDLING:**
+- If a question has sub-parts (like Q32 has parts a and b), you MUST populate the sub_scores array
+- Each sub-part gets its own: sub_id, obtained_marks, and ai_feedback
+- The question's main obtained_marks should be the SUM of all sub-part marks
+- The question's main ai_feedback should be brief overview, NOT detailed grading (details go in sub_scores)
+- Example: Q32 has parts (a) and (b). If student answered (a) correctly and didn't attempt (b):
+  - sub_scores: [{{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Correct answer"}}, {{"sub_id": "b", "obtained_marks": 0, "ai_feedback": "Not attempted/found"}}]
+  - obtained_marks: 3 (sum of sub-scores)
+  - ai_feedback: "Part (a) correct. Part (b) not attempted."
+
 ### Error Annotation Types:
 - calculation_error: Mathematical/arithmetic mistakes
 - conceptual_error: Fundamental misunderstanding of concept
