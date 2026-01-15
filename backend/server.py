@@ -5884,10 +5884,6 @@ async def unpublish_exam_results(exam_id: str, user: User = Depends(get_current_
     
     return {"message": "Results unpublished successfully", "exam_id": exam_id}
 
-        "feedback_id": feedback_id,
-        "exam_id": exam_id
-    }
-
 @api_router.get("/feedback/my-feedback")
 async def get_my_feedback(user: User = Depends(get_current_user)):
     """Get teacher's own feedback submissions"""
