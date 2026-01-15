@@ -741,57 +741,7 @@ export default function ReviewPapers({ user }) {
                                   <span className="text-sm font-medium">Click to enlarge</span>
                                 </div>
                               </div>
-                              
-                              {/* Error Annotations Overlay */}
-                              {showAnnotations && (
-                                <>
-                                  {selectedSubmission.question_scores?.flatMap((qs) => 
-                                    (qs.error_annotations || [])
-                                      .filter(ann => ann.page === idx + 1)
-                                      .map((ann, annIdx) => {
-                                        const regionTop = ann.region === 'top' ? '5%' : ann.region === 'middle' ? '38%' : '70%';
-                                        const severityColor = ann.severity === 'major' ? 'bg-red-500' : ann.severity === 'moderate' ? 'bg-orange-500' : 'bg-yellow-500';
-                                        return (
-                                          <div
-                                            key={`${qs.question_number}-${annIdx}`}
-                                            className={`absolute left-2 right-2 h-[28%] ${severityColor}/20 border-2 ${severityColor.replace('bg-', 'border-')} rounded-lg pointer-events-none`}
-                                            style={{ top: regionTop }}
-                                            title={`Q${qs.question_number}: ${ann.description}`}
-                                          >
-                                            <div className={`absolute -top-3 left-2 ${severityColor} text-white text-xs px-2 py-0.5 rounded shadow-lg`}>
-                                              Q{qs.question_number}: {ann.error_type.replace('_', ' ')}
-                                            </div>
-                                          </div>
-                                        );
-                                      })
-                                  )}
-                                </>
-                              )}
                             </div>
-                            {/* Side Annotation Indicator */}
-                            {showAnnotations && (
-                              <div className="absolute right-2 top-2 bottom-2 w-12 flex flex-col justify-start py-2 gap-1 overflow-y-auto">
-                                {selectedSubmission.question_scores?.map((qs) => {
-                                  const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
-                                  const hasErrors = (qs.error_annotations || []).length > 0;
-                                  if (scorePercentage < 60 || hasErrors) {
-                                    const severityColor = scorePercentage < 40 ? 'bg-red-500' : scorePercentage < 60 ? 'bg-orange-500' : 'bg-yellow-500';
-                                    return (
-                                      <div 
-                                        key={qs.question_number}
-                                        className={`${severityColor} text-white text-xs px-1 py-1 rounded shadow-lg flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-transform`}
-                                        title={`Q${qs.question_number}: ${qs.ai_feedback?.slice(0, 100)}...`}
-                                      >
-                                        <span className="font-bold text-[10px]">Q{qs.question_number}</span>
-                                        <span className="text-[9px]">{qs.obtained_marks}/{qs.max_marks}</span>
-                                        {hasErrors && <span className="text-[8px]">⚠️</span>}
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                })}
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
