@@ -3033,18 +3033,17 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
 
         logger.info(f"Calculated total marks from extraction: {total_marks} (including optional question handling)")
 
-        # Get the exam to preserve user's original total_marks
-        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
-        user_total_marks = exam.get("total_marks") if exam else None
+        # Preserve user's original total_marks if it was explicitly set during exam creation
+        # Only overwrite if user kept the default 100 or didn't set it
+        user_total_marks = exam.get("total_marks", 100)
         
-        # Preserve user's original total_marks if it was set during exam creation
-        # Only update if user didn't set it (default 100) or if it's significantly different
-        final_total_marks = user_total_marks if user_total_marks and user_total_marks != 100 else total_marks
-        
-        if user_total_marks and user_total_marks != total_marks:
-            logger.info(f"⚠️ Total marks mismatch: User set {user_total_marks}, extracted {total_marks}. Using user's value: {final_total_marks}")
+        # Use user's value if they changed it from default, otherwise use extracted value
+        if user_total_marks and user_total_marks != 100:
+            final_total_marks = user_total_marks
+            logger.info(f"✓ Preserving user's total marks: {final_total_marks} (extracted: {total_marks})")
         else:
-            logger.info(f"Using calculated total marks: {final_total_marks}")
+            final_total_marks = total_marks
+            logger.info(f"✓ Using extracted total marks: {final_total_marks}")
 
         # STEP 1: Delete old questions for this exam to prevent duplicates
         delete_result = await db.questions.delete_many({"exam_id": exam_id})
