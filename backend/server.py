@@ -3374,15 +3374,6 @@ Return your response in this exact JSON format:
       "ai_feedback": "Detailed feedback with: 1) What was done well, 2) What was missing/incorrect, 3) How to improve",
       "what_done_well": "Brief summary of correct elements",
       "areas_to_improve": "Specific improvement suggestions",
-      "error_annotations": [
-        {{
-          "error_type": "calculation_error|conceptual_error|incomplete|spelling|formatting",
-          "description": "Brief description of the error",
-          "severity": "minor|moderate|major",
-          "page": 1,
-          "region": "top|middle|bottom"
-        }}
-      ],
       "sub_scores": [
         {{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Feedback for part a"}},
         {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b"}}
@@ -3404,18 +3395,6 @@ Return your response in this exact JSON format:
   - obtained_marks: 3 (sum of sub-scores)
   - ai_feedback: "Part (a) correct. Part (b) not attempted."
 
-### Error Annotation Types:
-- calculation_error: Mathematical/arithmetic mistakes
-- conceptual_error: Fundamental misunderstanding of concept
-- incomplete: Missing required elements
-- spelling: Spelling mistakes in technical terms
-- formatting: Presentation/format issues
-
-### Severity Levels:
-- minor: Small deduction (10-20% of component marks)
-- moderate: Significant deduction (30-50% of component marks)
-- major: Most marks lost (60%+ of component marks)
-
 ### Flag Types (use when needed):
 - "BORDERLINE_SCORE": Score is borderline pass/fail
 - "ALTERNATIVE_METHOD": Valid but unusual approach used
@@ -3424,7 +3403,6 @@ Return your response in this exact JSON format:
 - "ILLEGIBLE_PORTIONS": Some parts hard to read
 
 If a question has no sub-questions, leave sub_scores as an empty array.
-If there are no errors, leave error_annotations as an empty array.
 
 ## QUALITY ASSURANCE
 
