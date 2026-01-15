@@ -545,7 +545,7 @@ export default function ReviewPapers({ user }) {
                 {qs.question_text && (
                   <div className="mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary">
                     <p className="text-xs text-foreground whitespace-pre-wrap">
-                      <strong>Q{qs.question_number}.</strong> {qs.question_text}
+                      <strong>Q{qs.question_number}.</strong> {typeof qs.question_text === 'object' ? JSON.stringify(qs.question_text) : qs.question_text}
                     </p>
                   </div>
                 )}
@@ -556,6 +556,11 @@ export default function ReviewPapers({ user }) {
                     {qs.sub_scores.map((subScore, subIndex) => {
                       const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
                       const subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
+                      
+                      // Ensure subQuestionText is a string
+                      const subQuestionTextString = typeof subQuestionText === 'object'
+                        ? JSON.stringify(subQuestionText)
+                        : subQuestionText;
                       
                       return (
                         <div 
@@ -580,10 +585,10 @@ export default function ReviewPapers({ user }) {
                           </div>
                           
                           {/* Sub-question Text */}
-                          {subQuestionText && (
+                          {subQuestionTextString && (
                             <div className="mb-2 p-1.5 bg-white/80 rounded border-l-2 border-orange-400">
                               <p className="text-xs text-gray-700">
-                                <strong className="text-orange-600">{subScore.sub_id})</strong> {subQuestionText}
+                                <strong className="text-orange-600">{subScore.sub_id})</strong> {subQuestionTextString}
                               </p>
                             </div>
                           )}
