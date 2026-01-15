@@ -290,6 +290,25 @@ export default function StudentResults({ user }) {
                             ))}
                           </div>
                         </div>
+                        
+                        {/* Question Paper Section */}
+                        {selectedSubmission.question_paper_images && selectedSubmission.question_paper_images.length > 0 && (
+                          <div className="space-y-2 mt-6">
+                            <h4 className="text-sm font-semibold text-green-700 border-b pb-1">Question Paper</h4>
+                            <div className="space-y-4">
+                              {selectedSubmission.question_paper_images.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg overflow-hidden shadow-sm">
+                                  <img 
+                                    src={`data:image/jpeg;base64,${img}`}
+                                    alt={`Question page ${idx + 1}`}
+                                    className="w-full cursor-pointer hover:shadow-lg transition-shadow"
+                                    onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Question Paper - Page ${idx + 1}` })}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </ScrollArea>
                   )}
