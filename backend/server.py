@@ -3690,17 +3690,17 @@ Return valid JSON only."""
 
         return []
 
-    # CHUNKED PROCESSING LOGIC
-    CHUNK_SIZE = 10
+    # CHUNKED PROCESSING LOGIC - REDUCED chunk size for better timeout handling
+    CHUNK_SIZE = 6  # Reduced from 10 to 6 to avoid API timeouts
     OVERLAP = 2
     total_student_pages = len(images)
     
-    if total_student_pages > 20:
+    if total_student_pages > 12:  # Lower threshold for large docs
         logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
     
     # Create chunks
     chunks = []
-    if total_student_pages <= 12: # Use simple processing for small docs (limit raised slightly)
+    if total_student_pages <= 10:  # Use simple processing for small docs
         chunks.append((0, images))
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
