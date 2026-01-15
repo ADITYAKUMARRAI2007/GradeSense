@@ -491,7 +491,7 @@ export default function UploadGrade({ user }) {
         qpFormData.append("file", questionPaperFile);
         const qpResponse = await axios.post(`${API}/exams/${examId}/upload-question-paper`, qpFormData, {
           headers: { "Content-Type": "multipart/form-data" },
-          timeout: 600000  // 10 minutes for large document processing
+          timeout: 900000  // 15 minutes for large document processing
         });
         
         // Show auto-extraction result
@@ -508,7 +508,7 @@ export default function UploadGrade({ user }) {
         formData.append("file", modelAnswerFile);
         const maResponse = await axios.post(`${API}/exams/${examId}/upload-model-answer`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
-          timeout: 600000  // 10 minutes for large document processing
+          timeout: 900000  // 15 minutes for large document processing
         });
         
         // Show auto-extraction result
@@ -547,7 +547,7 @@ export default function UploadGrade({ user }) {
       
       const response = await axios.post(`${API}/exams/${examId}/upload-papers`, formDataObj, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 600000  // 10 minutes for large document processing
+        timeout: 900000  // 15 minutes for large document processing (increased from 10 min)
       });
       
       clearInterval(progressInterval);
