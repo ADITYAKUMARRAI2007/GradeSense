@@ -3609,13 +3609,19 @@ Return valid JSON only."""
 
         user_msg = UserMessage(text=prompt_text, file_contents=chunk_all_images)
 
-        # Retry logic
+        # Retry logic with exponential backoff
         import asyncio
         max_retries = 3
-        retry_delay = 5
-
+        base_retry_delay = 5  # Base delay in seconds
+        
         for attempt in range(max_retries):
             try:
+                # Exponential backoff: 5s, 10s, 20s
+                if attempt > 0:
+                    wait_time = base_retry_delay * (2 ** attempt)
+                    logger.info(f"Waiting {wait_time}s before retry {attempt+1}")
+                    await asyncio.sleep(wait_time)
+                
                 logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                 ai_resp = await chunk_chat.send_message(user_msg)
 
@@ -3655,8 +3661,7 @@ Return valid JSON only."""
                 # All strategies failed
                 logger.warning(f"Failed to parse grading JSON (attempt {attempt + 1}). Response preview: {resp_text[:200]}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
+                    continue  # Will retry with exponential backoff at loop start
                 else:
                     logger.error(f"All JSON parsing strategies failed for chunk {chunk_idx+1}")
                     return []
@@ -3664,13 +3669,22 @@ Return valid JSON only."""
             except Exception as e:
                 error_msg = str(e).lower()
                 
+                # Check for API errors (502, 503, timeouts)
+                if "502" in str(e) or "503" in str(e) or "badgateway" in error_msg or "timeout" in error_msg:
+                    logger.warning(f"API error on chunk {chunk_idx+1}: {e}")
+                    if attempt < max_retries - 1:
+                        continue  # Will retry with exponential backoff at loop start
+                    else:
+                        logger.error(f"Failed to grade chunk {chunk_idx+1} after {max_retries} retries due to API errors.")
+                        return []
+                
                 # Check for rate limiting
                 if "429" in str(e) or "rate limit" in error_msg or "quota" in error_msg:
-                    wait_time = 60 * (attempt + 1)  # Exponential: 60s, 120s, 180s
+                    wait_time = 60 * (attempt + 1)  # 60s, 120s, 180s for rate limits
                     logger.warning(f"Rate limit hit on chunk {chunk_idx+1}. Waiting {wait_time}s before retry...")
                     await asyncio.sleep(wait_time)
                     if attempt < max_retries - 1:
-                        continue  # Retry immediately after wait
+                        continue
                     else:
                         raise HTTPException(
                             status_code=429,
@@ -3679,13 +3693,10 @@ Return valid JSON only."""
                 
                 logger.error(f"Error grading chunk {chunk_idx+1}: {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2**attempt))
+                    continue  # Will retry with exponential backoff at loop start
                 else:
-                    # Return fallback on final failure
+                    # Return empty on final failure - aggregation will handle as "not found"
                     logger.error(f"Failed to grade chunk {chunk_idx+1} after retries. Using fallback.")
-                    # Create consistent fallback for questions likely in this chunk
-                    # Since we don't know exactly which questions are in this chunk, we return empty
-                    # and let aggregation handle it as "not found"
                     return []
 
         return []
