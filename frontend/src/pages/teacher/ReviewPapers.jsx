@@ -285,7 +285,7 @@ export default function ReviewPapers({ user }) {
 
     setSubmittingFeedback(true);
     try {
-      await axios.post(`${API}/feedback/submit`, {
+      const response = await axios.post(`${API}/feedback/submit`, {
         submission_id: selectedSubmission?.submission_id,
         question_number: feedbackQuestion.question_number,
         feedback_type: feedbackForm.feedback_type,
@@ -296,7 +296,22 @@ export default function ReviewPapers({ user }) {
         teacher_correction: feedbackForm.teacher_correction
       });
       
-      toast.success("Feedback submitted successfully! This will help improve AI grading.");
+      // If "Apply to Batch" is checked, trigger batch re-grading
+      if (applyToBatch && response.data.feedback_id) {
+        toast.info("Re-grading all papers for this question...");
+        try {
+          const batchResponse = await axios.post(
+            `${API}/feedback/${response.data.feedback_id}/apply-to-batch`
+          );
+          toast.success(`${batchResponse.data.message}. Updated ${batchResponse.data.updated_count} papers.`);
+        } catch (batchError) {
+          console.error("Batch re-grading error:", batchError);
+          toast.error("Failed to apply to batch. Feedback saved but re-grading failed.");
+        }
+      } else {
+        toast.success("Feedback submitted successfully! This will help improve AI grading.");
+      }
+      
       setFeedbackDialogOpen(false);
       setFeedbackQuestion(null);
       setFeedbackForm({
@@ -304,6 +319,7 @@ export default function ReviewPapers({ user }) {
         teacher_expected_grade: "",
         teacher_correction: ""
       });
+      setApplyToBatch(false);
     } catch (error) {
       console.error("Feedback submission error:", error);
       toast.error(error.response?.data?.detail || "Failed to submit feedback");
