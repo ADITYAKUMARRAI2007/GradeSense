@@ -3519,6 +3519,11 @@ Apply the {grading_mode} mode specifications strictly.
 6. **FEEDBACK QUALITY**: Provide constructive, specific feedback
 7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
 8. **HANDLE ROTATION**: If text appears sideways, still read and grade it
+9. **SUB-QUESTION GRADING (CRITICAL)**: 
+   - If a question has sub-parts (a, b, c, i, ii, iii, etc.), you MUST grade EACH sub-part INDIVIDUALLY
+   - Provide separate obtained_marks and ai_feedback for each sub-part in the sub_scores array
+   - Do NOT give overall feedback for questions with sub-parts - grade each part separately
+   - If a sub-part is not attempted, mark it as 0 with feedback "Not attempted/found"
 
 ## OUTPUT
 Grade each question providing:
@@ -3561,6 +3566,11 @@ Apply the {grading_mode} mode specifications strictly.
 5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
 6. **FEEDBACK QUALITY**: Provide constructive, specific feedback that helps learning
 7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
+8. **SUB-QUESTION GRADING (CRITICAL)**: 
+   - If a question has sub-parts (a, b, c, i, ii, iii, etc.), you MUST grade EACH sub-part INDIVIDUALLY
+   - Provide separate obtained_marks and ai_feedback for each sub-part in the sub_scores array
+   - Do NOT give overall feedback for questions with sub-parts - grade each part separately
+   - If a sub-part is not attempted, mark it as 0 with feedback "Not attempted/found"
 
 ## PHASE 3: OUTPUT
 Grade each question providing:
@@ -3597,6 +3607,11 @@ Apply the {grading_mode} mode specifications strictly.
 5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
 6. **SUBJECT KNOWLEDGE**: Use your expertise to assess correctness
 7. **CONSTRUCTIVE FEEDBACK**: Help the student understand and improve
+8. **SUB-QUESTION GRADING (CRITICAL)**: 
+   - If a question has sub-parts (a, b, c, i, ii, iii, etc.), you MUST grade EACH sub-part INDIVIDUALLY
+   - Provide separate obtained_marks and ai_feedback for each sub-part in the sub_scores array
+   - Do NOT give overall feedback for questions with sub-parts - grade each part separately
+   - If a sub-part is not attempted, mark it as 0 with feedback "Not attempted/found"
 
 Return valid JSON only."""
 
