@@ -3787,7 +3787,6 @@ Return valid JSON only."""
             obtained_marks=min(best_score_data["obtained_marks"], q["max_marks"]),
             ai_feedback=best_score_data["ai_feedback"],
             sub_scores=[s.model_dump() for s in final_sub_scores],
-            error_annotations=best_score_data.get("error_annotations", []),
             question_text=q.get("question_text") or q.get("rubric"),
             status=status
         )
