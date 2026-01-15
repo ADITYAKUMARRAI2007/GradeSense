@@ -13,7 +13,7 @@ import base64
 
 class UploadMorePapersTest:
     def __init__(self):
-        self.base_url = "https://smart-grader-8.preview.emergentagent.com/api"
+        self.base_url = "https://teachassist-12.preview.emergentagent.com/api"
         self.session_token = None
         self.user_id = None
         self.test_batch_id = None

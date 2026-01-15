@@ -6,7 +6,7 @@ from datetime import datetime
 import subprocess
 
 def test_infer_topics():
-    base_url = "https://smart-grader-8.preview.emergentagent.com/api"
+    base_url = "https://teachassist-12.preview.emergentagent.com/api"
     
     # Create test user and session
     timestamp = int(datetime.now().timestamp())
