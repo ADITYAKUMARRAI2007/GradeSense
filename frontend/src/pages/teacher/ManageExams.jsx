@@ -660,6 +660,32 @@ export default function ManageExams({ user }) {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2 flex-wrap">
+                    {/* Publish/Unpublish Button */}
+                    <Button
+                      variant={selectedExam.results_published ? "outline" : "default"}
+                      size="sm"
+                      onClick={() => {
+                        if (selectedExam.results_published) {
+                          unpublishResults(selectedExam.exam_id);
+                        } else {
+                          publishResults(selectedExam.exam_id);
+                        }
+                      }}
+                      className={selectedExam.results_published ? "" : "bg-green-500 hover:bg-green-600"}
+                    >
+                      {selectedExam.results_published ? (
+                        <>
+                          <EyeOff className="w-4 h-4 mr-1" />
+                          Unpublish
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-4 h-4 mr-1" />
+                          Publish
+                        </>
+                      )}
+                    </Button>
+                    
                     {getStatusBadge(selectedExam.status)}
                     {!editMode && (
                       <>
