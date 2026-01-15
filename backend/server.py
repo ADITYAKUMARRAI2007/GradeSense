@@ -4337,6 +4337,41 @@ async def get_submission(submission_id: str, user: User = Depends(get_current_us
                 qs["question_text"] = question_data.get("rubric", "")
                 qs["sub_questions"] = question_data.get("sub_questions", [])
     
+    # For students, also provide question paper images (they should see the questions)
+    if user.role == "student":
+        # Get question paper from exam_files
+        exam_file = await db.exam_files.find_one(
+            {"exam_id": submission["exam_id"]},
+            {"_id": 0, "question_paper_gridfs_id": 1, "gridfs_id": 1}
+        )
+        
+        if exam_file:
+            # Try question_paper_gridfs_id first, then fallback to gridfs_id
+            file_id = exam_file.get("question_paper_gridfs_id") or exam_file.get("gridfs_id")
+            
+            if file_id:
+                try:
+                    import pickle
+                    grid_fs = db_client["test_database"].get_collection("fs.files")
+                    chunks_collection = db_client["test_database"].get_collection("fs.chunks")
+                    
+                    # Retrieve file metadata
+                    file_doc = await grid_fs.find_one({"_id": file_id})
+                    if file_doc:
+                        # Retrieve all chunks
+                        chunks_cursor = chunks_collection.find({"files_id": file_id}).sort("n", 1)
+                        chunks = await chunks_cursor.to_list(None)
+                        
+                        # Reconstruct file
+                        file_data = b"".join([chunk["data"] for chunk in chunks])
+                        
+                        # Deserialize
+                        images_list = pickle.loads(file_data)
+                        submission["question_paper_images"] = images_list
+                except Exception as e:
+                    logger.error(f"Error retrieving question paper for student: {e}")
+                    submission["question_paper_images"] = []
+    
     return submission
 
 @api_router.put("/submissions/{submission_id}")
