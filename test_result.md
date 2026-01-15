@@ -714,9 +714,13 @@ backend:
 
 test_plan:
   current_focus:
-    - "Critical Fix #4: Manual Entry Form Logic"
+    - "Visual Annotations for Error Highlighting"
+    - "Topic Mastery Heatmap Interactivity"
+    - "Student Deep-Dive Modal Logic Fix"
   stuck_tasks:
-    - "Critical Fix #4: Manual Entry Form Logic"
+    - "Topic Mastery Heatmap Interactivity"
+    - "Student Deep-Dive Modal Logic Fix"
+    - "Class Insights Page Enhancement"
   test_all: false
   test_priority: "critical_first"
 
