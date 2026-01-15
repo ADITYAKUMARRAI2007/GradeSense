@@ -984,6 +984,11 @@ export default function ReviewPapers({ user }) {
                           const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
                           const subQuestionText = examSubQuestion?.rubric || examSubQuestion?.question_text || "";
                           
+                          // Ensure subQuestionText is a string, not an object
+                          const subQuestionTextString = typeof subQuestionText === 'object'
+                            ? JSON.stringify(subQuestionText)
+                            : subQuestionText;
+                          
                           return (
                             <div 
                               key={subScore.sub_id}
@@ -1007,10 +1012,10 @@ export default function ReviewPapers({ user }) {
                               </div>
                               
                               {/* Sub-question Text */}
-                              {subQuestionText && (
+                              {subQuestionTextString && (
                                 <div className="mb-3 p-2 bg-white/80 rounded border-l-3 border-orange-400">
                                   <p className="text-xs text-gray-700 whitespace-pre-wrap">
-                                    <strong className="text-orange-600">{subScore.sub_id})</strong> {subQuestionText}
+                                    <strong className="text-orange-600">{subScore.sub_id})</strong> {subQuestionTextString}
                                   </p>
                                 </div>
                               )}
