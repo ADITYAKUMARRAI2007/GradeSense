@@ -423,6 +423,312 @@ export default function Analytics({ user }) {
             )}
           </>
         )}
+        
+        {/* PHASE 2: ADVANCED METRICS (Toggle) */}
+        {drillLevel === 'overview' && (
+          <>
+            <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-white">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Brain className="w-5 h-5 text-purple-600" />
+                      Advanced AI Metrics (Beta)
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Bluff detection, syllabus gaps, and peer group suggestions
+                    </p>
+                  </div>
+                  <Button
+                    variant={showAdvancedMetrics ? "default" : "outline"}
+                    onClick={() => setShowAdvancedMetrics(!showAdvancedMetrics)}
+                  >
+                    {showAdvancedMetrics ? 'Hide' : 'Show'} Advanced Metrics
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {showAdvancedMetrics && (
+              <div className="space-y-6">
+                {/* Action Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-start gap-2 hover:border-amber-500 hover:bg-amber-50"
+                    onClick={fetchBluffIndex}
+                    disabled={!selectedExam || loadingAdvanced}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      <span className="font-semibold">Bluff Index</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground text-left">
+                      Detect students writing long but irrelevant answers
+                    </span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-start gap-2 hover:border-blue-500 hover:bg-blue-50"
+                    onClick={fetchSyllabusCoverage}
+                    disabled={loadingAdvanced}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <Layers className="w-5 h-5 text-blue-600" />
+                      <span className="font-semibold">Syllabus Coverage</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground text-left">
+                      See which topics you've tested and assessment gaps
+                    </span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-start gap-2 hover:border-green-500 hover:bg-green-50"
+                    onClick={fetchPeerGroups}
+                    disabled={!selectedBatch || loadingAdvanced}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <Users className="w-5 h-5 text-green-600" />
+                      <span className="font-semibold">Peer Groups</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground text-left">
+                      Find study partners with complementary skills
+                    </span>
+                  </Button>
+                </div>
+
+                {/* Bluff Index Results */}
+                {bluffIndex && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-amber-700">
+                        <AlertTriangle className="w-5 h-5" />
+                        Bluff Index - {bluffIndex.exam_name}
+                      </CardTitle>
+                      <CardDescription>{bluffIndex.summary}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {bluffIndex.bluff_candidates.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Award className="w-12 h-12 mx-auto mb-3 opacity-30 text-green-600" />
+                          <p className="font-medium text-green-700">Great! No bluffing patterns detected.</p>
+                          <p className="text-sm">All students appear to be writing meaningful answers.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {bluffIndex.bluff_candidates.map((candidate, idx) => (
+                            <div key={idx} className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                                  <span className="font-semibold">{candidate.student_name}</span>
+                                </div>
+                                <Badge variant="outline" className="bg-amber-100 text-amber-700">
+                                  {candidate.bluff_score} suspicious answers
+                                </Badge>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {candidate.suspicious_answers.map((answer, aidx) => (
+                                  <div key={aidx} className="p-3 bg-white border border-amber-100 rounded text-sm">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="font-medium">Question {answer.question_number}</span>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs">
+                                          {answer.answer_length} chars
+                                        </Badge>
+                                        <Badge variant="destructive" className="text-xs">
+                                          {answer.score_percentage}%
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      AI Feedback: {answer.feedback_snippet}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full mt-3"
+                                onClick={() => handleStudentClick(candidate.student_id)}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Full Student Profile
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Syllabus Coverage Results */}
+                {syllabusCoverage && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Layers className="w-5 h-5 text-blue-600" />
+                        Syllabus Coverage - {syllabusCoverage.subject}
+                      </CardTitle>
+                      <CardDescription>{syllabusCoverage.summary}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {syllabusCoverage.tested_topics.map((topic, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border-2 ${
+                              topic.color === 'green' ? 'bg-green-50 border-green-200' :
+                              topic.color === 'amber' ? 'bg-amber-50 border-amber-200' :
+                              topic.color === 'red' ? 'bg-red-50 border-red-200' :
+                              'bg-gray-50 border-gray-200'
+                            }`}
+                          >
+                            <p className="font-medium text-xs truncate mb-1" title={topic.topic}>
+                              {topic.topic}
+                            </p>
+                            <p className={`text-xl font-bold ${
+                              topic.color === 'green' ? 'text-green-700' :
+                              topic.color === 'amber' ? 'text-amber-700' :
+                              topic.color === 'red' ? 'text-red-700' :
+                              'text-gray-700'
+                            }`}>
+                              {topic.avg_score}%
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {topic.exam_count} exam{topic.exam_count !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Peer Groups Results */}
+                {peerGroups && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-green-700">
+                        <Users className="w-5 h-5" />
+                        Peer Group Suggestions - {peerGroups.batch_name}
+                      </CardTitle>
+                      <CardDescription>{peerGroups.summary}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {peerGroups.suggestions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>No complementary peer groups found.</p>
+                          <p className="text-sm">Students may have similar skill profiles.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {peerGroups.suggestions.map((pair, idx) => (
+                            <div key={idx} className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-semibold flex items-center gap-2">
+                                  <Users className="w-4 h-4 text-green-600" />
+                                  Suggested Pair #{idx + 1}
+                                </h4>
+                                <Badge className="bg-green-100 text-green-700">
+                                  {pair.synergy_score} complementary topics
+                                </Badge>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div className="p-3 bg-white rounded border">
+                                  <p className="font-medium mb-2">{pair.student1.name}</p>
+                                  <div className="space-y-1">
+                                    <div>
+                                      <p className="text-xs font-semibold text-green-600">Strengths:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {pair.student1.strengths.slice(0, 3).map((s, i) => (
+                                          <Badge key={i} variant="outline" className="text-xs bg-green-50">
+                                            {s}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold text-red-600">Needs help:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {pair.student1.weaknesses.slice(0, 3).map((w, i) => (
+                                          <Badge key={i} variant="outline" className="text-xs bg-red-50">
+                                            {w}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-3 bg-white rounded border">
+                                  <p className="font-medium mb-2">{pair.student2.name}</p>
+                                  <div className="space-y-1">
+                                    <div>
+                                      <p className="text-xs font-semibold text-green-600">Strengths:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {pair.student2.strengths.slice(0, 3).map((s, i) => (
+                                          <Badge key={i} variant="outline" className="text-xs bg-green-50">
+                                            {s}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold text-red-600">Needs help:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {pair.student2.weaknesses.slice(0, 3).map((w, i) => (
+                                          <Badge key={i} variant="outline" className="text-xs bg-red-50">
+                                            {w}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded mb-3">
+                                <p className="text-xs font-semibold mb-2">Why this pairing works:</p>
+                                <div className="space-y-1">
+                                  {pair.complementary_topics.map((topic, tidx) => (
+                                    <p key={tidx} className="text-xs">
+                                      • <strong>{topic.helper}</strong> can help <strong>{topic.learner}</strong> with <em>{topic.topic}</em>
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <Button
+                                className="w-full bg-green-600 hover:bg-green-700"
+                                onClick={() => sendPeerGroupNotification(
+                                  pair.student1.id,
+                                  pair.student2.id,
+                                  `You both have complementary skills. Consider studying together!`
+                                )}
+                              >
+                                <Users className="w-4 h-4 mr-2" />
+                                Send Notification to Both Students
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </>
+        )}
 
         {/* LEVEL 2: TOPIC DNA */}
         {drillLevel === 'topic' && topicDrillDown && (
