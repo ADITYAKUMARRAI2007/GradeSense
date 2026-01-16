@@ -6594,18 +6594,18 @@ If the query is unclear or impossible to answer, return:
 }}
 """
         
-        llm = LlmChat(
+        chat = LlmChat(
             api_key=os.environ.get("EMERGENT_API_KEY"),
             session_id=f"nl_query_{uuid.uuid4().hex[:8]}",
             system_message="You are a precise data analyst. Return ONLY valid JSON, no markdown formatting."
-        )
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
-        result = llm.send_message_async([UserMessage(content=prompt)])
-        response_text = result.text if hasattr(result, 'text') else str(result)
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        response_text = response.strip()
         
         # Clean response
         import re
-        response_text = response_text.strip()
         response_text = re.sub(r'^```json\s*', '', response_text)
         response_text = re.sub(r'\s*```$', '', response_text)
         
