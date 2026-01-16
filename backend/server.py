@@ -1231,7 +1231,10 @@ async def upload_more_papers(
     submissions = []
     errors = []
     
-    for file in files:
+    # Log the number of files received
+    logger.info(f"Received {len(files)} files for batch grading")
+    for idx, file in enumerate(files):
+        logger.info(f"Processing file {idx + 1}/{len(files)}: {file.filename}")
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
