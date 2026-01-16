@@ -21,7 +21,8 @@ import {
   Zap,
   Brain,
   Award,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
