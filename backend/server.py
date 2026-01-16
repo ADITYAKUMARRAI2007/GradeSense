@@ -1232,16 +1232,19 @@ async def upload_more_papers(
     errors = []
     
     # Log the number of files received
-    logger.info(f"Received {len(files)} files for batch grading")
+    logger.info(f"=== BATCH GRADING START === Received {len(files)} files for exam {exam_id}")
     for idx, file in enumerate(files):
-        logger.info(f"Processing file {idx + 1}/{len(files)}: {file.filename}")
+        file_start_time = datetime.now(timezone.utc)
+        logger.info(f"[File {idx + 1}/{len(files)}] START processing: {file.filename}")
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
+            logger.info(f"[File {idx + 1}/{len(files)}] Read {len(pdf_bytes)} bytes from {file.filename}")
             
             # Check file size - limit to 30MB for safety
             file_size_mb = len(pdf_bytes) / (1024 * 1024)
             if len(pdf_bytes) > 30 * 1024 * 1024:
+                logger.warning(f"[File {idx + 1}/{len(files)}] File too large: {file_size_mb:.1f}MB")
                 errors.append({
                     "filename": file.filename,
                     "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
@@ -1249,8 +1252,10 @@ async def upload_more_papers(
                 continue
             
             images = pdf_to_images(pdf_bytes)
+            logger.info(f"[File {idx + 1}/{len(files)}] Extracted {len(images) if images else 0} images from PDF")
             
             if not images:
+                logger.error(f"[File {idx + 1}/{len(files)}] Failed to extract images")
                 errors.append({
                     "filename": file.filename,
                     "error": "Failed to extract images from PDF"
@@ -4089,16 +4094,19 @@ async def upload_student_papers(
     errors = []
     
     # Log the number of files received
-    logger.info(f"Received {len(files)} files for batch grading")
+    logger.info(f"=== BATCH GRADING START === Received {len(files)} files for exam {exam_id}")
     for idx, file in enumerate(files):
-        logger.info(f"Processing file {idx + 1}/{len(files)}: {file.filename}")
+        file_start_time = datetime.now(timezone.utc)
+        logger.info(f"[File {idx + 1}/{len(files)}] START processing: {file.filename}")
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
+            logger.info(f"[File {idx + 1}/{len(files)}] Read {len(pdf_bytes)} bytes from {file.filename}")
             
             # Check file size - limit to 30MB for safety
             file_size_mb = len(pdf_bytes) / (1024 * 1024)
             if len(pdf_bytes) > 30 * 1024 * 1024:
+                logger.warning(f"[File {idx + 1}/{len(files)}] File too large: {file_size_mb:.1f}MB")
                 errors.append({
                     "filename": file.filename,
                     "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
@@ -4106,8 +4114,10 @@ async def upload_student_papers(
                 continue
             
             images = pdf_to_images(pdf_bytes)
+            logger.info(f"[File {idx + 1}/{len(files)}] Extracted {len(images) if images else 0} images from PDF")
             
             if not images:
+                logger.error(f"[File {idx + 1}/{len(files)}] Failed to extract images")
                 errors.append({
                     "filename": file.filename,
                     "error": "Failed to extract images from PDF"
