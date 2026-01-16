@@ -338,6 +338,158 @@ export default function Analytics({ user }) {
         {/* LEVEL 1: OVERVIEW */}
         {drillLevel === 'overview' && (
           <>
+            {/* Ask Your Data - Natural Language Query */}
+            <Card className="border-2 border-primary">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-primary" />
+                  Ask Your Data (AI-Powered)
+                </CardTitle>
+                <CardDescription>
+                  Ask questions in plain English - e.g., "Show me top 5 students in Math" or "Who failed Question 3?"
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search Bar */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder='Try: "Show me top 5 students" or "Compare Section A vs Section B"'
+                      className="flex-1 border p-3 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
+                      value={nlQuery}
+                      onChange={(e) => setNlQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAskData()}
+                      disabled={loadingNlQuery}
+                    />
+                    <Button
+                      onClick={handleAskData}
+                      disabled={loadingNlQuery || !nlQuery.trim()}
+                      className="px-8"
+                    >
+                      {loadingNlQuery ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Ask AI
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Suggested Questions */}
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs text-muted-foreground">Quick questions:</span>
+                    {[
+                      "Show me top 5 students",
+                      "Who failed in Math?",
+                      "Show students below 40%",
+                      "Top performers in last exam"
+                    ].map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setNlQuery(suggestion);
+                          setNlResult(null);
+                        }}
+                        className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Results */}
+                  {nlResult && (
+                    <div className="mt-4 border rounded-lg p-4 bg-white">
+                      {nlResult.type === 'error' ? (
+                        <div className="text-center py-8">
+                          <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-red-500" />
+                          <p className="font-semibold text-red-700">Could not process query</p>
+                          <p className="text-sm text-muted-foreground mt-2">{nlResult.message}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mb-4">
+                            <h4 className="font-semibold text-lg">{nlResult.title}</h4>
+                            {nlResult.description && (
+                              <p className="text-sm text-muted-foreground mt-1">{nlResult.description}</p>
+                            )}
+                          </div>
+
+                          {/* Bar Chart */}
+                          {nlResult.type === 'bar' && nlResult.data?.length > 0 && (
+                            <div className="h-80">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={nlResult.data}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis
+                                    dataKey={nlResult.xAxis || 'name'}
+                                    tick={{ fontSize: 12 }}
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={100}
+                                  />
+                                  <YAxis />
+                                  <Tooltip />
+                                  <Bar
+                                    dataKey={nlResult.yAxis || 'value'}
+                                    fill="#F97316"
+                                    radius={[4, 4, 0, 0]}
+                                  />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          )}
+
+                          {/* Table */}
+                          {nlResult.type === 'table' && nlResult.data?.length > 0 && (
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse">
+                                <thead>
+                                  <tr className="bg-gray-50">
+                                    {Object.keys(nlResult.data[0]).map((key, idx) => (
+                                      <th key={idx} className="border p-2 text-left text-sm font-semibold">
+                                        {key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {nlResult.data.map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50">
+                                      {Object.values(row).map((val, vidx) => (
+                                        <td key={vidx} className="border p-2 text-sm">
+                                          {typeof val === 'number' ? val.toFixed(1) : val}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* No Data */}
+                          {nlResult.data?.length === 0 && (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                              <p>No results found for your query.</p>
+                              <p className="text-sm">Try rephrasing or selecting different filters.</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Topic Mastery Radar */}
             <Card>
               <CardHeader>
