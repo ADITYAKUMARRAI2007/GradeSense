@@ -6092,6 +6092,392 @@ async def get_student_journey(
     }
 
 
+
+# ============== PHASE 2: ADVANCED AI METRICS ==============
+
+@api_router.get("/analytics/bluff-index")
+async def get_bluff_index(
+    exam_id: str,
+    user: User = Depends(get_current_user)
+):
+    """
+    Bluff Index: Detect answers that are long but contain low semantic relevance
+    Uses AI to identify students who are 'guessing' rather than 'knowing'
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get exam
+    exam = await db.exams.find_one(
+        {"exam_id": exam_id, "teacher_id": user.user_id},
+        {"_id": 0}
+    )
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get all submissions
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "student_id": 1, "student_name": 1, "question_scores": 1}
+    ).to_list(1000)
+    
+    logger.info(f"Analyzing bluff index for {len(submissions)} submissions")
+    
+    # Analyze each answer for semantic relevance
+    bluff_candidates = []
+    
+    for submission in submissions:
+        student_bluff_score = 0
+        suspicious_answers = []
+        
+        for qs in submission.get("question_scores", []):
+            answer_text = qs.get("answer_text", "")
+            feedback = qs.get("ai_feedback", "")
+            obtained = qs.get("obtained_marks", 0)
+            max_marks = qs.get("max_marks", 1)
+            percentage = (obtained / max_marks) * 100 if max_marks > 0 else 0
+            
+            # Heuristic: Long answer (>100 chars) but low score (<40%)
+            if len(answer_text) > 100 and percentage < 40:
+                # Use AI feedback to determine if it's bluffing
+                if any(keyword in feedback.lower() for keyword in [
+                    "irrelevant", "off-topic", "does not answer", "incorrect approach",
+                    "vague", "unclear", "lacks understanding", "superficial"
+                ]):
+                    student_bluff_score += 1
+                    suspicious_answers.append({
+                        "question_number": qs.get("question_number"),
+                        "answer_length": len(answer_text),
+                        "score_percentage": round(percentage, 1),
+                        "feedback_snippet": feedback[:150]
+                    })
+        
+        # If student has 2+ suspicious answers, add to bluff candidates
+        if student_bluff_score >= 2:
+            bluff_candidates.append({
+                "student_id": submission["student_id"],
+                "student_name": submission["student_name"],
+                "bluff_score": student_bluff_score,
+                "suspicious_answers": suspicious_answers
+            })
+    
+    # Sort by bluff score
+    bluff_candidates.sort(key=lambda x: x["bluff_score"], reverse=True)
+    
+    return {
+        "exam_id": exam_id,
+        "exam_name": exam.get("exam_name", "Unknown"),
+        "total_students": len(submissions),
+        "bluff_candidates": bluff_candidates,
+        "summary": f"Found {len(bluff_candidates)} students with potential bluffing patterns (long answers with low relevance)"
+    }
+
+
+@api_router.get("/analytics/syllabus-coverage")
+async def get_syllabus_coverage(
+    batch_id: Optional[str] = None,
+    subject_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """
+    Syllabus Coverage Heatmap: Shows which topics have been tested and results
+    Helps teachers identify gaps in assessment coverage
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get all exams for this teacher
+    exam_query = {"teacher_id": user.user_id}
+    if batch_id:
+        exam_query["batch_id"] = batch_id
+    if subject_id:
+        exam_query["subject_id"] = subject_id
+    
+    exams = await db.exams.find(exam_query, {"_id": 0}).to_list(100)
+    
+    if not exams:
+        return {
+            "tested_topics": [],
+            "untested_topics": [],
+            "coverage_percentage": 0,
+            "topic_heatmap": []
+        }
+    
+    # Get subject to identify full syllabus
+    subject = None
+    if subject_id:
+        subject = await db.subjects.find_one({"subject_id": subject_id}, {"_id": 0})
+    
+    # Collect all tested topics
+    tested_topics = {}
+    
+    for exam in exams:
+        exam_id = exam["exam_id"]
+        
+        # Get submissions for this exam
+        submissions = await db.submissions.find(
+            {"exam_id": exam_id},
+            {"_id": 0, "question_scores": 1}
+        ).to_list(1000)
+        
+        for question in exam.get("questions", []):
+            topics = question.get("topic_tags", [])
+            if not topics:
+                topics = [subject.get("name", "General")] if subject else ["General"]
+            
+            q_num = question.get("question_number")
+            
+            for topic in topics:
+                if topic not in tested_topics:
+                    tested_topics[topic] = {
+                        "exam_count": 0,
+                        "question_count": 0,
+                        "total_scores": [],
+                        "last_tested": None
+                    }
+                
+                tested_topics[topic]["exam_count"] += 1
+                tested_topics[topic]["question_count"] += 1
+                tested_topics[topic]["last_tested"] = exam.get("created_at", "")
+                
+                # Collect scores
+                for sub in submissions:
+                    for qs in sub.get("question_scores", []):
+                        if qs.get("question_number") == q_num:
+                            percentage = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+                            tested_topics[topic]["total_scores"].append(percentage)
+    
+    # Calculate coverage heatmap
+    topic_heatmap = []
+    for topic, data in tested_topics.items():
+        avg_score = sum(data["total_scores"]) / len(data["total_scores"]) if data["total_scores"] else 0
+        
+        color = "grey"  # Not tested
+        if avg_score > 0:
+            if avg_score >= 70:
+                color = "green"
+            elif avg_score >= 50:
+                color = "amber"
+            else:
+                color = "red"
+        
+        topic_heatmap.append({
+            "topic": topic,
+            "status": "tested",
+            "exam_count": data["exam_count"],
+            "question_count": data["question_count"],
+            "avg_score": round(avg_score, 1),
+            "last_tested": data["last_tested"],
+            "color": color
+        })
+    
+    # TODO: Identify untested topics (would require a predefined syllabus structure)
+    # For now, we show only tested topics
+    
+    coverage_percentage = 100  # Assuming all tested topics = 100% coverage
+    
+    return {
+        "subject": subject.get("name") if subject else "All Subjects",
+        "total_exams": len(exams),
+        "tested_topics": sorted(topic_heatmap, key=lambda x: x["avg_score"]),
+        "untested_topics": [],  # Placeholder for future enhancement
+        "coverage_percentage": coverage_percentage,
+        "summary": f"Assessed {len(tested_topics)} topics across {len(exams)} exams"
+    }
+
+
+@api_router.get("/analytics/peer-groups")
+async def get_peer_group_suggestions(
+    batch_id: str,
+    user: User = Depends(get_current_user)
+):
+    """
+    Peer Groups: Auto-suggest study pairs based on complementary strengths/weaknesses
+    E.g., Student A (strong in Algebra, weak in Geometry) + Student B (strong in Geometry, weak in Algebra)
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get all students in batch
+    batch = await db.batches.find_one({"batch_id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    student_ids = batch.get("students", [])
+    
+    if len(student_ids) < 2:
+        return {
+            "suggestions": [],
+            "summary": "Need at least 2 students to form peer groups"
+        }
+    
+    # Get all students' performance data
+    student_profiles = {}
+    
+    for student_id in student_ids:
+        student = await db.users.find_one({"user_id": student_id}, {"_id": 0, "name": 1})
+        if not student:
+            continue
+        
+        # Get submissions
+        submissions = await db.submissions.find(
+            {"student_id": student_id},
+            {"_id": 0, "exam_id": 1, "question_scores": 1}
+        ).to_list(1000)
+        
+        if not submissions:
+            continue
+        
+        # Build topic performance profile
+        topic_performance = {}
+        
+        for sub in submissions:
+            exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "questions": 1})
+            if not exam:
+                continue
+            
+            question_topics = {}
+            for q in exam.get("questions", []):
+                topics = q.get("topic_tags", ["General"])
+                question_topics[q.get("question_number")] = topics
+            
+            for qs in sub.get("question_scores", []):
+                q_num = qs.get("question_number")
+                topics = question_topics.get(q_num, ["General"])
+                percentage = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+                
+                for topic in topics:
+                    if topic not in topic_performance:
+                        topic_performance[topic] = []
+                    topic_performance[topic].append(percentage)
+        
+        # Calculate averages
+        strengths = []
+        weaknesses = []
+        
+        for topic, scores in topic_performance.items():
+            avg = sum(scores) / len(scores)
+            if avg >= 70:
+                strengths.append(topic)
+            elif avg < 50:
+                weaknesses.append(topic)
+        
+        student_profiles[student_id] = {
+            "name": student.get("name", "Unknown"),
+            "strengths": strengths,
+            "weaknesses": weaknesses
+        }
+    
+    # Find complementary pairs
+    suggestions = []
+    processed_pairs = set()
+    
+    for sid1, profile1 in student_profiles.items():
+        for sid2, profile2 in student_profiles.items():
+            if sid1 >= sid2:  # Avoid duplicates and self-pairing
+                continue
+            
+            pair_key = tuple(sorted([sid1, sid2]))
+            if pair_key in processed_pairs:
+                continue
+            
+            # Check for complementary strengths/weaknesses
+            # Student 1's strength matches Student 2's weakness
+            complementary_topics = []
+            
+            for strength in profile1["strengths"]:
+                if strength in profile2["weaknesses"]:
+                    complementary_topics.append({
+                        "topic": strength,
+                        "helper": profile1["name"],
+                        "learner": profile2["name"]
+                    })
+            
+            for strength in profile2["strengths"]:
+                if strength in profile1["weaknesses"]:
+                    complementary_topics.append({
+                        "topic": strength,
+                        "helper": profile2["name"],
+                        "learner": profile1["name"]
+                    })
+            
+            # If they have 2+ complementary topics, suggest pairing
+            if len(complementary_topics) >= 2:
+                suggestions.append({
+                    "student1": {
+                        "id": sid1,
+                        "name": profile1["name"],
+                        "strengths": profile1["strengths"],
+                        "weaknesses": profile1["weaknesses"]
+                    },
+                    "student2": {
+                        "id": sid2,
+                        "name": profile2["name"],
+                        "strengths": profile2["strengths"],
+                        "weaknesses": profile2["weaknesses"]
+                    },
+                    "complementary_topics": complementary_topics,
+                    "synergy_score": len(complementary_topics)
+                })
+                processed_pairs.add(pair_key)
+    
+    # Sort by synergy score
+    suggestions.sort(key=lambda x: x["synergy_score"], reverse=True)
+    
+    return {
+        "batch_id": batch_id,
+        "batch_name": batch.get("name", "Unknown"),
+        "total_students": len(student_profiles),
+        "suggestions": suggestions[:10],  # Top 10 pairs
+        "summary": f"Found {len(suggestions)} potential study pairs with complementary skills"
+    }
+
+
+@api_router.post("/analytics/send-peer-group-email")
+async def send_peer_group_email(
+    student1_id: str,
+    student2_id: str,
+    message: str,
+    user: User = Depends(get_current_user)
+):
+    """
+    Send email notification to suggested peer group
+    Placeholder for future email integration
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get student emails
+    student1 = await db.users.find_one({"user_id": student1_id}, {"_id": 0, "email": 1, "name": 1})
+    student2 = await db.users.find_one({"user_id": student2_id}, {"_id": 0, "email": 1, "name": 1})
+    
+    if not student1 or not student2:
+        raise HTTPException(status_code=404, detail="Students not found")
+    
+    # TODO: Integrate with email service (SendGrid, Resend, etc.)
+    # For now, create a notification
+    
+    await create_notification(
+        user_id=student1_id,
+        notification_type="peer_group_suggestion",
+        title="Study Partner Suggestion",
+        message=f"Your teacher suggests studying with {student2.get('name')}. {message}"
+    )
+    
+    await create_notification(
+        user_id=student2_id,
+        notification_type="peer_group_suggestion",
+        title="Study Partner Suggestion",
+        message=f"Your teacher suggests studying with {student1.get('name')}. {message}"
+    )
+    
+    return {
+        "success": True,
+        "message": "Notifications sent to both students"
+    }
+
+
+
 # ============== STUDY MATERIALS (STUDENT) ==============
 
 @api_router.get("/study-materials")
