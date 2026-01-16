@@ -4923,6 +4923,93 @@ Only return the JSON array, no other text."""
     }
 
 
+
+
+def extract_topic_from_rubric(rubric: str, subject_name: str = "General") -> str:
+    """
+    Extract topic from question rubric using keyword matching
+    Returns specific topic name based on keywords found in rubric
+    """
+    if not rubric:
+        return subject_name
+    
+    rubric_lower = rubric.lower()
+    
+    # Mathematics topics (most comprehensive)
+    math_topics = {
+        "Algebra": ["algebra", "algebraic", "equation", "equations", "variable", "variables", "expression", "expressions", 
+                    "polynomial", "polynomials", "quadratic", "linear", "factorize", "factorization", "simplify", "solve for"],
+        
+        "Geometry": ["geometry", "geometric", "triangle", "triangles", "circle", "circles", "square", "rectangle", "polygon",
+                    "angle", "angles", "perimeter", "area", "congruent", "similar", "parallel", "perpendicular", "diagonal"],
+        
+        "Trigonometry": ["trigonometry", "trigonometric", "sine", "cosine", "tangent", "sin", "cos", "tan", "sec", "cosec", "cot",
+                        "radian", "degree", "angle", "hypotenuse", "opposite", "adjacent"],
+        
+        "Calculus": ["calculus", "derivative", "derivatives", "differentiation", "integration", "integral", "integrals", 
+                    "limit", "limits", "maxima", "minima", "rate of change", "slope", "tangent line", "curve"],
+        
+        "Statistics & Probability": ["statistics", "statistical", "probability", "probable", "mean", "median", "mode", 
+                                    "average", "data", "frequency", "distribution", "variance", "standard deviation",
+                                    "random", "sample", "population", "histogram", "bar graph"],
+        
+        "Coordinate Geometry": ["coordinate", "coordinates", "cartesian", "graph", "line", "slope", "gradient", "intercept",
+                               "axis", "axes", "origin", "plot", "distance formula", "section formula", "midpoint"],
+        
+        "Mensuration": ["volume", "volumes", "surface area", "cube", "cuboid", "cylinder", "cone", "sphere", "hemisphere",
+                       "prism", "pyramid", "capacity", "curved surface", "total surface"],
+        
+        "Number Systems": ["number system", "number", "numbers", "integer", "integers", "fraction", "fractions", "decimal", 
+                          "decimals", "rational", "irrational", "real number", "prime", "composite", "hcf", "lcm", "divisibility"],
+        
+        "Set Theory": ["set", "sets", "union", "intersection", "subset", "superset", "venn diagram", "element", "universal set",
+                      "complement", "disjoint", "cardinality"],
+        
+        "Matrices": ["matrix", "matrices", "determinant", "inverse", "transpose", "row", "column", "order", "singular"],
+        
+        "Sequences & Series": ["sequence", "sequences", "series", "arithmetic progression", "geometric progression", "ap", "gp",
+                              "term", "sum", "infinite series"],
+    }
+    
+    # Science topics
+    science_topics = {
+        "Physics - Mechanics": ["force", "motion", "velocity", "acceleration", "momentum", "energy", "work", "power", "friction"],
+        "Physics - Electricity": ["current", "voltage", "resistance", "circuit", "electricity", "ohm", "capacitor", "inductor"],
+        "Physics - Optics": ["light", "reflection", "refraction", "lens", "mirror", "optics", "ray", "spectrum"],
+        "Chemistry - Organic": ["organic", "hydrocarbon", "alcohol", "acid", "ester", "polymer", "isomer", "benzene"],
+        "Chemistry - Inorganic": ["inorganic", "metal", "non-metal", "periodic", "salt", "oxide", "compound", "element"],
+        "Biology - Botany": ["plant", "leaf", "root", "stem", "flower", "photosynthesis", "chlorophyll", "botany"],
+        "Biology - Zoology": ["animal", "cell", "tissue", "organ", "digestion", "respiration", "circulation", "reproduction"],
+    }
+    
+    # English/Language topics
+    language_topics = {
+        "Grammar": ["grammar", "tense", "verb", "noun", "adjective", "adverb", "pronoun", "preposition", "conjunction",
+                   "sentence", "clause", "phrase", "subject", "predicate", "punctuation"],
+        "Comprehension": ["comprehension", "passage", "read", "understand", "infer", "context", "meaning", "paragraph"],
+        "Writing": ["essay", "letter", "write", "composition", "article", "story", "creative writing", "formal", "informal"],
+        "Literature": ["poem", "poetry", "prose", "novel", "drama", "character", "plot", "theme", "author", "literary"],
+    }
+    
+    # Combine all topic dictionaries based on subject
+    all_topics = {**math_topics, **science_topics, **language_topics}
+    
+    # Check each topic for keyword matches
+    topic_scores = {}
+    for topic, keywords in all_topics.items():
+        score = sum(1 for keyword in keywords if keyword in rubric_lower)
+        if score > 0:
+            topic_scores[topic] = score
+    
+    # Return topic with highest score
+    if topic_scores:
+        best_topic = max(topic_scores, key=topic_scores.get)
+        return best_topic
+    
+    # Fallback to subject name
+    return subject_name
+
+
 @api_router.get("/analytics/topic-mastery")
 async def get_topic_mastery(
     exam_id: Optional[str] = None,
