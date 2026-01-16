@@ -30,11 +30,8 @@ export default function TeacherDashboard({ user }) {
   const [generalFeedback, setGeneralFeedback] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   
-  // New: Class snapshot and submission modal
+  // New: Class snapshot
   const [classSnapshot, setClassSnapshot] = useState(null);
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
-  const [loadingSubmission, setLoadingSubmission] = useState(false);
   
   const navigate = useNavigate();
 
