@@ -45,6 +45,13 @@ export default function Analytics({ user }) {
   // Modal states
   const [studentJourneyModal, setStudentJourneyModal] = useState(false);
   const [selectedStudentJourney, setSelectedStudentJourney] = useState(null);
+  
+  // Phase 2: Advanced Metrics
+  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
+  const [bluffIndex, setBluffIndex] = useState(null);
+  const [syllabusCoverage, setSyllabusCoverage] = useState(null);
+  const [peerGroups, setPeerGroups] = useState(null);
+  const [loadingAdvanced, setLoadingAdvanced] = useState(false);
 
   useEffect(() => {
     fetchFilters();
