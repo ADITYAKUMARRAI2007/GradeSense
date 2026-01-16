@@ -52,6 +52,11 @@ export default function Analytics({ user }) {
   const [syllabusCoverage, setSyllabusCoverage] = useState(null);
   const [peerGroups, setPeerGroups] = useState(null);
   const [loadingAdvanced, setLoadingAdvanced] = useState(false);
+  
+  // Ask Your Data (NL Query)
+  const [nlQuery, setNlQuery] = useState('');
+  const [nlResult, setNlResult] = useState(null);
+  const [loadingNlQuery, setLoadingNlQuery] = useState(false);
 
   useEffect(() => {
     fetchFilters();
