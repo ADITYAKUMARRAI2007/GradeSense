@@ -230,6 +230,33 @@ export default function Analytics({ user }) {
       toast.error('Failed to send notifications');
     }
   };
+  
+  // Natural Language Query
+  const handleAskData = async () => {
+    if (!nlQuery.trim()) {
+      toast.error('Please enter a question');
+      return;
+    }
+    
+    setLoadingNlQuery(true);
+    try {
+      const response = await axios.post(`${API}/analytics/ask`, {
+        query: nlQuery,
+        batch_id: selectedBatch,
+        exam_id: selectedExam
+      });
+      setNlResult(response.data);
+    } catch (error) {
+      console.error('Error processing natural language query:', error);
+      toast.error('Failed to process your question');
+      setNlResult({
+        type: 'error',
+        message: error.response?.data?.detail || 'Failed to process query'
+      });
+    } finally {
+      setLoadingNlQuery(false);
+    }
+  };
 
   const getScoreColor = (percentage) => {
     if (percentage >= 70) return 'text-green-600';
