@@ -158,6 +158,73 @@ export default function Analytics({ user }) {
       setTopicDrillDown(null);
     }
   };
+  
+  // Phase 2: Advanced Metrics Functions
+  const fetchBluffIndex = async () => {
+    if (!selectedExam) {
+      toast.error('Please select an exam to analyze bluff patterns');
+      return;
+    }
+    
+    setLoadingAdvanced(true);
+    try {
+      const response = await axios.get(`${API}/analytics/bluff-index?exam_id=${selectedExam}`);
+      setBluffIndex(response.data);
+    } catch (error) {
+      console.error('Error fetching bluff index:', error);
+      toast.error('Failed to load bluff analysis');
+    } finally {
+      setLoadingAdvanced(false);
+    }
+  };
+  
+  const fetchSyllabusCoverage = async () => {
+    setLoadingAdvanced(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedBatch) params.append('batch_id', selectedBatch);
+      
+      const response = await axios.get(`${API}/analytics/syllabus-coverage?${params}`);
+      setSyllabusCoverage(response.data);
+    } catch (error) {
+      console.error('Error fetching syllabus coverage:', error);
+      toast.error('Failed to load syllabus coverage');
+    } finally {
+      setLoadingAdvanced(false);
+    }
+  };
+  
+  const fetchPeerGroups = async () => {
+    if (!selectedBatch) {
+      toast.error('Please select a batch to find peer groups');
+      return;
+    }
+    
+    setLoadingAdvanced(true);
+    try {
+      const response = await axios.get(`${API}/analytics/peer-groups?batch_id=${selectedBatch}`);
+      setPeerGroups(response.data);
+    } catch (error) {
+      console.error('Error fetching peer groups:', error);
+      toast.error('Failed to load peer group suggestions');
+    } finally {
+      setLoadingAdvanced(false);
+    }
+  };
+  
+  const sendPeerGroupNotification = async (student1Id, student2Id, message) => {
+    try {
+      await axios.post(`${API}/analytics/send-peer-group-email`, {
+        student1_id: student1Id,
+        student2_id: student2Id,
+        message: message
+      });
+      toast.success('Notifications sent to both students!');
+    } catch (error) {
+      console.error('Error sending notifications:', error);
+      toast.error('Failed to send notifications');
+    }
+  };
 
   const getScoreColor = (percentage) => {
     if (percentage >= 70) return 'text-green-600';
