@@ -530,7 +530,7 @@ export default function Analytics({ user }) {
                     <TrendingDown className="w-8 h-8 text-red-500" />
                     <div>
                       <p className="text-2xl font-bold text-red-600">{questionDrillDown.statistics.fail_count}</p>
-                      <p className="text-xs text-muted-foreground">Failed (<50%)</p>
+                      <p className="text-xs text-muted-foreground">Failed (&lt;50%)</p>
                     </div>
                   </div>
                 </CardContent>
