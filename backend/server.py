@@ -6596,7 +6596,7 @@ If the query is unclear or impossible to answer, return:
 """
         
         chat = LlmChat(
-            api_key=os.environ.get("EMERGENT_API_KEY"),
+            api_key=os.environ.get("EMERGENT_LLM_KEY"),
             session_id=f"nl_query_{uuid.uuid4().hex[:8]}",
             system_message="You are a precise data analyst. Return ONLY valid JSON, no markdown formatting."
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
