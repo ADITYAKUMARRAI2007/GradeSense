@@ -120,25 +120,11 @@ export default function TeacherDashboard({ user }) {
       bgColor: "bg-orange-50"
     },
     { 
-      label: "Active Batches", 
-      value: stats.total_batches || 0, 
-      icon: BookOpen, 
-      color: "text-blue-600",
-      bgColor: "bg-blue-50"
-    },
-    { 
       label: "Pending Reviews", 
       value: stats.pending_reviews || 0, 
       icon: Clock, 
       color: "text-yellow-600",
       bgColor: "bg-yellow-50"
-    },
-    { 
-      label: "Class Average", 
-      value: `${stats.avg_score || 0}%`, 
-      icon: TrendingUp, 
-      color: "text-green-600",
-      bgColor: "bg-green-50"
     },
   ];
 
