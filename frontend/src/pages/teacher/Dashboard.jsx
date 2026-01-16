@@ -49,6 +49,7 @@ export default function TeacherDashboard({ user }) {
 
   useEffect(() => {
     fetchDashboard();
+    fetchClassSnapshot();
   }, []);
 
   const fetchDashboard = async () => {
@@ -59,6 +60,31 @@ export default function TeacherDashboard({ user }) {
       console.error("Error fetching dashboard:", error);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchClassSnapshot = async () => {
+    try {
+      const response = await axios.get(`${API}/dashboard/class-snapshot`);
+      setClassSnapshot(response.data);
+    } catch (error) {
+      console.error("Error fetching class snapshot:", error);
+    }
+  };
+  
+  const handleSubmissionClick = async (submission) => {
+    setLoadingSubmission(true);
+    setSubmissionModalOpen(true);
+    
+    try {
+      const response = await axios.get(`${API}/submissions/${submission.submission_id}`);
+      setSelectedSubmission(response.data);
+    } catch (error) {
+      console.error("Error fetching submission details:", error);
+      toast.error("Failed to load submission details");
+      setSubmissionModalOpen(false);
+    } finally {
+      setLoadingSubmission(false);
     }
   };
 
