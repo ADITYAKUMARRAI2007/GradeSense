@@ -165,6 +165,82 @@ export default function TeacherDashboard({ user }) {
           </Button>
         </div>
 
+        {/* Class Performance Snapshot */}
+        {classSnapshot && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
+            {/* Batch Info */}
+            <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 card-hover">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Batch</p>
+                </div>
+                <p className="text-lg font-bold text-blue-900 truncate" title={classSnapshot.batch_name}>
+                  {classSnapshot.batch_name}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {classSnapshot.total_students} students
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Class Average */}
+            <Card className="bg-gradient-to-br from-green-50 to-white border-green-200 card-hover cursor-pointer" onClick={() => navigate('/teacher/analytics')}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Class Avg</p>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-lg font-bold text-green-900">
+                    {classSnapshot.class_average}%
+                  </p>
+                  {classSnapshot.trend !== 0 && (
+                    <Badge variant="outline" className={`text-xs ${classSnapshot.trend > 0 ? 'text-green-600 border-green-300' : 'text-red-600 border-red-300'}`}>
+                      {classSnapshot.trend > 0 ? '↗' : '↘'} {Math.abs(classSnapshot.trend)}%
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {classSnapshot.trend > 0 ? '↗ Improving' : classSnapshot.trend < 0 ? '↘ Declining' : '→ Stable'}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Pass Rate */}
+            <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-200 card-hover cursor-pointer" onClick={() => navigate('/teacher/analytics')}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle className="w-4 h-4 text-amber-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Pass Rate</p>
+                </div>
+                <p className="text-lg font-bold text-amber-900">
+                  {classSnapshot.pass_rate}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {classSnapshot.total_exams} exams
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Recent Exam */}
+            <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200 card-hover">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <BookOpen className="w-4 h-4 text-purple-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Recent Exam</p>
+                </div>
+                <p className="text-sm font-bold text-purple-900 truncate" title={classSnapshot.recent_exam}>
+                  {classSnapshot.recent_exam}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {classSnapshot.recent_exam_date ? new Date(classSnapshot.recent_exam_date).toLocaleDateString() : ''}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           {statCards.map((stat, index) => {
