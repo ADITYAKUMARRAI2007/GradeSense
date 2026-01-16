@@ -4231,6 +4231,9 @@ async def upload_student_papers(
                 "error": str(e)
             })
     
+    # Log final summary
+    logger.info(f"Batch grading complete: {len(submissions)} successful, {len(errors)} errors out of {len(files)} total files")
+    
     # Update exam status
     await db.exams.update_one(
         {"exam_id": exam_id},
