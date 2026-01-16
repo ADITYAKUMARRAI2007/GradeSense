@@ -489,6 +489,115 @@ export default function TeacherDashboard({ user }) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Submission Details Modal */}
+        <Dialog open={submissionModalOpen} onOpenChange={setSubmissionModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                Graded Paper - {selectedSubmission?.student_name || 'Loading...'}
+              </DialogTitle>
+            </DialogHeader>
+
+            {loadingSubmission ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            ) : selectedSubmission ? (
+              <div className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <p className="text-sm text-muted-foreground">Total Score</p>
+                      <p className="text-2xl font-bold text-blue-900">
+                        {selectedSubmission.total_score}/{selectedSubmission.max_marks || 'N/A'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-green-50 border-green-200">
+                    <CardContent className="p-4">
+                      <p className="text-sm text-muted-foreground">Percentage</p>
+                      <p className="text-2xl font-bold text-green-900">
+                        {selectedSubmission.percentage}%
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-amber-50 border-amber-200">
+                    <CardContent className="p-4">
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <Badge className={selectedSubmission.percentage >= 50 ? 'bg-green-600' : 'bg-red-600'}>
+                        {selectedSubmission.percentage >= 50 ? 'Passed' : 'Failed'}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Question-wise Scores */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Question-wise Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {selectedSubmission.question_scores?.map((qs, idx) => (
+                        <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold">Question {qs.question_number}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">
+                                {qs.obtained_marks}/{qs.max_marks}
+                              </Badge>
+                              <Badge className={
+                                (qs.obtained_marks / qs.max_marks) * 100 >= 70 ? 'bg-green-600' :
+                                (qs.obtained_marks / qs.max_marks) * 100 >= 50 ? 'bg-amber-600' :
+                                'bg-red-600'
+                              }>
+                                {Math.round((qs.obtained_marks / qs.max_marks) * 100)}%
+                              </Badge>
+                            </div>
+                          </div>
+                          {qs.ai_feedback && (
+                            <div className="text-sm text-muted-foreground mt-2 p-2 bg-white rounded border">
+                              <p className="font-medium text-xs mb-1">AI Feedback:</p>
+                              <p>{qs.ai_feedback}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => navigate(`/teacher/review?exam=${selectedSubmission.exam_id}&student=${selectedSubmission.student_id}`)}
+                  >
+                    View Full Paper
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      setSubmissionModalOpen(false);
+                      navigate('/teacher/analytics');
+                    }}
+                  >
+                    View Analytics
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>Failed to load submission details</p>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
