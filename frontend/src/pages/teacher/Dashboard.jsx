@@ -73,19 +73,8 @@ export default function TeacherDashboard({ user }) {
   };
   
   const handleSubmissionClick = async (submission) => {
-    setLoadingSubmission(true);
-    setSubmissionModalOpen(true);
-    
-    try {
-      const response = await axios.get(`${API}/submissions/${submission.submission_id}`);
-      setSelectedSubmission(response.data);
-    } catch (error) {
-      console.error("Error fetching submission details:", error);
-      toast.error("Failed to load submission details");
-      setSubmissionModalOpen(false);
-    } finally {
-      setLoadingSubmission(false);
-    }
+    // Navigate directly to ReviewPapers page with filters for this specific submission
+    navigate(`/teacher/review?exam=${submission.exam_id}&student=${submission.student_id}`);
   };
 
   const handleSubmitGeneralFeedback = async () => {
