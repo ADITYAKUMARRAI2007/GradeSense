@@ -11,6 +11,7 @@ import UploadGrade from "./pages/teacher/UploadGrade";
 import ReviewPapers from "./pages/teacher/ReviewPapers";
 import ClassReports from "./pages/teacher/ClassReports";
 import ClassInsights from "./pages/teacher/ClassInsights";
+import Analytics from "./pages/teacher/Analytics";
 import ManageStudents from "./pages/teacher/ManageStudents";
 import ManageBatches from "./pages/teacher/ManageBatches";
 import ManageExams from "./pages/teacher/ManageExams";
