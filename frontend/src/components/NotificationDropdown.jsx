@@ -125,12 +125,39 @@ export default function NotificationDropdown({ user }) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h3 className="font-semibold">Notifications</h3>
-          {unreadCount > 0 && (
-            <Badge variant="default" className="bg-red-500">
-              {unreadCount} new
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <Badge variant="default" className="bg-red-500">
+                {unreadCount} new
+              </Badge>
+            )}
+          </div>
         </div>
+        
+        {/* Action Buttons */}
+        {notifications.length > 0 && (
+          <div className="flex gap-2 p-3 border-b bg-muted/30">
+            {unreadCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 text-xs"
+                onClick={markAllAsRead}
+              >
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Mark all read
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={clearAllNotifications}
+            >
+              Clear all
+            </Button>
+          </div>
+        )}
 
         {/* Notifications List */}
         <ScrollArea className="h-[400px]">
