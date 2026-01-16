@@ -15,131 +15,98 @@ The user wants to create a comprehensive web application MVP called GradeSense, 
     -   The exam creation UI should allow users to select the numbering format (e.g., 'a, b, c' or 'i, ii, iii') for sub-questions.
     -   A recurring UI bug with resizable panels needs to be fixed.
     -   **NEW:** The manual question entry step should be removed as a mandatory requirement. The system must automatically extract the entire question structure (questions, sub-questions, marks) from an uploaded question paper or model answer. An interface must be provided for the teacher to edit this extracted structure if it's incorrect.
+    -   **NEW:** The AI should learn from teacher corrections. If a teacher adjusts a grade for one student, there should be an option to apply that correction to the entire batch for that specific question.
+    -   **NEW:** Students should only see their results after the teacher explicitly publishes them.
+    -   **NEW:** Students must be able to view the question paper alongside their graded answer sheet.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The GradeSense application is a full-stack web app (React/FastAPI/MongoDB) featuring teacher/student authentication and AI-powered grading.
+GradeSense is a full-stack React/FastAPI/MongoDB application for AI-powered grading. It features robust capabilities including Google-based authentication, automatic question extraction using Gemini 2.5 Flash, large document handling via MongoDB GridFS, and chunked processing to prevent timeouts.
 
-The core architecture has been significantly updated to be more robust and scalable:
--   **LLM Engine:** All AI tasks now use **Google's Gemini 2.5 Flash** model, replacing GPT-4o-mini to avoid restrictive safety filters.
--   **Large File Handling:** Implemented **MongoDB GridFS** to store large files (question papers, model answers), permanently resolving the 16MB document size limit. This is paired with **image compression** to reduce storage by ~50%.
--   **Automatic Question Extraction:** The workflow has shifted from mandatory manual question entry to automatic structure extraction. The backend now contains a sophisticated function to parse uploaded papers, identify questions, sub-questions, and marks, and save this structure.
--   **Frontend Workflow:** The UI for creating exams () has been updated to make manual question entry an optional fallback. A new Edit Questions interface has been added to  using a new  component, allowing teachers to correct the AI-extracted structure.
--   **Performance:** Long-running extraction tasks on large documents (20+ pages) are now chunked to prevent API timeouts.
+Key workflows implemented in this session include:
+-   **Result Gating:** A new publication system requires teachers to explicitly Publish results before students can view them.
+-   **Batch Re-grading:** Teachers can correct a grade for a single question on one paper and apply that specific correction across all other papers in the batch, saving time and credits.
+-   **Student Question Paper Access:** Students can now view the original question paper alongside their graded answer sheet in their results view.
+-   **Cost/Complexity Reduction:** The error annotation feature was removed from the backend and frontend at the user's request.
 
 **Last working item**:
-The agent was about to start fixing four critical issues that the user identified after the latest round of feature implementations.
+The user reported a critical failure in the core batch grading workflow.
 
--   **Last item agent was working:** Addressing a set of four critical bugs that render the application's core workflow unusable. The user has provided a detailed list of the issues and a plan to fix them.
+-   **Last item agent was working:** Investigating why uploading 10 student papers for grading resulted in only one paper being processed and graded. The user named the files 1.pdf, 2.pdf, etc., and only the submission for 10 was created.
 -   **Status:** NOT STARTED
 -   **Agent Testing Done:** N
--   **Which testing method agent to use?** both.
-    -   **Backend Testing Agent:** To verify that auto-extracted questions save correctly (Issue 1) and that optional questions are handled properly to calculate the correct total marks (Issue 2).
-    -   **Frontend Testing Agent/Screenshot Tool:** To verify the UI fixes for the Review Papers checkboxes (Issue 3) and the conditional logic in the exam creation flow (Issue 4).
+-   **Which testing method agent to use?** backend testing agent. The issue is likely within the backend's  endpoint logic. The agent needs to test the file handling loop to ensure it processes every file in a multi-file upload, not just the last one.
 -   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Auto-extracted questions are not saved to the database (P0 - CRITICAL BLOCKER)**
--   **Issue 2: AI does not handle optional questions, leading to incorrect total marks (P0)**
--   **Issue 3: Review Papers UI is empty by default because checkboxes are not ticked (P0)**
--   **Issue 4: Manual entry form in exam creation shows incorrectly due to a logic bug (P0)**
--   **Issue 5: Resizable panels in Review Papers may not be fixed (P1)**
--   **Issue 6: Analytics features are not working correctly (P2)**
+-   **Issue 1: Batch grading fails; only processes one file from multiple uploads (P0 - CRITICAL BLOCKER)**
+-   **Issue 2: Analytics features are not working correctly (P1)**
+-   **Issue 3: Resizable panels in  may not be fixed (P2)**
 
 **Issues Detail:**
 -   **Issue 1:**
-    -   **Description:** The  function in  successfully extracts the question structure from the paper but fails to save it to the database. This results in exams having zero questions, which causes all subsequent grading attempts to fail and return a score of 0.
-    -   **Attempted fixes:** None yet. The user provided a fix plan in the last message.
+    -   **Description:** When a teacher uploads multiple student answer sheets (e.g., 10 PDFs) at once for grading, the system only processes and creates a submission for one of the files, ignoring the rest. This completely breaks the batch grading functionality.
+    -   **Attempted fixes:** None. The agent acknowledged the problem and was about to begin the investigation.
     -   **Next debug checklist:**
-        1.  Modify the  function in .
-        2.  Implement logic to first delete any old questions associated with the exam to prevent duplicates.
-        3.  Use  or a similar batch operation to save the newly extracted question structure.
-        4.  Update the parent  document with the correct  and calculated .
-    -   **Why fix this issue and what will be achieved with the fix?** This is the highest priority critical blocker. The entire grading workflow is broken without this fix.
+        1.  Examine the  endpoint in .
+        2.  Verify how the  parameter is being iterated.
+        3.  Check the logic within the loop to ensure that  is invoked as a background task for *each* file.
+        4.  Review backend logs during a multi-file upload to spot any errors after the first file is processed. It's possible the loop is terminating prematurely or subsequent tasks are not being created.
+    -   **Why fix this issue and what will be achieved with the fix?** This is the highest priority issue as it renders the primary feature of the application (batch grading) useless.
     -   **Status:** NOT STARTED
     -   **Is recurring issue?** N
     -   **Should Test frontend/backend/both after fix?** Backend
 
 -   **Issue 2:**
-    -   **Description:** The AI extraction prompt does not account for optional questions (e.g., Attempt any 4 out of 6). It incorrectly sums the marks of all available questions, leading to an inflated  (e.g., 95 instead of 80).
-    -   **Attempted fixes:** None yet.
-    -   **Next debug checklist:**
-        1.  Enhance the system prompt in  to identify instructions for optional questions.
-        2.  Modify the data model (Pydantic/DB) to include fields like , , and .
-        3.  Update the backend logic to calculate an  based on these new optional question rules.
-    -   **Why fix this issue and what will be achieved with the fix?** To ensure exam scores and percentages are calculated correctly.
-    -   **Status:** NOT STARTED
-    -   **Is recurring issue?** N
-    -   **Should Test frontend/backend/both after fix?** Backend
-
--   **Issue 3:**
-    -   **Description:** On the  page, the checkboxes to Show Questions, Show Model Answer, and Show Errors are unchecked by default. This makes the page appear empty and non-functional, confusing the user.
-    -   **Attempted fixes:** None yet.
-    -   **Next debug checklist:**
-        1.  In , locate the  declarations for these checkboxes.
-        2.  Change their default initial value from  to .
-    -   **Why fix this issue and what will be achieved with the fix?** This is a simple but critical UX fix that makes a core feature usable by default.
-    -   **Status:** NOT STARTED
-    -   **Is recurring issue?** N
-    -   **Should Test frontend/backend/both after fix?** Frontend
-
--   **Issue 4:**
-    -   **Description:** In the Create Exam flow (), the manual question entry form is incorrectly displayed even when the user chooses the AI Auto-Extract option. This is likely due to faulty conditional logic (an  where an  is needed).
-    -   **Attempted fixes:** None yet.
-    -   **Next debug checklist:**
-        1.  In , review the conditional rendering logic for the manual entry form within Step 4.
-        2.  Correct the state management to ensure the form only renders when  is explicitly set to .
-    -   **Why fix this issue and what will be achieved with the fix?** To fix a confusing and buggy UI in the exam creation workflow.
-    -   **Status:** NOT STARTED
-    -   **Is recurring issue?** N
-    -   **Should Test frontend/backend/both after fix?** Frontend
-
--   **Issue 5:**
-    -   **Description:** A long-standing bug where resizable panels in  collapse on click. A fix was attempted by downgrading a package.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** Frontend
-
--   **Issue 6:**
     -   **Description:** From a previous fork. The Topic Mastery Heatmap is not interactive, the Student Deep-Dive modal shows incorrect data, and the Class Insights page is bland.
     -   **Status:** NOT STARTED
     -   **Is recurring issue?** Y
     -   **Should Test frontend/backend/both after fix?** Frontend
 
+-   **Issue 3:**
+    -   **Description:** A long-standing bug where resizable panels in  collapse on click. A fix was attempted by downgrading a package.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** Frontend
+
 **In progress Task List**:
--   **Task 1: Stabilize the Automatic Question Extraction & Grading Workflow**
-    -   **Where to resume:** Begin by implementing the fix for Issue #1 in  as detailed in the user's last message.
-    -   **What will be achieved with this?** A functional end-to-end workflow where a user can upload a paper, have its question structure automatically and correctly extracted and saved, and then have student papers graded against that structure.
-    -   **Status:** NOT STARTED
+-   **Task 1: Stabilize Batch Grading Workflow**
+    -   **Where to resume:** Begin by debugging Issue #1 (multi-file upload failure) in .
+    -   **What will be achieved with this?** A functional end-to-end workflow where a teacher can upload a batch of student papers and have all of them graded successfully.
+    -   **Status:** BLOCKED
     -   **Should Test frontend/backend/both after fix?** Both
-    -   **Blocked on something:** None
+    -   **Blocked on something:** Issue #1: Multiple file uploads not working.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks:**
-    -   **P1: Fix Analytics Features:** Address all interactivity and data correctness issues in  and .
+    -   **P1: Fix Analytics Features:** Address interactivity and data correctness issues in  and .
 -   **Future Tasks:**
-    -   **Pagination/Virtualization:** Implement for large class lists in  to improve performance.
+    -   **P2: Pagination/Virtualization:** Implement for large class lists in  to improve performance.
+    -   **P3: Student Re-evaluation Requests:** Allow students to request a review for a specific question.
+    -   **P4: Email Notifications:** Notify students when results are published.
 
 **Completed work in this session**
--   **LLM Engine Switch:** Migrated all AI calls from OpenAI's  to Google's  to bypass restrictive safety filters and removed the  parameter.
--   **Large File Architecture Overhaul (GridFS):** Re-architected file storage to use MongoDB's GridFS, permanently solving the 16MB document size limit and enabling uploads of large PDFs. Also implemented image compression on upload to save ~50% storage space.
--   **Automatic Question Extraction Feature:**
-    -   **Backend:** Implemented a new, robust function () to automatically extract a nested question structure (including sub-questions and marks) from uploaded papers. Added new endpoints () and logic for this workflow.
-    -   **Frontend:** Removed the mandatory manual question entry step.  was modified to make it optional, and a new Edit Questions interface was added to  using a new  component.
--   **Bug Fix (API Timeouts):** Implemented chunking for the extraction process, allowing the system to handle large documents (20+ pages) without API timeouts.
--   **Bug Fix (File Uploads):** Diagnosed and fixed multiple file upload errors, including a  error caused by redundant data storage and a regression when a user-provided file overwrote the GridFS implementation.
--   **Bug Fix (Sub-question text):** Merged a user-provided fix to the extraction prompt to ensure sub-question text is correctly placed in the sub-question's rubric field instead of being lumped into the parent question.
--   **Bug Fix (JSON Parsing):** Made the JSON parsing for AI responses more robust to handle malformed outputs.
+-   **New Feature - Batch Re-grading:** Implemented a system for teachers to apply a correction for a single question to all other papers in a batch, saving cost and time.
+-   **New Feature - Result Publication System:** Created a result-gating workflow where students can only see their grades after a teacher explicitly clicks Publish Results.
+-   **New Feature - Student Question Paper Access:** Students can now view the original question paper alongside their answers.
+-   **Critical Bug Fixes (4):** Resolved issues where auto-extracted questions didn't save, optional questions broke total marks calculation, the review UI was empty by default, and the manual entry form showed incorrectly.
+-   **Root Cause UI Error Resolved:** Fixed a recurring React error (Objects are not valid as a React child) by correcting the backend data structure to not store objects in string fields and adding defensive code on the frontend.
+-   **Grading Robustness (Phase 1):**
+    -   Reduced the document chunk size from 10 to 6 pages to improve API success rates.
+    -   Implemented exponential backoff for API retries to better handle transient errors.
+    -   Increased frontend API timeouts to 15 minutes to accommodate long grading jobs.
+-   **Feature Removal - Annotations:** Removed the costly and underperforming error annotation feature from the backend prompt and frontend UI.
+-   **UX Improvements:** Implemented auto-advance in the exam creation flow and added a UI note clarifying how  is handled.
 
 **Earlier issues found/mentioned but not fixed**
 -   All known issues are captured in the **All Pending/In progress Issue list**.
 
 **Known issue recurrence from previous fork**
--   **Issue recurrence in previous fork:** Resizable panels in  are not working.
--   **Recurrence count:** 3+
--   **Status:** USER VERIFICATION PENDING
--   **Note:** A fix was attempted by downgrading the  package. This needs to be verified by the user or tested.
+-   **Issue recurrence in previous fork:** Analytics features are broken.
+-   **Recurrence count:** 2+
+-   **Status:** NOT STARTED
+-   **Note:** This is a persistent low-priority issue that has not been addressed.
 
 **Code Architecture**
 
@@ -147,82 +114,77 @@ The agent was about to start fixing four critical issues that the user identifie
 **Key Technical Concepts**
 -   **Backend:** FastAPI, Motor, Pydantic, GridFS.
 -   **Frontend:** React, Axios, Shadcn UI.
--   **LLM Strategy:**
-    -   **Model:** Using **Google Gemini 2.5 Flash** for all AI tasks.
-    -   **Determinism:** Using . The  parameter is not supported by Gemini and has been removed.
-    -   **Automatic Structure Extraction:** A core feature where a complex prompt instructs the LLM to parse an entire exam paper and return a structured JSON of questions, sub-questions, and marks.
-    -   **Chunking:** Large documents are split into smaller chunks (5-10 pages) before being sent to the LLM to avoid API timeouts.
--   **Database:** MongoDB.
-    -   **GridFS:** Used for storing all large file data (images from PDFs) to bypass the 16MB document limit.  collection now stores a  reference instead of the full image data.
-    -   **Image Compression:** Images are compressed (JPEG quality 75%) before being stored in GridFS to save space.
+-   **LLM Strategy:** Google Gemini 2.5 Flash, chunked processing, exponential backoff retries.
+-   **Database:** MongoDB with GridFS for large file storage.
+-   **New Core Features:**
+    -   **Result Gating:** A publication workflow controlled by a boolean flag () in the  collection.
+    -   **Batch Re-grading:** A targeted re-grading system that re-processes a single question for multiple submissions.
 
 **key DB schema**
--   **exams:** Contains exam metadata. The  field, previously populated manually, is now intended to be populated by the automatic extraction process.
--   **questions:** (Conceptual/Implicit) A collection or embedded documents within  that holds the detailed structure for each question, including , , , and a nested array of .
--   **exam_files:** Stores file metadata. Instead of a large  array, it now contains a  pointing to the file data stored in GridFS's  and  collections.
+-   **exams:** 
+-   **questions:** 
+-   **submissions:** 
+-   **exam_files:** 
+-   **grading_feedback:** 
 
 **changes in tech stack**
--   **LLM Model:** Switched from OpenAI GPT-4o-mini to **Google Gemini 2.5 Flash**.
--   **File Storage:** Switched from storing base64 image arrays in MongoDB documents to using **GridFS**.
+-   None.
 
 **All files of reference**
--   **/app/backend/server.py**: Contains the entire backend logic, including the critical GridFS implementation and the new automatic question structure extraction functions (, ).
--   **/app/frontend/src/pages/teacher/UploadGrade.jsx**: The main exam creation component, heavily modified to support the new optional manual entry workflow.
--   **/app/frontend/src/pages/teacher/ManageExams.jsx**: Modified to include the Edit Questions and Re-extract features.
--   **/app/frontend/src/components/QuestionEditor.jsx**: A new, reusable component created to provide the UI for editing the AI-extracted question structure.
+-   **/app/backend/server.py**: Contains all backend logic. Critical changes were made to the grading, feedback, and submission endpoints.
+-   **/app/frontend/src/pages/teacher/ReviewPapers.jsx**: UI for the new batch re-grading feature.
+-   **/app/frontend/src/pages/teacher/ManageExams.jsx**: UI for the new result publication feature.
+-   **/app/frontend/src/pages/student/Results.jsx**: UI for displaying the question paper to students.
+
+**Areas that need refactoring**:
+-   The  file is now over 6000 lines long and contains all logic for routing, data models, and services. It urgently needs to be broken down into a more scalable structure (e.g., , , ).
 
 **key api endpoints**
--   ****: New endpoint to trigger the question extraction process again.
--   ****: Existing endpoint now used to save the edited question structure from the new UI.
--   ** / **: Core logic modified to trigger the new  function and store files using GridFS.
+-   ****: Core grading endpoint. **(CURRENTLY BUGGED)**
+-   ****: **(NEW)** Triggers re-grading for a single question across the batch.
+-   ****: **(NEW)** Publishes results for an exam, making them visible to students.
+-   ****: **(NEW)** Hides results from students.
+-   ****: Now filters results for students based on the  flag.
 
 **Critical Info for New Agent**
-1.  **Fix the 4 Critical Issues First:** Your immediate priority is to address the four bugs the user reported in their last message. Start with **Issue #1 (questions not saving)**, as it's a complete blocker for the entire grading workflow. The user has already laid out a detailed plan for the fixes.
-2.  **Preserve GridFS at all costs:** The application now depends on GridFS to handle large files. A previous user-provided file overwrote this implementation, causing a critical  regression. When merging or applying file changes, **always ensure the GridFS logic (, , ) remains intact.**
-3.  **Automatic Extraction is the Core Workflow:** The system's primary method for defining an exam's structure is now automatic extraction. Manual entry is only a fallback. The function  in  is central to this.
-4.  **LLM is Gemini 2.5 Flash:** All AI calls use this model. Do not re-introduce the  parameter, as it's unsupported and caused errors previously.
-5.  **Chunking is Essential for Large Docs:** The  function processes documents in chunks to avoid API timeouts. This logic must be preserved.
+1.  **Start with the Critical Bug:** Your immediate and only priority is to fix the batch grading failure (Issue #1). The app's primary value proposition is broken until you can upload multiple papers and have them all graded.
+2.  **Understand the New Workflows:** Familiarize yourself with the result publication and batch re-grading features. These were significant additions and are central to the teacher's workflow now.
+3.  **Refactoring is Needed:** The  file is extremely large. While you shouldn't refactor it immediately, be aware that it's a major source of technical debt and makes debugging difficult. Propose refactoring after the critical bug is fixed.
 
 **documents and test reports created in this job**
--   /app/GRADING_EDGE_CASES_ANALYSIS.md
--   /app/WORKFLOW_VALIDATION.md
--   /app/ISSUE_ANALYSIS.md
--   /app/MANAGE_EXAMS_IMPLEMENTATION_GUIDE.md
+-   The file  was updated during the session.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Reported 4 critical issues: 1) Grading fails (0 score) because extracted questions aren't saved. 2) Total marks are wrong because optional questions aren't handled. 3) Review Papers UI is empty by default. 4) Manual entry form shows up incorrectly. Provided a detailed fix plan. (PENDING IMPLEMENTATION)
-2.  **User:** Reported that the model runs for too long and consumes credits without output. (FIXED - Agent implemented chunking for large document processing).
-3.  **User:** Approved the plan to merge the improved extraction prompt with the GridFS setup. (COMPLETED)
-4.  **User:** Reported a file upload error again. (FIXED - Agent diagnosed that the user's new file overwrote the GridFS implementation, causing a  error, and merged the changes correctly).
-5.  **User:** Provided an updated  to fix sub-question text extraction. (COMPLETED - Agent applied the file and then fixed a regression it introduced).
-6.  **User:** Asked for the reason why sub-question text appears in the main question section. (ANSWERED - Agent explained the extraction prompt was flawed).
-7.  **User:** Approved the plan to implement frontend changes for the new automatic extraction workflow. (COMPLETED)
-8.  **User:** Confirmed understanding and approved the agent's plan to automate question extraction and remove the mandatory manual entry step. (COMPLETED)
-9.  **User:** Clarified requirements for the new automated question extraction feature, including adding a Re-extract button and validation. (COMPLETED)
-10. **User:** Requested to automate question extraction and remove the mandatory manual entry step. (COMPLETED)
+1.  **User:** Requested an explanation of all product features. (COMPLETED - Agent provided a detailed breakdown).
+2.  **User:** Asked to implement batch re-grading and result publication. (COMPLETED).
+3.  **User:** Asked for an explanation of the Improve AI Grading feature and when students get results. (COMPLETED - Agent explained the existing feedback loop and implemented a new result publication system).
+4.  **User:** Confirmed Phase 1 fixes for grading timeouts and asked for testing. (COMPLETED).
+5.  **User:** Asked to fix grading failures, providing a detailed plan. (COMPLETED - Agent implemented Phase 1 of the user's plan).
+6.  **User:** Reported grading timed out after 10 minutes. (COMPLETED - Agent investigated and implemented robustness improvements).
+7.  **User:** Asked to remove the annotation feature and fix a 1-question grading bug. (COMPLETED).
+8.  **User:** Reported a recurring UI error (Objects are not valid as a React child). (COMPLETED - Agent found the root cause in both backend and frontend and fixed it).
+9.  **User:** Reported another instance of the UI error on the Manage Exams page. (COMPLETED - Agent fixed it).
+10. **User:** Reported that after uploading 10 papers, only one was graded. **(PENDING - THIS IS THE NEXT TASK).**
 
 **Project Health Check:**
 -   **Broken:**
-    -   **Core Grading Workflow:** Fails completely because auto-extracted questions are not saved to the database (Issue #1).
-    -   **Exam Score Calculation:** Incorrectly calculates total marks by not handling optional questions (Issue #2).
-    -   **Review Papers UI:** Unusable by default as crucial information is hidden behind unchecked boxes (Issue #3).
-    -   **Exam Creation UI:** The workflow is buggy and shows the manual entry form incorrectly (Issue #4).
+    -   **Batch Paper Grading:** The system fails to process more than one file when multiple are uploaded, which is a critical failure of the core workflow.
 -   **Mocked:** N/A
 
 **3rd Party Integrations**
--   **Google Gemini 2.5 Flash:** Used for all AI-powered tasks (grading, question extraction). Uses Emergent LLM Key.
+-   **Google Gemini 2.5 Flash:** Used for all AI-powered tasks. Uses Emergent LLM Key.
 -   **Emergent-managed Google Auth:** Used for user authentication.
 -   **Google Analytics (GA4):** Integrated via script in .
 
 **Testing status**
--   **Testing agent used after significant changes:** NO
+-   **Testing agent used after significant changes:** YES (for initial bug fixes and timeout verification).
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** None.
--   **Known regressions:** A  error recurred when a user-provided file overwrote the GridFS implementation. This was subsequently fixed by merging the user's prompt improvements into the GridFS-enabled file.
+-   **Known regressions:** The batch grading functionality is now broken.
 
 **Credentials to test flow:**
 -   **Teacher Account:** 
 -   **Student Account:** 
 
 **What agent forgot to execute**
-The agent was about to begin implementing the fixes for the four critical issues identified by the user in their last message. The user provided a clear, prioritized list of fixes, and the agent's next action should be to start with the first and most critical issue: ensuring auto-extracted questions are correctly saved to the database.</analysis>
+-   The agent has not yet begun to investigate or fix the user's latest and most critical issue: the failure of the batch grading system to process more than one uploaded paper at a time.</analysis>
