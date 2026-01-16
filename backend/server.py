@@ -6767,8 +6767,6 @@ If the query is unclear or impossible to answer, return:
         }
 
 
-    }
-
 
 
 # ============== STUDY MATERIALS (STUDENT) ==============
