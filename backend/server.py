@@ -568,6 +568,43 @@ async def mark_notification_read(notification_id: str, user: User = Depends(get_
     
     return {"message": "Notification marked as read"}
 
+
+@api_router.put("/notifications/mark-all-read")
+async def mark_all_notifications_read(user: User = Depends(get_current_user)):
+    """Mark all notifications as read"""
+    result = await db.notifications.update_many(
+        {"user_id": user.user_id, "is_read": False},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "message": "All notifications marked as read",
+        "count": result.modified_count
+    }
+
+@api_router.delete("/notifications/clear-all")
+async def clear_all_notifications(user: User = Depends(get_current_user)):
+    """Clear (delete) all notifications"""
+    result = await db.notifications.delete_many({"user_id": user.user_id})
+    
+    return {
+        "message": "All notifications cleared",
+        "count": result.deleted_count
+    }
+
+@api_router.delete("/notifications/{notification_id}")
+async def delete_notification(notification_id: str, user: User = Depends(get_current_user)):
+    """Delete a specific notification"""
+    result = await db.notifications.delete_one(
+        {"notification_id": notification_id, "user_id": user.user_id}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification deleted"}
+
+
 async def create_notification(user_id: str, notification_type: str, title: str, message: str, link: str = None):
     """Helper function to create notifications"""
     notification_id = f"notif_{uuid.uuid4().hex[:12]}"
