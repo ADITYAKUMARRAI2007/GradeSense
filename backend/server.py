@@ -5863,9 +5863,9 @@ Respond in JSON format:
 """
             
             llm = LlmChat(
-                model_name="gemini-2.0-flash-exp",
-                system_prompt="You are an educational data analyst. Categorize student errors precisely.",
-                api_key=os.environ.get("EMERGENT_API_KEY")
+                api_key=os.environ.get("EMERGENT_API_KEY"),
+                session_id=f"error_group_{uuid.uuid4().hex[:8]}",
+                system_message="You are an educational data analyst. Categorize student errors precisely."
             )
             
             result = llm.send_message_async([UserMessage(content=prompt)])
