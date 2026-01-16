@@ -168,6 +168,14 @@ function AppRouter() {
         }
       />
       <Route
+        path="/teacher/analytics"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <Analytics {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/teacher/students"
         element={
           <ProtectedRoute allowedRoles={["teacher"]}>
