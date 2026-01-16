@@ -309,7 +309,8 @@ export default function TeacherDashboard({ user }) {
                   {recentSubmissions.map((submission, index) => (
                     <div 
                       key={submission.submission_id}
-                      className="flex items-center justify-between p-3 lg:p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      className="flex items-center justify-between p-3 lg:p-4 rounded-lg bg-muted/50 hover:bg-muted hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => handleSubmissionClick(submission)}
                     >
                       <div className="flex items-center gap-2 lg:gap-3 min-w-0">
                         <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
