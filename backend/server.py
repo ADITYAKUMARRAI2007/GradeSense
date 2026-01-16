@@ -605,6 +605,129 @@ async def delete_notification(notification_id: str, user: User = Depends(get_cur
     return {"message": "Notification deleted"}
 
 
+
+@api_router.get("/dashboard/class-snapshot")
+async def get_class_snapshot(
+    batch_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """
+    Get overall class performance snapshot for dashboard
+    Returns: average score, pass rate, total exams, trends
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Build query
+    exam_query = {"teacher_id": user.user_id}
+    if batch_id:
+        exam_query["batch_id"] = batch_id
+    
+    # Get exams
+    exams = await db.exams.find(exam_query, {"_id": 0, "exam_id": 1, "exam_name": 1, "created_at": 1, "batch_id": 1}).to_list(100)
+    
+    if not exams:
+        return {
+            "batch_name": "No Batch Selected",
+            "total_students": 0,
+            "class_average": 0,
+            "pass_rate": 0,
+            "total_exams": 0,
+            "recent_exam": None,
+            "trend": 0,
+            "top_performers": [],
+            "struggling_students": []
+        }
+    
+    exam_ids = [e["exam_id"] for e in exams]
+    
+    # Get all submissions
+    submissions = await db.submissions.find(
+        {"exam_id": {"$in": exam_ids}},
+        {"_id": 0, "student_id": 1, "student_name": 1, "percentage": 1, "created_at": 1, "exam_id": 1}
+    ).to_list(10000)
+    
+    if not submissions:
+        return {
+            "batch_name": "No Data",
+            "total_students": 0,
+            "class_average": 0,
+            "pass_rate": 0,
+            "total_exams": len(exams),
+            "recent_exam": exams[0].get("exam_name") if exams else None,
+            "trend": 0,
+            "top_performers": [],
+            "struggling_students": []
+        }
+    
+    # Calculate metrics
+    total_students = len(set(s["student_id"] for s in submissions))
+    class_average = sum(s["percentage"] for s in submissions) / len(submissions)
+    pass_count = len([s for s in submissions if s["percentage"] >= 50])
+    pass_rate = (pass_count / len(submissions)) * 100 if submissions else 0
+    
+    # Get batch name
+    batch_name = "All Batches"
+    if batch_id:
+        batch = await db.batches.find_one({"batch_id": batch_id}, {"_id": 0, "name": 1})
+        batch_name = batch.get("name") if batch else "Unknown Batch"
+    
+    # Get recent exam
+    recent_exam = max(exams, key=lambda x: x.get("created_at", ""))
+    
+    # Calculate trend (compare last 3 exams vs previous 3)
+    sorted_exams = sorted(exams, key=lambda x: x.get("created_at", ""), reverse=True)
+    trend = 0
+    
+    if len(sorted_exams) >= 6:
+        recent_exam_ids = [e["exam_id"] for e in sorted_exams[:3]]
+        older_exam_ids = [e["exam_id"] for e in sorted_exams[3:6]]
+        
+        recent_subs = [s for s in submissions if s["exam_id"] in recent_exam_ids]
+        older_subs = [s for s in submissions if s["exam_id"] in older_exam_ids]
+        
+        if recent_subs and older_subs:
+            recent_avg = sum(s["percentage"] for s in recent_subs) / len(recent_subs)
+            older_avg = sum(s["percentage"] for s in older_subs) / len(older_subs)
+            trend = round(recent_avg - older_avg, 1)
+    
+    # Get top performers (by average)
+    student_averages = {}
+    for sub in submissions:
+        sid = sub["student_id"]
+        if sid not in student_averages:
+            student_averages[sid] = {"name": sub["student_name"], "scores": []}
+        student_averages[sid]["scores"].append(sub["percentage"])
+    
+    student_stats = []
+    for sid, data in student_averages.items():
+        avg = sum(data["scores"]) / len(data["scores"])
+        student_stats.append({
+            "student_id": sid,
+            "student_name": data["name"],
+            "average": round(avg, 1)
+        })
+    
+    student_stats.sort(key=lambda x: x["average"], reverse=True)
+    
+    top_performers = student_stats[:3]
+    struggling_students = [s for s in student_stats if s["average"] < 50][:3]
+    
+    return {
+        "batch_name": batch_name,
+        "total_students": total_students,
+        "class_average": round(class_average, 1),
+        "pass_rate": round(pass_rate, 1),
+        "total_exams": len(exams),
+        "recent_exam": recent_exam.get("exam_name", "Unknown"),
+        "recent_exam_date": recent_exam.get("created_at", ""),
+        "trend": trend,
+        "top_performers": top_performers,
+        "struggling_students": struggling_students
+    }
+
+
+
 async def create_notification(user_id: str, notification_type: str, title: str, message: str, link: str = None):
     """Helper function to create notifications"""
     notification_id = f"notif_{uuid.uuid4().hex[:12]}"
