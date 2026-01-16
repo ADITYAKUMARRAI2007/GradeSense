@@ -1345,10 +1345,10 @@ async def upload_more_papers(
                 "total_score": total_score,
                 "percentage": percentage
             })
-            logger.info(f"Successfully graded {file.filename} - Student: {student_name}, Score: {total_score}/{exam['total_marks']}")
+            logger.info(f"✓ Successfully graded {file.filename} - Student: {student_name}, Score: {total_score}/{exam['total_marks']}")
             
         except Exception as e:
-            logger.error(f"Error processing {file.filename}: {e}", exc_info=True)
+            logger.error(f"✗ Error processing {file.filename}: {e}", exc_info=True)
             errors.append({
                 "filename": file.filename,
                 "error": str(e)
