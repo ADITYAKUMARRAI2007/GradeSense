@@ -5581,6 +5581,517 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
         "strong_areas": [{"question": t["topic"], "score": f"{t['avg_score']}%"} for t in strong_topics]
     }
 
+
+
+# ============== NEW DRILL-DOWN ANALYTICS ==============
+
+@api_router.get("/analytics/drill-down/topic/{topic_name}")
+async def get_topic_drilldown(
+    topic_name: str,
+    exam_id: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """
+    Level 2 Drill-Down: Get detailed breakdown of a topic into sub-skills
+    Returns: Sub-skill performance, questions, and student groups
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Build query
+    exam_query = {"teacher_id": user.user_id}
+    if exam_id:
+        exam_query["exam_id"] = exam_id
+    if batch_id:
+        exam_query["batch_id"] = batch_id
+    
+    exams = await db.exams.find(exam_query, {"_id": 0}).to_list(50)
+    if not exams:
+        return {"sub_skills": [], "questions": [], "students": []}
+    
+    exam_ids = [e["exam_id"] for e in exams]
+    
+    # Get all questions related to this topic
+    questions_in_topic = []
+    for exam in exams:
+        for question in exam.get("questions", []):
+            topics = question.get("topic_tags", [])
+            if not topics:
+                # Fallback to subject name
+                subject = None
+                if exam.get("subject_id"):
+                    subject_doc = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+                    subject = subject_doc.get("name") if subject_doc else None
+                topics = [subject or "General"]
+            
+            if topic_name in topics:
+                questions_in_topic.append({
+                    "exam_id": exam["exam_id"],
+                    "exam_name": exam.get("exam_name", "Unknown"),
+                    "question_number": question.get("question_number"),
+                    "rubric": question.get("rubric", ""),
+                    "max_marks": question.get("max_marks", 0),
+                    "sub_questions": question.get("sub_questions", [])
+                })
+    
+    # Get submissions for these exams
+    submissions = await db.submissions.find(
+        {"exam_id": {"$in": exam_ids}},
+        {"_id": 0, "student_id": 1, "student_name": 1, "exam_id": 1, "question_scores": 1}
+    ).to_list(500)
+    
+    # Analyze sub-skills using AI
+    # Extract sub-skills from question rubrics
+    sub_skill_performance = {}
+    question_performance = {}
+    
+    for q in questions_in_topic:
+        q_key = f"{q['exam_id']}_{q['question_number']}"
+        question_performance[q_key] = {
+            "exam_name": q["exam_name"],
+            "question_number": q["question_number"],
+            "rubric": q["rubric"],
+            "max_marks": q["max_marks"],
+            "scores": [],
+            "avg_percentage": 0
+        }
+        
+        # Identify sub-skill from rubric (simplified - can be enhanced with AI)
+        rubric_lower = q["rubric"].lower()
+        sub_skill = "Concept Understanding"  # Default
+        
+        if any(word in rubric_lower for word in ["calculate", "compute", "find the value"]):
+            sub_skill = "Calculation"
+        elif any(word in rubric_lower for word in ["prove", "derive", "show that"]):
+            sub_skill = "Proof & Derivation"
+        elif any(word in rubric_lower for word in ["apply", "solve", "use"]):
+            sub_skill = "Application"
+        elif any(word in rubric_lower for word in ["explain", "describe", "define"]):
+            sub_skill = "Concept Understanding"
+        
+        if sub_skill not in sub_skill_performance:
+            sub_skill_performance[sub_skill] = {"scores": [], "question_count": 0}
+        
+        sub_skill_performance[sub_skill]["question_count"] += 1
+    
+    # Collect scores
+    for submission in submissions:
+        for qs in submission.get("question_scores", []):
+            q_key = f"{submission['exam_id']}_{qs.get('question_number')}"
+            if q_key in question_performance:
+                percentage = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+                question_performance[q_key]["scores"].append({
+                    "student_id": submission["student_id"],
+                    "student_name": submission["student_name"],
+                    "obtained": qs["obtained_marks"],
+                    "max": qs["max_marks"],
+                    "percentage": percentage,
+                    "feedback": qs.get("ai_feedback", "")
+                })
+    
+    # Calculate averages
+    for q_key, q_data in question_performance.items():
+        if q_data["scores"]:
+            q_data["avg_percentage"] = round(sum(s["percentage"] for s in q_data["scores"]) / len(q_data["scores"]), 1)
+    
+    # Aggregate sub-skill scores
+    for q in questions_in_topic:
+        q_key = f"{q['exam_id']}_{q['question_number']}"
+        if q_key in question_performance:
+            rubric_lower = q["rubric"].lower()
+            sub_skill = "Concept Understanding"
+            
+            if any(word in rubric_lower for word in ["calculate", "compute", "find the value"]):
+                sub_skill = "Calculation"
+            elif any(word in rubric_lower for word in ["prove", "derive", "show that"]):
+                sub_skill = "Proof & Derivation"
+            elif any(word in rubric_lower for word in ["apply", "solve", "use"]):
+                sub_skill = "Application"
+            elif any(word in rubric_lower for word in ["explain", "describe", "define"]):
+                sub_skill = "Concept Understanding"
+            
+            for score in question_performance[q_key]["scores"]:
+                sub_skill_performance[sub_skill]["scores"].append(score["percentage"])
+    
+    # Format sub-skills
+    sub_skills = []
+    for skill, data in sub_skill_performance.items():
+        if data["scores"]:
+            avg = round(sum(data["scores"]) / len(data["scores"]), 1)
+            sub_skills.append({
+                "name": skill,
+                "avg_percentage": avg,
+                "question_count": data["question_count"],
+                "color": "green" if avg >= 70 else "amber" if avg >= 50 else "red"
+            })
+    
+    # Get struggling students for this topic
+    student_performance = {}
+    for q_key, q_data in question_performance.items():
+        for score in q_data["scores"]:
+            sid = score["student_id"]
+            if sid not in student_performance:
+                student_performance[sid] = {
+                    "student_id": sid,
+                    "student_name": score["student_name"],
+                    "scores": []
+                }
+            student_performance[sid]["scores"].append(score["percentage"])
+    
+    struggling_students = []
+    for sid, data in student_performance.items():
+        avg = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
+        if avg < 60:  # Threshold for struggling
+            struggling_students.append({
+                "student_id": data["student_id"],
+                "student_name": data["student_name"],
+                "avg_percentage": round(avg, 1),
+                "attempts": len(data["scores"])
+            })
+    
+    # AI-generated insight
+    insight = f"Analysis shows {len(struggling_students)} students need attention in {topic_name}. "
+    if sub_skills:
+        weakest = min(sub_skills, key=lambda x: x["avg_percentage"])
+        insight += f"Weakest sub-skill: {weakest['name']} ({weakest['avg_percentage']}%)."
+    
+    return {
+        "topic": topic_name,
+        "insight": insight,
+        "sub_skills": sorted(sub_skills, key=lambda x: x["avg_percentage"]),
+        "questions": [q for q in question_performance.values()],
+        "struggling_students": struggling_students
+    }
+
+
+@api_router.get("/analytics/drill-down/question")
+async def get_question_drilldown(
+    exam_id: str,
+    question_number: int,
+    user: User = Depends(get_current_user)
+):
+    """
+    Level 3 Drill-Down: Get error patterns for a specific question
+    Returns: Student groups by error type
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get exam
+    exam = await db.exams.find_one(
+        {"exam_id": exam_id, "teacher_id": user.user_id},
+        {"_id": 0}
+    )
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get question details
+    question = None
+    for q in exam.get("questions", []):
+        if q.get("question_number") == question_number:
+            question = q
+            break
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    # Get all submissions for this exam
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "student_id": 1, "student_name": 1, "question_scores": 1, "file_images": 1}
+    ).to_list(1000)
+    
+    # Collect all answers for this question
+    student_answers = []
+    for submission in submissions:
+        for qs in submission.get("question_scores", []):
+            if qs.get("question_number") == question_number:
+                student_answers.append({
+                    "student_id": submission["student_id"],
+                    "student_name": submission["student_name"],
+                    "obtained_marks": qs["obtained_marks"],
+                    "max_marks": qs["max_marks"],
+                    "percentage": (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0,
+                    "feedback": qs.get("ai_feedback", ""),
+                    "answer_text": qs.get("answer_text", ""),
+                    "sub_scores": qs.get("sub_scores", [])
+                })
+    
+    # Group students by error patterns using AI
+    logger.info(f"Analyzing error patterns for Question {question_number} with {len(student_answers)} answers")
+    
+    # Separate into performance groups
+    failed_answers = [a for a in student_answers if a["percentage"] < 50]
+    passed_answers = [a for a in student_answers if a["percentage"] >= 50]
+    blank_answers = [a for a in student_answers if a["obtained_marks"] == 0]
+    
+    # Use AI to categorize errors for failed students
+    error_groups = {}
+    
+    if failed_answers:
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            
+            # Prepare feedback summary for AI
+            feedback_samples = [f"Student {a['student_name']}: {a['feedback'][:200]}" for a in failed_answers[:10]]
+            
+            prompt = f"""
+Analyze these student errors for Question {question_number}:
+
+Question: {question.get('rubric', '')}
+Max Marks: {question.get('max_marks', 0)}
+
+Failed Student Feedbacks:
+{chr(10).join(feedback_samples)}
+
+Task: Identify 3-4 common error patterns/categories. For each category, provide:
+1. Error type name (e.g., "Calculation Error", "Conceptual Misunderstanding", "Incomplete Answer")
+2. Brief description
+3. Which students fall into this category (by name)
+
+Respond in JSON format:
+{{
+    "error_categories": [
+        {{
+            "type": "Calculation Error",
+            "description": "Made arithmetic mistakes",
+            "student_names": ["Alice", "Bob"]
+        }}
+    ]
+}}
+"""
+            
+            llm = LlmChat(
+                model_name="gemini-2.0-flash-exp",
+                system_prompt="You are an educational data analyst. Categorize student errors precisely.",
+                api_key=os.environ.get("EMERGENT_API_KEY")
+            )
+            
+            result = llm.send_message_async([UserMessage(content=prompt)])
+            import json
+            import re
+            
+            # Extract JSON from response
+            response_text = result.text if hasattr(result, 'text') else str(result)
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            
+            if json_match:
+                error_analysis = json.loads(json_match.group())
+                
+                # Map students to categories
+                for category in error_analysis.get("error_categories", []):
+                    error_type = category["type"]
+                    error_groups[error_type] = {
+                        "description": category["description"],
+                        "students": []
+                    }
+                    
+                    # Find students matching this category
+                    for answer in failed_answers:
+                        if answer["student_name"] in category.get("student_names", []):
+                            error_groups[error_type]["students"].append({
+                                "student_id": answer["student_id"],
+                                "student_name": answer["student_name"],
+                                "score": answer["obtained_marks"],
+                                "feedback": answer["feedback"]
+                            })
+            
+        except Exception as e:
+            logger.error(f"Error in AI error grouping: {e}")
+            # Fallback grouping
+            error_groups = {
+                "Low Scorers": {
+                    "description": "Students who scored below 50%",
+                    "students": [{
+                        "student_id": a["student_id"],
+                        "student_name": a["student_name"],
+                        "score": a["obtained_marks"],
+                        "feedback": a["feedback"]
+                    } for a in failed_answers]
+                }
+            }
+    
+    # Add blank/not attempted group
+    if blank_answers:
+        error_groups["Not Attempted / Blank"] = {
+            "description": "Students who left the question blank or scored 0",
+            "students": [{
+                "student_id": a["student_id"],
+                "student_name": a["student_name"],
+                "score": 0,
+                "feedback": "No answer provided"
+            } for a in blank_answers]
+        }
+    
+    # Calculate statistics
+    total_students = len(student_answers)
+    avg_score = sum(a["percentage"] for a in student_answers) / total_students if total_students > 0 else 0
+    pass_count = len([a for a in student_answers if a["percentage"] >= 50])
+    
+    return {
+        "question": {
+            "number": question_number,
+            "rubric": question.get("rubric", ""),
+            "max_marks": question.get("max_marks", 0)
+        },
+        "statistics": {
+            "total_students": total_students,
+            "avg_percentage": round(avg_score, 1),
+            "pass_count": pass_count,
+            "fail_count": total_students - pass_count,
+            "blank_count": len(blank_answers)
+        },
+        "error_groups": [
+            {
+                "type": error_type,
+                "description": data["description"],
+                "count": len(data["students"]),
+                "students": data["students"]
+            }
+            for error_type, data in error_groups.items()
+        ],
+        "top_performers": sorted(
+            [{
+                "student_name": a["student_name"],
+                "score": a["obtained_marks"],
+                "max_marks": a["max_marks"]
+            } for a in passed_answers],
+            key=lambda x: x["score"],
+            reverse=True
+        )[:5]
+    }
+
+
+@api_router.get("/analytics/student-journey/{student_id}")
+async def get_student_journey(
+    student_id: str,
+    user: User = Depends(get_current_user)
+):
+    """
+    Student Journey View: Complete academic health record with comparisons
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Get student info
+    student = await db.users.find_one({"user_id": student_id}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Get all submissions for this student
+    submissions = await db.submissions.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    if not submissions:
+        return {
+            "student": student,
+            "performance_trend": [],
+            "vs_class_avg": [],
+            "blind_spots": [],
+            "strengths": []
+        }
+    
+    # Sort by date
+    submissions.sort(key=lambda x: x.get("created_at", ""))
+    
+    # Build performance trend
+    performance_trend = []
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "exam_name": 1})
+        performance_trend.append({
+            "exam_name": exam.get("exam_name", "Unknown") if exam else "Unknown",
+            "date": sub.get("created_at", ""),
+            "percentage": sub["percentage"],
+            "score": sub["total_score"]
+        })
+    
+    # Calculate class averages for comparison
+    exam_ids = [s["exam_id"] for s in submissions]
+    class_averages = {}
+    
+    for exam_id in exam_ids:
+        all_submissions = await db.submissions.find(
+            {"exam_id": exam_id},
+            {"_id": 0, "percentage": 1}
+        ).to_list(1000)
+        
+        if all_submissions:
+            avg = sum(s["percentage"] for s in all_submissions) / len(all_submissions)
+            class_averages[exam_id] = round(avg, 1)
+    
+    # Add class average to trend
+    vs_class_avg = []
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "exam_name": 1})
+        vs_class_avg.append({
+            "exam_name": exam.get("exam_name", "Unknown") if exam else "Unknown",
+            "student_score": sub["percentage"],
+            "class_avg": class_averages.get(sub["exam_id"], 0),
+            "difference": round(sub["percentage"] - class_averages.get(sub["exam_id"], 0), 1)
+        })
+    
+    # Identify blind spots (topics with consistent low performance)
+    topic_performance = {}
+    
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "questions": 1})
+        if not exam:
+            continue
+        
+        question_topics = {}
+        for q in exam.get("questions", []):
+            topics = q.get("topic_tags", ["General"])
+            question_topics[q.get("question_number")] = topics
+        
+        for qs in sub.get("question_scores", []):
+            q_num = qs.get("question_number")
+            topics = question_topics.get(q_num, ["General"])
+            percentage = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+            
+            for topic in topics:
+                if topic not in topic_performance:
+                    topic_performance[topic] = []
+                topic_performance[topic].append(percentage)
+    
+    # Calculate blind spots (avg < 50%)
+    blind_spots = []
+    strengths = []
+    
+    for topic, scores in topic_performance.items():
+        avg = sum(scores) / len(scores)
+        data = {
+            "topic": topic,
+            "avg_score": round(avg, 1),
+            "attempts": len(scores)
+        }
+        
+        if avg < 50:
+            blind_spots.append(data)
+        elif avg >= 70:
+            strengths.append(data)
+    
+    return {
+        "student": {
+            "name": student.get("name", "Unknown"),
+            "email": student.get("email", ""),
+            "student_id": student.get("student_id", "")
+        },
+        "overall_stats": {
+            "total_exams": len(submissions),
+            "avg_percentage": round(sum(s["percentage"] for s in submissions) / len(submissions), 1),
+            "highest": max(s["percentage"] for s in submissions),
+            "lowest": min(s["percentage"] for s in submissions)
+        },
+        "performance_trend": performance_trend,
+        "vs_class_avg": vs_class_avg,
+        "blind_spots": sorted(blind_spots, key=lambda x: x["avg_score"]),
+        "strengths": sorted(strengths, key=lambda x: x["avg_score"], reverse=True)
+    }
+
+
 # ============== STUDY MATERIALS (STUDENT) ==============
 
 @api_router.get("/study-materials")
