@@ -6474,6 +6474,7 @@ async def send_peer_group_email(
     return {
         "success": True,
         "message": "Notifications sent to both students"
+    }
 
 
 # ============== NATURAL LANGUAGE QUERY (Ask Your Data) ==============
