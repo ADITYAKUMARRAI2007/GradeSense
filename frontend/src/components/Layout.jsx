@@ -39,6 +39,7 @@ const teacherNavItems = [
     label: "Analytics", 
     isGroup: true,
     children: [
+      { icon: BarChart3, label: "Data Studio", path: "/teacher/analytics" },
       { icon: BarChart3, label: "Class Reports", path: "/teacher/reports" },
       { icon: Lightbulb, label: "Insights", path: "/teacher/insights" },
     ]
