@@ -5862,18 +5862,19 @@ Respond in JSON format:
 }}
 """
             
-            llm = LlmChat(
+            chat = LlmChat(
                 api_key=os.environ.get("EMERGENT_API_KEY"),
                 session_id=f"error_group_{uuid.uuid4().hex[:8]}",
                 system_message="You are an educational data analyst. Categorize student errors precisely."
-            )
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
-            result = llm.send_message_async([UserMessage(content=prompt)])
+            user_message = UserMessage(text=prompt)
+            response = await chat.send_message(user_message)
             import json
             import re
             
             # Extract JSON from response
-            response_text = result.text if hasattr(result, 'text') else str(result)
+            response_text = response.strip()
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             
             if json_match:
