@@ -511,58 +511,150 @@ export default function Analytics({ user }) {
                     <p>No data available. Select an exam or batch with graded submissions.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Radar Chart */}
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={radarData}>
-                          <PolarGrid />
-                          <PolarAngleAxis dataKey="topic" />
-                          <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                          <Radar
-                            name="Score"
-                            dataKey="score"
-                            stroke="#F97316"
-                            fill="#F97316"
-                            fillOpacity={0.6}
-                          />
-                          <Tooltip />
-                        </RadarChart>
-                      </ResponsiveContainer>
+                  <>
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-muted-foreground">Topics Analyzed</p>
+                        <p className="text-2xl font-bold text-blue-700">{topicMastery.topics.length}</p>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-sm text-muted-foreground">Avg Performance</p>
+                        <p className="text-2xl font-bold text-green-700">
+                          {topicMastery.topics.length > 0 
+                            ? Math.round(topicMastery.topics.reduce((sum, t) => sum + t.avg_percentage, 0) / topicMastery.topics.length)
+                            : 0}%
+                        </p>
+                      </div>
+                      <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <p className="text-sm text-muted-foreground">Needs Attention</p>
+                        <p className="text-2xl font-bold text-amber-700">
+                          {topicMastery.topics.filter(t => t.color === 'red').length}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Topic Cards */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {topicMastery.topics.slice(0, 6).map((topic, idx) => (
-                        <div
-                          key={idx}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${
-                            topic.color === 'green' ? 'bg-green-50 border-green-300 hover:border-green-500' :
-                            topic.color === 'amber' ? 'bg-amber-50 border-amber-300 hover:border-amber-500' :
-                            'bg-red-50 border-red-300 hover:border-red-500'
-                          }`}
-                          onClick={() => handleTopicClick(topic)}
-                        >
-                          <p className="font-medium text-sm truncate mb-1" title={topic.topic}>
-                            {topic.topic}
-                          </p>
-                          <p className={`text-2xl font-bold ${
-                            topic.color === 'green' ? 'text-green-700' :
-                            topic.color === 'amber' ? 'text-amber-700' :
-                            'text-red-700'
-                          }`}>
-                            {topic.avg_percentage}%
-                          </p>
-                          <div className="flex items-center justify-between mt-2">
-                            <Badge variant="outline" className="text-xs">
-                              {topic.question_count} Q
-                            </Badge>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          </div>
+                    {/* Adaptive Visualization */}
+                    {topicMastery.topics.length >= 5 ? (
+                      // Show Radar Chart for 5+ topics
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="h-80">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart data={radarData}>
+                              <PolarGrid />
+                              <PolarAngleAxis dataKey="topic" />
+                              <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                              <Radar
+                                name="Score"
+                                dataKey="score"
+                                stroke="#F97316"
+                                fill="#F97316"
+                                fillOpacity={0.6}
+                              />
+                              <Tooltip />
+                            </RadarChart>
+                          </ResponsiveContainer>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          {topicMastery.topics.slice(0, 6).map((topic, idx) => (
+                            <div
+                              key={idx}
+                              className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${
+                                topic.color === 'green' ? 'bg-green-50 border-green-300 hover:border-green-500' :
+                                topic.color === 'amber' ? 'bg-amber-50 border-amber-300 hover:border-amber-500' :
+                                'bg-red-50 border-red-300 hover:border-red-500'
+                              }`}
+                              onClick={() => handleTopicClick(topic)}
+                            >
+                              <p className="font-medium text-sm truncate mb-1" title={topic.topic}>
+                                {topic.topic}
+                              </p>
+                              <p className={`text-2xl font-bold ${
+                                topic.color === 'green' ? 'text-green-700' :
+                                topic.color === 'amber' ? 'text-amber-700' :
+                                'text-red-700'
+                              }`}>
+                                {topic.avg_percentage}%
+                              </p>
+                              <div className="flex items-center justify-between mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {topic.question_count} Q
+                                </Badge>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      // Show Progress Bars for <5 topics (Better for limited data)
+                      <div className="space-y-3">
+                        {topicMastery.topics.map((topic, idx) => (
+                          <div
+                            key={idx}
+                            className="p-4 bg-white border rounded-lg hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => handleTopicClick(topic)}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <span className="font-semibold text-lg">{topic.topic}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {topic.question_count} questions
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-2xl font-bold ${
+                                  topic.color === 'green' ? 'text-green-600' :
+                                  topic.color === 'amber' ? 'text-amber-600' :
+                                  'text-red-600'
+                                }`}>
+                                  {topic.avg_percentage}%
+                                </span>
+                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                              </div>
+                            </div>
+                            
+                            {/* Progress Bar */}
+                            <div className="relative">
+                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${
+                                    topic.color === 'green' ? 'bg-green-500' :
+                                    topic.color === 'amber' ? 'bg-amber-500' :
+                                    'bg-red-500'
+                                  }`}
+                                  style={{ width: `${topic.avg_percentage}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                <span>0%</span>
+                                <span>50%</span>
+                                <span>100%</span>
+                              </div>
+                            </div>
+
+                            {/* Status indicator */}
+                            <div className="mt-2 flex items-center gap-2">
+                              {topic.color === 'green' && (
+                                <Badge className="bg-green-100 text-green-700">✓ Strong Performance</Badge>
+                              )}
+                              {topic.color === 'amber' && (
+                                <Badge className="bg-amber-100 text-amber-700">⚠ Needs Practice</Badge>
+                              )}
+                              {topic.color === 'red' && (
+                                <Badge className="bg-red-100 text-red-700">⚠ Critical - Needs Attention</Badge>
+                              )}
+                              {topic.struggling_count > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  {topic.struggling_count} students struggling
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
