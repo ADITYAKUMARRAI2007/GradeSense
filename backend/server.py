@@ -5051,13 +5051,16 @@ async def get_topic_mastery(
             # Get topic tags - use AI-inferred or manually set topics
             topics = question.get("topic_tags", [])
             
-            # If no topic tags, create a generic topic based on exam subject
+            # If no topic tags, extract from rubric using keyword matching
             if not topics:
                 subject = None
                 if exam.get("subject_id"):
                     subject_doc = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
                     subject = subject_doc.get("name") if subject_doc else None
-                topics = [subject or "General"]
+                
+                # Extract topic from rubric
+                extracted_topic = extract_topic_from_rubric(rubric, subject or "General")
+                topics = [extracted_topic]
             
             for topic in topics:
                 if topic not in topic_data:
