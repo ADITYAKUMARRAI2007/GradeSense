@@ -55,6 +55,29 @@ export default function NotificationDropdown({ user }) {
       toast.error("Failed to process notification");
     }
   };
+  
+  const markAllAsRead = async () => {
+    try {
+      await axios.put(`${API}/notifications/mark-all-read`);
+      toast.success("All notifications marked as read");
+      fetchNotifications();
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+      toast.error("Failed to mark notifications as read");
+    }
+  };
+  
+  const clearAllNotifications = async () => {
+    try {
+      await axios.delete(`${API}/notifications/clear-all`);
+      toast.success("All notifications cleared");
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+      toast.error("Failed to clear notifications");
+    }
+  };
 
   const getNotificationIcon = (type) => {
     switch (type) {
