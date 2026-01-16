@@ -6474,6 +6474,298 @@ async def send_peer_group_email(
     return {
         "success": True,
         "message": "Notifications sent to both students"
+
+
+# ============== NATURAL LANGUAGE QUERY (Ask Your Data) ==============
+
+class NaturalLanguageQuery(BaseModel):
+    query: str
+    batch_id: Optional[str] = None
+    exam_id: Optional[str] = None
+    subject_id: Optional[str] = None
+
+@api_router.post("/analytics/ask")
+async def ask_your_data(
+    request: NaturalLanguageQuery,
+    user: User = Depends(get_current_user)
+):
+    """
+    Natural Language Query: Ask questions in plain English and get visualizations
+    Examples:
+    - "Show me top 5 students in Math"
+    - "Compare performance of boys vs girls"
+    - "Who failed in Question 3?"
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    logger.info(f"NL Query: '{request.query}' from user {user.user_id}")
+    
+    # Step 1: Get context data for the teacher
+    context_data = {}
+    
+    # Get teacher's batches
+    batches = await db.batches.find({"teacher_id": user.user_id}, {"_id": 0, "batch_id": 1, "name": 1}).to_list(100)
+    context_data["batches"] = [{"id": b["batch_id"], "name": b["name"]} for b in batches]
+    
+    # Get teacher's subjects
+    subjects = await db.subjects.find({"teacher_id": user.user_id}, {"_id": 0, "subject_id": 1, "name": 1}).to_list(100)
+    context_data["subjects"] = [{"id": s["subject_id"], "name": s["name"]} for s in subjects]
+    
+    # Get teacher's exams
+    exam_query = {"teacher_id": user.user_id}
+    if request.batch_id:
+        exam_query["batch_id"] = request.batch_id
+    if request.exam_id:
+        exam_query["exam_id"] = request.exam_id
+    if request.subject_id:
+        exam_query["subject_id"] = request.subject_id
+    
+    exams = await db.exams.find(exam_query, {"_id": 0, "exam_id": 1, "exam_name": 1, "batch_id": 1, "subject_id": 1}).to_list(100)
+    context_data["exams"] = [{"id": e["exam_id"], "name": e["exam_name"]} for e in exams]
+    
+    # Get submissions for context
+    exam_ids = [e["exam_id"] for e in exams]
+    if not exam_ids:
+        return {
+            "type": "error",
+            "message": "No exams found. Please create and grade some exams first."
+        }
+    
+    submissions = await db.submissions.find(
+        {"exam_id": {"$in": exam_ids}},
+        {"_id": 0, "submission_id": 1, "exam_id": 1, "student_id": 1, "student_name": 1, "total_score": 1, "percentage": 1, "question_scores": 1}
+    ).to_list(1000)
+    
+    context_data["total_submissions"] = len(submissions)
+    context_data["total_students"] = len(set(s["student_id"] for s in submissions))
+    
+    # Step 2: Use AI to parse the query and determine what data to fetch
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        prompt = f"""
+You are a data analyst for a teacher. Parse the natural language query and return a structured JSON response.
+
+Teacher's Context:
+- Batches: {', '.join([b['name'] for b in context_data['batches']])}
+- Subjects: {', '.join([s['name'] for s in context_data['subjects']])}
+- Total Students: {context_data['total_students']}
+- Total Submissions: {context_data['total_submissions']}
+
+Teacher's Query: "{request.query}"
+
+Your task:
+1. Understand the intent
+2. Determine what data to show
+3. Choose the best visualization type
+4. Return ONLY valid JSON (no markdown, no explanations)
+
+Available chart types: "bar", "table", "pie", "comparison"
+
+Response Format (JSON only, no markdown):
+{{
+    "intent": "show_top_students | compare_groups | show_failures | show_distribution | other",
+    "chart_type": "bar | table | pie | comparison",
+    "data_query": {{
+        "entity": "students | questions | topics",
+        "filter": {{
+            "subject": "Math" (if mentioned),
+            "question_number": 3 (if mentioned),
+            "performance": "failed | passed | top" (if mentioned)
+        }},
+        "group_by": "batch | gender | topic" (if comparison),
+        "limit": 5 (if top N mentioned)
+    }},
+    "chart_config": {{
+        "title": "Top 5 Students in Math",
+        "xAxis": "student_name",
+        "yAxis": "score",
+        "description": "Brief explanation of what this shows"
+    }}
+}}
+
+If the query is unclear or impossible to answer, return:
+{{
+    "intent": "error",
+    "chart_type": "error",
+    "message": "Explanation of why this cannot be answered"
+}}
+"""
+        
+        llm = LlmChat(
+            model_name="gemini-2.0-flash-exp",
+            system_prompt="You are a precise data analyst. Return ONLY valid JSON, no markdown formatting.",
+            api_key=os.environ.get("EMERGENT_API_KEY")
+        )
+        
+        result = llm.send_message_async([UserMessage(content=prompt)])
+        response_text = result.text if hasattr(result, 'text') else str(result)
+        
+        # Clean response
+        import re
+        response_text = response_text.strip()
+        response_text = re.sub(r'^```json\s*', '', response_text)
+        response_text = re.sub(r'\s*```$', '', response_text)
+        
+        query_intent = json.loads(response_text)
+        
+        # Handle error from AI
+        if query_intent.get("intent") == "error":
+            return {
+                "type": "error",
+                "message": query_intent.get("message", "Could not understand the query")
+            }
+        
+    except Exception as e:
+        logger.error(f"Error parsing NL query with AI: {e}")
+        return {
+            "type": "error",
+            "message": f"Failed to parse query: {str(e)}"
+        }
+    
+    # Step 3: Fetch actual data based on AI's interpretation
+    try:
+        data_query = query_intent.get("data_query", {})
+        entity = data_query.get("entity", "students")
+        filters = data_query.get("filter", {})
+        limit = data_query.get("limit", 10)
+        
+        result_data = []
+        
+        # Query: Top/Bottom Students
+        if entity == "students":
+            # Filter submissions
+            filtered_submissions = submissions
+            
+            # Filter by subject if mentioned
+            if "subject" in filters:
+                subject_name = filters["subject"]
+                subject_doc = await db.subjects.find_one(
+                    {"name": {"$regex": subject_name, "$options": "i"}, "teacher_id": user.user_id},
+                    {"_id": 0, "subject_id": 1}
+                )
+                if subject_doc:
+                    subject_exams = [e["exam_id"] for e in exams if e.get("subject_id") == subject_doc["subject_id"]]
+                    filtered_submissions = [s for s in filtered_submissions if s["exam_id"] in subject_exams]
+            
+            # Filter by performance
+            if filters.get("performance") == "failed":
+                filtered_submissions = [s for s in filtered_submissions if s["percentage"] < 50]
+            elif filters.get("performance") == "passed":
+                filtered_submissions = [s for s in filtered_submissions if s["percentage"] >= 50]
+            elif filters.get("performance") == "top":
+                filtered_submissions = sorted(filtered_submissions, key=lambda x: x["percentage"], reverse=True)[:limit]
+            
+            # Aggregate by student
+            student_aggregates = {}
+            for sub in filtered_submissions:
+                sid = sub["student_id"]
+                if sid not in student_aggregates:
+                    student_aggregates[sid] = {
+                        "student_name": sub["student_name"],
+                        "total_score": 0,
+                        "count": 0,
+                        "percentages": []
+                    }
+                student_aggregates[sid]["total_score"] += sub["total_score"]
+                student_aggregates[sid]["count"] += 1
+                student_aggregates[sid]["percentages"].append(sub["percentage"])
+            
+            # Calculate averages
+            for sid, data in student_aggregates.items():
+                avg_percentage = sum(data["percentages"]) / len(data["percentages"]) if data["percentages"] else 0
+                result_data.append({
+                    "student_name": data["student_name"],
+                    "avg_score": round(avg_percentage, 1),
+                    "exams_taken": data["count"]
+                })
+            
+            # Sort and limit
+            result_data = sorted(result_data, key=lambda x: x["avg_score"], reverse=True)[:limit]
+        
+        # Query: Question Analysis
+        elif entity == "questions":
+            question_num = filters.get("question_number")
+            
+            if question_num:
+                # Get all answers for this question
+                question_data = []
+                for sub in submissions:
+                    for qs in sub.get("question_scores", []):
+                        if qs.get("question_number") == question_num:
+                            percentage = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+                            
+                            # Filter by performance
+                            if filters.get("performance") == "failed" and percentage >= 50:
+                                continue
+                            
+                            question_data.append({
+                                "student_name": sub["student_name"],
+                                "score": qs["obtained_marks"],
+                                "max_marks": qs["max_marks"],
+                                "percentage": round(percentage, 1)
+                            })
+                
+                result_data = sorted(question_data, key=lambda x: x["percentage"])[:limit]
+        
+        # Query: Topic Performance
+        elif entity == "topics":
+            # Aggregate by topic
+            topic_performance = {}
+            
+            for sub in submissions:
+                exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "questions": 1})
+                if not exam:
+                    continue
+                
+                question_topics = {}
+                for q in exam.get("questions", []):
+                    topics = q.get("topic_tags", ["General"])
+                    question_topics[q.get("question_number")] = topics
+                
+                for qs in sub.get("question_scores", []):
+                    q_num = qs.get("question_number")
+                    topics = question_topics.get(q_num, ["General"])
+                    percentage = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+                    
+                    for topic in topics:
+                        if topic not in topic_performance:
+                            topic_performance[topic] = []
+                        topic_performance[topic].append(percentage)
+            
+            # Calculate averages
+            for topic, scores in topic_performance.items():
+                avg = sum(scores) / len(scores) if scores else 0
+                result_data.append({
+                    "topic": topic,
+                    "avg_score": round(avg, 1),
+                    "sample_size": len(scores)
+                })
+            
+            result_data = sorted(result_data, key=lambda x: x["avg_score"], reverse=True)[:limit]
+        
+        # Step 4: Return structured response
+        chart_config = query_intent.get("chart_config", {})
+        
+        return {
+            "type": query_intent.get("chart_type", "table"),
+            "title": chart_config.get("title", "Query Results"),
+            "description": chart_config.get("description", ""),
+            "xAxis": chart_config.get("xAxis", "name"),
+            "yAxis": chart_config.get("yAxis", "value"),
+            "data": result_data,
+            "query_intent": query_intent.get("intent", "unknown")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing data query: {e}")
+        return {
+            "type": "error",
+            "message": f"Failed to fetch data: {str(e)}"
+        }
+
+
     }
 
 
