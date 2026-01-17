@@ -63,10 +63,12 @@ export default function ReviewPapers({ user }) {
   const [feedbackForm, setFeedbackForm] = useState({
     feedback_type: "question_grading",
     teacher_expected_grade: "",
-    teacher_correction: ""
+    teacher_correction: "",
+    selected_sub_question: "all" // "all" or specific sub_id
   });
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [applyToBatch, setApplyToBatch] = useState(false);
+  const [applyToAllPapers, setApplyToAllPapers] = useState(false); // New: Apply correction to all students
   const [extractingQuestions, setExtractingQuestions] = useState(false);
 
   useEffect(() => {
