@@ -74,6 +74,15 @@ export default function TeacherDashboard({ user }) {
     }
   };
   
+  const fetchBatches = async () => {
+    try {
+      const response = await axios.get(`${API}/batches`);
+      setBatches(response.data);
+    } catch (error) {
+      console.error("Error fetching batches:", error);
+    }
+  };
+  
   const handleSubmissionClick = async (submission) => {
     // Navigate directly to ReviewPapers page with filters for this specific submission
     navigate(`/teacher/review?exam=${submission.exam_id}&student=${submission.student_id}`);
