@@ -227,32 +227,8 @@ export default function TeacherDashboard({ user }) {
           </div>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-3 lg:gap-4">
-          {statCards.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <Card 
-                key={stat.label} 
-                className="card-hover animate-fade-in"
-                style={{ animationDelay: `${index * 0.1}s` }}
-                data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs lg:text-sm text-muted-foreground truncate">{stat.label}</p>
-                      <p className="text-xl lg:text-3xl font-bold mt-1">{stat.value}</p>
-                    </div>
-                    <div className={`p-2 lg:p-3 rounded-xl ${stat.bgColor} flex-shrink-0 ml-2`}>
-                      <Icon className={`w-4 h-4 lg:w-6 lg:h-6 ${stat.color}`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {/* New Actionable Dashboard Stats */}
+        <DashboardStats batches={batches} />
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
