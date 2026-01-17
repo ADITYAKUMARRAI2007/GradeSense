@@ -1258,13 +1258,13 @@ export default function ReviewPapers({ user }) {
           
           {feedbackQuestion && (
             <div className="space-y-4 pb-4">
+              {/* Question Header */}
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium mb-1">Question {feedbackQuestion.question_number}</p>
                 {feedbackQuestion.question_text && (
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {(() => {
                       let text = feedbackQuestion.question_text;
-                      // Handle nested object structure
                       if (typeof text === 'object' && text !== null) {
                         text = text.rubric || text.question_text || JSON.stringify(text);
                       }
@@ -1274,153 +1274,153 @@ export default function ReviewPapers({ user }) {
                 )}
               </div>
 
-              {/* Sub-Question Selector */}
-              {feedbackQuestion.sub_scores && feedbackQuestion.sub_scores.length > 0 && (
-                <div>
-                  <Label className="text-xs">Select Part/Sub-Question</Label>
-                  <Select 
-                    value={feedbackForm.selected_sub_question}
-                    onValueChange={(v) => {
-                      setFeedbackForm(prev => ({ ...prev, selected_sub_question: v }));
-                      // Update expected grade when sub-question changes
-                      if (v === "all") {
-                        setFeedbackForm(prev => ({ 
-                          ...prev, 
-                          teacher_expected_grade: feedbackQuestion.obtained_marks.toString() 
-                        }));
-                      } else {
-                        const subScore = feedbackQuestion.sub_scores.find(s => s.sub_id === v);
-                        if (subScore) {
-                          setFeedbackForm(prev => ({ 
-                            ...prev, 
-                            teacher_expected_grade: subScore.obtained_marks.toString() 
-                          }));
-                        }
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">
-                        <span className="font-medium">Whole Question</span>
-                        <span className="text-xs text-muted-foreground ml-2">
-                          ({feedbackQuestion.obtained_marks}/{feedbackQuestion.max_marks} marks)
-                        </span>
-                      </SelectItem>
-                      {feedbackQuestion.sub_scores.map((subScore, idx) => {
-                        const examQuestion = examQuestions.find(q => q.question_number === feedbackQuestion.question_number);
-                        const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
-                        const subLabel = examSubQuestion?.sub_label || `Part ${idx + 1}`;
-                        
-                        return (
-                          <SelectItem key={subScore.sub_id} value={subScore.sub_id}>
-                            <span className="font-medium">{subLabel}</span>
+              {/* Multiple Corrections */}
+              {feedbackCorrections.map((correction, index) => (
+                <div key={correction.id} className="p-4 border-2 border-orange-200 rounded-lg bg-orange-50/30 space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-orange-700">
+                      Correction {index + 1}
+                    </h4>
+                    {feedbackCorrections.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeCorrection(correction.id)}
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Sub-Question Selector */}
+                  {feedbackQuestion.sub_scores && feedbackQuestion.sub_scores.length > 0 && (
+                    <div>
+                      <Label className="text-xs">Select Part/Sub-Question</Label>
+                      <Select 
+                        value={correction.selected_sub_question}
+                        onValueChange={(v) => {
+                          updateCorrection(correction.id, 'selected_sub_question', v);
+                          if (v === "all") {
+                            updateCorrection(correction.id, 'teacher_expected_grade', feedbackQuestion.obtained_marks.toString());
+                          } else {
+                            const subScore = feedbackQuestion.sub_scores.find(s => s.sub_id === v);
+                            if (subScore) {
+                              updateCorrection(correction.id, 'teacher_expected_grade', subScore.obtained_marks.toString());
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            <span className="font-medium">Whole Question</span>
                             <span className="text-xs text-muted-foreground ml-2">
-                              ({subScore.obtained_marks}/{subScore.max_marks} marks)
+                              ({feedbackQuestion.obtained_marks}/{feedbackQuestion.max_marks} marks)
                             </span>
                           </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Choose a specific sub-question or provide feedback for the whole question
-                  </p>
-                </div>
-              )}
+                          {feedbackQuestion.sub_scores.map((subScore, idx) => {
+                            const examQuestion = examQuestions.find(q => q.question_number === feedbackQuestion.question_number);
+                            const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
+                            const subLabel = examSubQuestion?.sub_label || `Part ${idx + 1}`;
+                            
+                            return (
+                              <SelectItem key={subScore.sub_id} value={subScore.sub_id}>
+                                <span className="font-medium">{subLabel}</span>
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  ({subScore.obtained_marks}/{subScore.max_marks} marks)
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">AI Grade</Label>
-                  <div className="p-2 bg-muted rounded text-center font-medium">
-                    {(() => {
-                      // Show grade for selected sub-question or whole question
-                      if (feedbackForm.selected_sub_question === "all") {
-                        return `${feedbackQuestion.obtained_marks} / ${feedbackQuestion.max_marks}`;
-                      } else {
-                        const subScore = feedbackQuestion.sub_scores?.find(
-                          s => s.sub_id === feedbackForm.selected_sub_question
-                        );
-                        return subScore 
-                          ? `${subScore.obtained_marks} / ${subScore.max_marks}`
-                          : `${feedbackQuestion.obtained_marks} / ${feedbackQuestion.max_marks}`;
-                      }
-                    })()}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">AI Grade</Label>
+                      <div className="p-2 bg-white rounded text-center font-medium border">
+                        {(() => {
+                          if (correction.selected_sub_question === "all") {
+                            return `${feedbackQuestion.obtained_marks} / ${feedbackQuestion.max_marks}`;
+                          } else {
+                            const subScore = feedbackQuestion.sub_scores?.find(
+                              s => s.sub_id === correction.selected_sub_question
+                            );
+                            return subScore 
+                              ? `${subScore.obtained_marks} / ${subScore.max_marks}`
+                              : `${feedbackQuestion.obtained_marks} / ${feedbackQuestion.max_marks}`;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Your Expected Grade</Label>
+                      <Input 
+                        type="number"
+                        min="0"
+                        max={(() => {
+                          if (correction.selected_sub_question === "all") {
+                            return feedbackQuestion.max_marks;
+                          } else {
+                            const subScore = feedbackQuestion.sub_scores?.find(
+                              s => s.sub_id === correction.selected_sub_question
+                            );
+                            return subScore?.max_marks || feedbackQuestion.max_marks;
+                          }
+                        })()}
+                        step="0.5"
+                        value={correction.teacher_expected_grade}
+                        onChange={(e) => updateCorrection(correction.id, 'teacher_expected_grade', e.target.value)}
+                        className="text-center"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">AI&apos;s Feedback</Label>
+                    <div className="p-2 bg-white rounded text-xs text-muted-foreground max-h-16 overflow-y-auto border">
+                      {(() => {
+                        if (correction.selected_sub_question === "all") {
+                          return feedbackQuestion.ai_feedback || "No AI feedback available";
+                        } else {
+                          const subScore = feedbackQuestion.sub_scores?.find(
+                            s => s.sub_id === correction.selected_sub_question
+                          );
+                          return subScore?.ai_feedback || feedbackQuestion.ai_feedback || "No AI feedback available";
+                        }
+                      })()}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Your Correction / Feedback *</Label>
+                    <Textarea 
+                      value={correction.teacher_correction}
+                      onChange={(e) => updateCorrection(correction.id, 'teacher_correction', e.target.value)}
+                      placeholder="Explain what the AI got wrong and how it should grade this type of answer..."
+                      rows={3}
+                      className="text-sm"
+                    />
                   </div>
                 </div>
-                <div>
-                  <Label className="text-xs">Your Expected Grade</Label>
-                  <Input 
-                    type="number"
-                    min="0"
-                    max={(() => {
-                      // Set max based on selected sub-question or whole question
-                      if (feedbackForm.selected_sub_question === "all") {
-                        return feedbackQuestion.max_marks;
-                      } else {
-                        const subScore = feedbackQuestion.sub_scores?.find(
-                          s => s.sub_id === feedbackForm.selected_sub_question
-                        );
-                        return subScore?.max_marks || feedbackQuestion.max_marks;
-                      }
-                    })()}
-                    step="0.5"
-                    value={feedbackForm.teacher_expected_grade}
-                    onChange={(e) => setFeedbackForm(prev => ({ ...prev, teacher_expected_grade: e.target.value }))}
-                    className="text-center"
-                  />
-                </div>
-              </div>
+              ))}
 
-              <div>
-                <Label className="text-xs">AI&apos;s Feedback</Label>
-                <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground max-h-20 overflow-y-auto">
-                  {(() => {
-                    // Show feedback for selected sub-question or whole question
-                    if (feedbackForm.selected_sub_question === "all") {
-                      return feedbackQuestion.ai_feedback || "No AI feedback available";
-                    } else {
-                      const subScore = feedbackQuestion.sub_scores?.find(
-                        s => s.sub_id === feedbackForm.selected_sub_question
-                      );
-                      return subScore?.ai_feedback || feedbackQuestion.ai_feedback || "No AI feedback available";
-                    }
-                  })()}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs">Feedback Type</Label>
-                <Select 
-                  value={feedbackForm.feedback_type}
-                  onValueChange={(v) => setFeedbackForm(prev => ({ ...prev, feedback_type: v }))}
-                >
-                  <SelectTrigger className="text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="question_grading">Grading Issue</SelectItem>
-                    <SelectItem value="correction">AI Mistake</SelectItem>
-                    <SelectItem value="general_suggestion">General Suggestion</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs">Your Correction / Feedback *</Label>
-                <Textarea 
-                  value={feedbackForm.teacher_correction}
-                  onChange={(e) => setFeedbackForm(prev => ({ ...prev, teacher_correction: e.target.value }))}
-                  placeholder="Explain what the AI got wrong and how it should grade this type of answer..."
-                  rows={3}
-                  className="text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your feedback helps train the AI to grade more accurately.
-                </p>
-              </div>
+              {/* Add Another Correction Button */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addNewCorrection}
+                className="w-full border-dashed border-2 border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Another Sub-Question Correction
+              </Button>
 
               {/* Apply to All Papers Option */}
               <div className="flex items-start space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -1438,10 +1438,7 @@ export default function ReviewPapers({ user }) {
                     🤖 Intelligently re-grade all papers with AI
                   </label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {feedbackForm.selected_sub_question === "all" 
-                      ? `AI will re-analyze each student's answer for Question ${feedbackQuestion.question_number} using your grading guidance. Each student will receive an individual grade based on their answer quality.`
-                      : `AI will re-analyze each student's answer for the selected sub-question using your grading guidance. Each student will receive an individual grade based on their answer quality.`
-                    }
+                    AI will re-analyze each student&apos;s answer for {feedbackCorrections.filter(c => c.teacher_correction.trim()).length} part(s) using your grading guidance.
                   </p>
                   <p className="text-xs text-orange-600 mt-1 font-medium">
                     ⏱️ This will take 1-2 minutes for 30 papers. Uses LLM credits.
@@ -1450,8 +1447,9 @@ export default function ReviewPapers({ user }) {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setFeedbackDialogOpen(false)}
                   disabled={submittingFeedback}
                 >
@@ -1459,15 +1457,10 @@ export default function ReviewPapers({ user }) {
                 </Button>
                 <Button 
                   onClick={handleSubmitFeedback}
-                  disabled={submittingFeedback || !feedbackForm.teacher_correction.trim()}
-                  className="bg-orange-500 hover:bg-orange-600"
+                  disabled={submittingFeedback || feedbackCorrections.every(c => !c.teacher_correction.trim())}
+                  className="bg-orange-600 hover:bg-orange-700"
                 >
-                  {submittingFeedback ? (
-                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <Send className="w-4 h-4 mr-2" />
-                  )}
-                  Submit Feedback
+                  {submittingFeedback ? "Submitting..." : `Submit ${feedbackCorrections.filter(c => c.teacher_correction.trim()).length} Correction(s)`}
                 </Button>
               </div>
             </div>
