@@ -7477,7 +7477,9 @@ async def submit_grading_feedback(feedback: FeedbackSubmit, user: User = Depends
         "feedback_id": feedback_id,
         "teacher_id": user.user_id,
         "submission_id": feedback.submission_id,
+        "exam_id": feedback.exam_id or exam_id,
         "question_number": feedback.question_number,
+        "sub_question_id": feedback.sub_question_id,  # New field
         "feedback_type": feedback.feedback_type,
         "question_text": feedback.question_text,
         "student_answer_summary": student_answer_summary,
@@ -7486,7 +7488,6 @@ async def submit_grading_feedback(feedback: FeedbackSubmit, user: User = Depends
         "teacher_expected_grade": feedback.teacher_expected_grade,
         "teacher_correction": feedback.teacher_correction,
         "grading_mode": grading_mode,
-        "exam_id": exam_id,
         "is_common": False,
         "upvote_count": 0,
         "created_at": datetime.now(timezone.utc)
