@@ -7956,6 +7956,7 @@ Analyze the student's response carefully and apply the grading criteria the teac
         "message": f"Intelligently re-graded {updated_count} papers using your feedback",
         "updated_count": updated_count,
         "failed_count": failed_count
+    }
 
 
 @api_router.post("/feedback/apply-multiple-to-all-papers")
