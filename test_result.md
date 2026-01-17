@@ -726,6 +726,7 @@ backend:
 
 test_plan:
   current_focus:
+    - "Heads-Up Display Dashboard Stats Integration"
     - "Visual Annotations for Error Highlighting"
     - "Topic Mastery Heatmap Interactivity"
     - "Student Deep-Dive Modal Logic Fix"
@@ -734,7 +735,7 @@ test_plan:
     - "Student Deep-Dive Modal Logic Fix"
     - "Class Insights Page Enhancement"
   test_all: false
-  test_priority: "critical_first"
+  test_priority: "high_first"
   upload_grading_flow_tested: true
 
 agent_communication:
