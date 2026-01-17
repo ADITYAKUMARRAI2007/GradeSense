@@ -729,7 +729,6 @@ backend:
 
 test_plan:
   current_focus:
-    - "Heads-Up Display Dashboard Stats Integration"
     - "Visual Annotations for Error Highlighting"
     - "Topic Mastery Heatmap Interactivity"
     - "Student Deep-Dive Modal Logic Fix"
