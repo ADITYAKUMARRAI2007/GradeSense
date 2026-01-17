@@ -7672,6 +7672,123 @@ Return JSON:
 
 
 
+
+
+@api_router.post("/feedback/{feedback_id}/apply-to-all-papers")
+async def apply_feedback_to_all_papers(
+    feedback_id: str,
+    user: User = Depends(get_current_user)
+):
+    """
+    Apply teacher's correction to all students' papers for a specific question or sub-question
+    This directly updates grades without re-running AI, saving time and credits
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can apply corrections")
+    
+    # Get the feedback
+    feedback = await db.grading_feedback.find_one({"feedback_id": feedback_id}, {"_id": 0})
+    if not feedback:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    
+    exam_id = feedback.get("exam_id")
+    question_number = feedback.get("question_number")
+    sub_question_id = feedback.get("sub_question_id")
+    teacher_expected_grade = feedback.get("teacher_expected_grade")
+    teacher_correction = feedback.get("teacher_correction")
+    
+    if not exam_id or not question_number:
+        raise HTTPException(status_code=400, detail="Missing exam_id or question_number")
+    
+    # Find all submissions for this exam
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "submission_id": 1, "question_scores": 1, "total_score": 1}
+    ).to_list(1000)
+    
+    if not submissions:
+        return {"message": "No submissions found", "updated_count": 0}
+    
+    updated_count = 0
+    
+    # Update each submission
+    for submission in submissions:
+        try:
+            question_scores = submission.get("question_scores", [])
+            
+            # Find the question
+            q_index = next((i for i, qs in enumerate(question_scores) 
+                           if qs.get("question_number") == question_number), None)
+            
+            if q_index is None:
+                continue
+            
+            question_score = question_scores[q_index]
+            old_total = question_score.get("obtained_marks", 0)
+            
+            # Update based on whether it's whole question or sub-question
+            if sub_question_id and sub_question_id != "all":
+                # Update specific sub-question
+                sub_scores = question_score.get("sub_scores", [])
+                sub_index = next((i for i, ss in enumerate(sub_scores) 
+                                 if ss.get("sub_id") == sub_question_id), None)
+                
+                if sub_index is not None:
+                    old_sub_marks = sub_scores[sub_index].get("obtained_marks", 0)
+                    
+                    # Update sub-question marks and feedback
+                    sub_scores[sub_index]["obtained_marks"] = teacher_expected_grade
+                    sub_scores[sub_index]["ai_feedback"] = f"[Teacher Corrected] {teacher_correction}"
+                    
+                    # Recalculate total for this question
+                    new_total = sum(ss.get("obtained_marks", 0) for ss in sub_scores)
+                    question_scores[q_index]["obtained_marks"] = new_total
+                    question_scores[q_index]["sub_scores"] = sub_scores
+                    
+                    # Update submission total score
+                    submission_total = submission.get("total_score", 0)
+                    new_submission_total = submission_total - old_sub_marks + teacher_expected_grade
+                    
+                    # Update in database
+                    await db.submissions.update_one(
+                        {"submission_id": submission["submission_id"]},
+                        {"$set": {
+                            "question_scores": question_scores,
+                            "total_score": new_submission_total,
+                            f"question_scores.{q_index}.obtained_marks": new_total,
+                            f"question_scores.{q_index}.sub_scores": sub_scores
+                        }}
+                    )
+                    updated_count += 1
+            else:
+                # Update whole question
+                question_scores[q_index]["obtained_marks"] = teacher_expected_grade
+                question_scores[q_index]["ai_feedback"] = f"[Teacher Corrected] {teacher_correction}"
+                
+                # Update submission total score
+                submission_total = submission.get("total_score", 0)
+                new_submission_total = submission_total - old_total + teacher_expected_grade
+                
+                # Update in database
+                await db.submissions.update_one(
+                    {"submission_id": submission["submission_id"]},
+                    {"$set": {
+                        "question_scores": question_scores,
+                        "total_score": new_submission_total
+                    }}
+                )
+                updated_count += 1
+                
+        except Exception as e:
+            logger.error(f"Error updating submission {submission.get('submission_id')}: {e}")
+            continue
+    
+    return {
+        "message": f"Applied correction to {updated_count} papers",
+        "updated_count": updated_count
+    }
+
+
 @api_router.post("/exams/{exam_id}/publish-results")
 async def publish_exam_results(exam_id: str, user: User = Depends(get_current_user)):
     """Publish exam results to make them visible to students"""
