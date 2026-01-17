@@ -1655,11 +1655,11 @@ async def upload_more_papers(
                 
                 if error:
                     errors.append({
-                    "filename": filename,
-                    "student_id": student_id,
-                    "error": error
-                })
-                continue
+                        "filename": filename,
+                        "student_id": student_id,
+                        "error": error
+                    })
+                    continue
             
             # Grade with AI
             # Get model answer images from separate collection
@@ -4593,11 +4593,11 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 
                 if error:
                     errors.append({
-                    "filename": filename,
-                    "student_id": student_id,
-                    "error": error
-                })
-                continue
+                        "filename": filename,
+                        "student_id": student_id,
+                        "error": error
+                    })
+                    continue
             
                 # Grade with AI using the grading mode from exam
                 # Get model answer images from separate collection
