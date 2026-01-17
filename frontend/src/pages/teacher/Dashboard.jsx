@@ -34,6 +34,9 @@ export default function TeacherDashboard({ user }) {
   // New: Class snapshot
   const [classSnapshot, setClassSnapshot] = useState(null);
   
+  // New: Batches for DashboardStats
+  const [batches, setBatches] = useState([]);
+  
   const navigate = useNavigate();
 
   const dateString = useMemo(() => {
