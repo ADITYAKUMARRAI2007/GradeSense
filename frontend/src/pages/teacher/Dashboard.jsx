@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { Textarea } from "../../components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { toast } from "sonner";
+import DashboardStats from "../../components/DashboardStats";
 
 export default function TeacherDashboard({ user }) {
   const [analytics, setAnalytics] = useState(null);
