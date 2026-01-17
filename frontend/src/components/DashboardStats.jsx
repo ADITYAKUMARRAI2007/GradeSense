@@ -18,6 +18,7 @@ const DashboardStats = ({ batches = [] }) => {
 
   useEffect(() => {
     fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBatch]);
 
   const fetchStats = async () => {
