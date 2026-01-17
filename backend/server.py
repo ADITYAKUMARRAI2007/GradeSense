@@ -432,19 +432,26 @@ async def create_session(request: Request, response: Response):
         raise HTTPException(status_code=400, detail="session_id required")
     
     # Call Emergent auth service
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:  # 10 second timeout
         try:
             auth_response = await client.get(
                 "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
                 headers={"X-Session-ID": session_id}
             )
             if auth_response.status_code != 200:
+                logger.error(f"Auth service returned {auth_response.status_code}: {auth_response.text}")
                 raise HTTPException(status_code=401, detail="Invalid session_id")
             
             auth_data = auth_response.json()
+        except httpx.TimeoutException:
+            logger.error("Auth service timeout after 10 seconds")
+            raise HTTPException(status_code=504, detail="Auth service timeout - please try again")
+        except httpx.HTTPError as e:
+            logger.error(f"Auth service HTTP error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Auth service connection error")
         except Exception as e:
-            logger.error(f"Auth service error: {e}")
-            raise HTTPException(status_code=500, detail="Auth service error")
+            logger.error(f"Auth service error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Auth service error: {str(e)}")
     
     # Extract user data from auth response
     user_email = auth_data.get("email")
