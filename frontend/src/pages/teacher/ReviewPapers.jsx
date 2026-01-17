@@ -273,13 +273,15 @@ export default function ReviewPapers({ user }) {
 
   const openFeedbackDialog = (questionScore) => {
     setFeedbackQuestion(questionScore);
-    setFeedbackForm({
-      feedback_type: "question_grading",
-      teacher_expected_grade: questionScore.obtained_marks.toString(),
-      teacher_correction: "",
-      selected_sub_question: "all" // Default to whole question
-    });
-    setApplyToAllPapers(false); // Reset checkbox
+    setFeedbackCorrections([
+      {
+        id: 1,
+        selected_sub_question: "all",
+        teacher_expected_grade: questionScore.obtained_marks.toString(),
+        teacher_correction: ""
+      }
+    ]);
+    setApplyToAllPapers(false);
     setFeedbackDialogOpen(true);
   };
 
