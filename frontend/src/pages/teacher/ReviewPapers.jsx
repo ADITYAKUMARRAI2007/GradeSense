@@ -1231,6 +1231,63 @@ export default function ReviewPapers({ user }) {
                 )}
               </div>
 
+              {/* Sub-Question Selector */}
+              {feedbackQuestion.sub_scores && feedbackQuestion.sub_scores.length > 0 && (
+                <div>
+                  <Label className="text-xs">Select Part/Sub-Question</Label>
+                  <Select 
+                    value={feedbackForm.selected_sub_question}
+                    onValueChange={(v) => {
+                      setFeedbackForm(prev => ({ ...prev, selected_sub_question: v }));
+                      // Update expected grade when sub-question changes
+                      if (v === "all") {
+                        setFeedbackForm(prev => ({ 
+                          ...prev, 
+                          teacher_expected_grade: feedbackQuestion.obtained_marks.toString() 
+                        }));
+                      } else {
+                        const subScore = feedbackQuestion.sub_scores.find(s => s.sub_id === v);
+                        if (subScore) {
+                          setFeedbackForm(prev => ({ 
+                            ...prev, 
+                            teacher_expected_grade: subScore.obtained_marks.toString() 
+                          }));
+                        }
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        <span className="font-medium">Whole Question</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({feedbackQuestion.obtained_marks}/{feedbackQuestion.max_marks} marks)
+                        </span>
+                      </SelectItem>
+                      {feedbackQuestion.sub_scores.map((subScore, idx) => {
+                        const examQuestion = examQuestions.find(q => q.question_number === feedbackQuestion.question_number);
+                        const examSubQuestion = examQuestion?.sub_questions?.find(sq => sq.sub_id === subScore.sub_id);
+                        const subLabel = examSubQuestion?.sub_label || `Part ${idx + 1}`;
+                        
+                        return (
+                          <SelectItem key={subScore.sub_id} value={subScore.sub_id}>
+                            <span className="font-medium">{subLabel}</span>
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({subScore.obtained_marks}/{subScore.max_marks} marks)
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Choose a specific sub-question or provide feedback for the whole question
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">AI Grade</Label>
