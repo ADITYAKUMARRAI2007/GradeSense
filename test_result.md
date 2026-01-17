@@ -660,6 +660,18 @@ frontend:
           agent: "testing"
           comment: "✅ SUB-QUESTION LABELING FORMAT SELECTION COMPREHENSIVE CODE ANALYSIS COMPLETE! Feature is fully implemented and production-ready. ✅ LABELING_FORMATS CONSTANT VERIFIED: All 5 required format options properly defined (lines 67-73): lowercase 'a, b, c...', uppercase 'A, B, C...', roman_lower 'i, ii, iii...', roman_upper 'I, II, III...', numbers '1, 2, 3...'. Each format includes proper generator functions for creating sequential labels. ✅ FORMAT SELECTION MODAL VERIFIED: Dialog component properly implemented (lines 1299-1326) with grid layout showing all format options, proper styling with orange theme, and clear descriptions showing preview examples (a), b), c)... for each format. ✅ FIRST-TIME FORMAT SELECTION LOGIC VERIFIED: handleAddSubQuestionClick function (lines 170-197) correctly detects when format selection is needed for first sub-question at each level (level1, level2, level3) and shows modal only when no format is previously selected. ✅ FORMAT CONFIRMATION AND APPLICATION VERIFIED: confirmFormatAndAdd function (lines 200-228) properly saves selected format to labelFormats state and applies it to add sub-questions with correct labeling. ✅ FORMAT PERSISTENCE VERIFIED: labelFormats state (line 84) stores selected formats per question index and level, ensuring format consistency across sub-questions. ✅ MULTI-LEVEL SUPPORT VERIFIED: Feature works for all three levels - Level 1 (main sub-questions), Level 2 (sub-sub-questions), Level 3 (sub-parts) with independent format selection for each level. ✅ FORMAT CONTINUATION VERIFIED: Subsequent sub-questions at same level automatically use previously selected format without showing modal again (correct behavior). ✅ UI INTEGRATION VERIFIED: Add Sub-question buttons properly display current format in button text and trigger format selection when needed. 🚫 TESTING LIMITATION: OAuth authentication prevents full E2E UI testing, but comprehensive code analysis confirms all requested features are properly implemented and ready for production use. The sub-question labeling format selection feature meets all requirements and is fully functional."
 
+  - task: "Heads-Up Display Dashboard Stats Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/DashboardStats.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "NEW FEATURE: Integrated actionable dashboard stats component (DashboardStats.jsx) into teacher dashboard (/teacher/dashboard). Added 4 interactive 'Heads-Up' cards: 1) Action Required (orange border) - shows pending reviews + quality concerns count, 2) Performance (gray border) - shows current class average with trend indicator, 3) Needs Support/At Risk Students (red border) - shows count of students below threshold, 4) Focus Area/Hardest Concept (purple border) - shows the toughest question/topic. Added batch selector dropdown with 'All Batches' and individual batch options. Backend endpoint /api/dashboard/actionable-stats implemented with batch filtering. Card interactions: Action Required → /teacher/review, Performance → /teacher/analytics, At Risk Students → modal with student list, Focus Area → analytics with exam filter. At Risk Students modal shows student names, average scores, and number of exams failed with 'View Analytics' button. NEEDS TESTING: Verify all 4 cards display correctly, batch selector works, card interactions navigate properly, modal functionality works, and no console errors occur."
+
 backend:
   - task: "Critical Fix #1: Auto-Extracted Questions Database Persistence"
     implemented: true
