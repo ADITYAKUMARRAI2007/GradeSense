@@ -208,13 +208,16 @@ class GradingFeedback(BaseModel):
 
 class FeedbackSubmit(BaseModel):
     submission_id: Optional[str] = None
+    exam_id: Optional[str] = None
     question_number: Optional[int] = None
+    sub_question_id: Optional[str] = None  # New: For sub-question specific feedback
     feedback_type: str
     teacher_correction: str
     question_text: Optional[str] = None
     ai_grade: Optional[float] = None
     ai_feedback: Optional[str] = None
     teacher_expected_grade: Optional[float] = None
+    apply_to_all_papers: Optional[bool] = False  # New: Apply to all students
 
 # ============== FILE HELPER FUNCTIONS ==============
 
