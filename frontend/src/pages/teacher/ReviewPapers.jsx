@@ -291,17 +291,34 @@ export default function ReviewPapers({ user }) {
     try {
       const response = await axios.post(`${API}/feedback/submit`, {
         submission_id: selectedSubmission?.submission_id,
+        exam_id: selectedSubmission?.exam_id,
         question_number: feedbackQuestion.question_number,
+        sub_question_id: feedbackForm.selected_sub_question !== "all" ? feedbackForm.selected_sub_question : null,
         feedback_type: feedbackForm.feedback_type,
         question_text: feedbackQuestion.question_text || "",
         ai_grade: feedbackQuestion.obtained_marks,
         ai_feedback: feedbackQuestion.ai_feedback,
         teacher_expected_grade: parseFloat(feedbackForm.teacher_expected_grade) || feedbackQuestion.obtained_marks,
-        teacher_correction: feedbackForm.teacher_correction
+        teacher_correction: feedbackForm.teacher_correction,
+        apply_to_all_papers: applyToAllPapers
       });
       
-      // If "Apply to Batch" is checked, trigger batch re-grading
-      if (applyToBatch && response.data.feedback_id) {
+      // If "Apply to All Papers" is checked, trigger bulk update
+      if (applyToAllPapers && response.data.feedback_id) {
+        toast.info("Applying correction to all papers...");
+        try {
+          const bulkResponse = await axios.post(
+            `${API}/feedback/${response.data.feedback_id}/apply-to-all-papers`
+          );
+          toast.success(`✓ Updated ${bulkResponse.data.updated_count} papers successfully!`);
+          // Refresh the current view
+          fetchData();
+        } catch (bulkError) {
+          console.error("Bulk update error:", bulkError);
+          toast.error("Failed to apply to all papers. Feedback saved but bulk update failed.");
+        }
+      } else if (applyToBatch && response.data.feedback_id) {
+        // Original batch re-grading logic (kept for backward compatibility)
         toast.info("Re-grading all papers for this question...");
         try {
           const batchResponse = await axios.post(
@@ -321,7 +338,8 @@ export default function ReviewPapers({ user }) {
       setFeedbackForm({
         feedback_type: "question_grading",
         teacher_expected_grade: "",
-        teacher_correction: ""
+        teacher_correction: "",
+        selected_sub_question: "all"
       });
       setApplyToBatch(false);
     } catch (error) {
