@@ -285,6 +285,28 @@ export default function ReviewPapers({ user }) {
     setFeedbackDialogOpen(true);
   };
 
+  const addNewCorrection = () => {
+    const newId = Math.max(...feedbackCorrections.map(c => c.id)) + 1;
+    setFeedbackCorrections([...feedbackCorrections, {
+      id: newId,
+      selected_sub_question: "all",
+      teacher_expected_grade: "",
+      teacher_correction: ""
+    }]);
+  };
+
+  const removeCorrection = (id) => {
+    if (feedbackCorrections.length > 1) {
+      setFeedbackCorrections(feedbackCorrections.filter(c => c.id !== id));
+    }
+  };
+
+  const updateCorrection = (id, field, value) => {
+    setFeedbackCorrections(feedbackCorrections.map(correction => 
+      correction.id === id ? { ...correction, [field]: value } : correction
+    ));
+  };
+
   const handleSubmitFeedback = async () => {
     if (!feedbackQuestion || !feedbackForm.teacher_correction.trim()) {
       toast.error("Please provide your feedback");
