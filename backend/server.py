@@ -4699,6 +4699,19 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
     
     return result
 
+except Exception as e:
+    logger.error(f"Critical error in background grading job {job_id}: {e}")
+    # Update job status to failed
+    await db.grading_jobs.update_one(
+        {"job_id": job_id},
+        {"$set": {
+            "status": "failed",
+            "error": str(e),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    raise
+
 # ============== SUBMISSION ROUTES ==============
 
 @api_router.get("/submissions")
