@@ -540,36 +540,80 @@ export default function UploadGrade({ user }) {
         formDataObj.append("files", file);
       });
       
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProcessingProgress(prev => Math.min(prev + 5, 90));
-      }, 500);
-      
+      // Start background grading job - returns immediately
       const response = await axios.post(`${API}/exams/${examId}/grade-papers-bg`, formDataObj, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 900000  // 15 minutes for large document processing (increased from 10 min)
+        timeout: 30000  // Only 30 seconds - job starts instantly
       });
       
-      clearInterval(progressInterval);
-      setProcessingProgress(100);
-      setResults(response.data);
+      const { job_id, total_papers } = response.data;
+      toast.success(`Grading started for ${total_papers} papers. Processing in background...`);
       
-      // Show success/error messages
-      if (response.data.errors && response.data.errors.length > 0) {
-        toast.warning(`Graded ${response.data.processed} papers. ${response.data.errors.length} files had errors.`);
-        
-        // Show detailed errors
-        response.data.errors.forEach(error => {
-          toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
-        });
-      } else {
-        toast.success(`Successfully graded ${response.data.processed} papers`);
-      }
+      // Poll for job status every 2 seconds
+      const pollInterval = setInterval(async () => {
+        try {
+          const jobResponse = await axios.get(`${API}/grading-jobs/${job_id}`);
+          const jobData = jobResponse.data;
+          
+          // Update progress bar
+          const progress = jobData.total_papers > 0 
+            ? Math.round((jobData.processed_papers / jobData.total_papers) * 100)
+            : 0;
+          setProcessingProgress(progress);
+          
+          // Check if job completed
+          if (jobData.status === 'completed') {
+            clearInterval(pollInterval);
+            setProcessingProgress(100);
+            
+            // Set results in the expected format
+            setResults({
+              processed: jobData.successful,
+              submissions: jobData.submissions || [],
+              errors: jobData.errors || []
+            });
+            
+            // Show success/error messages
+            if (jobData.errors && jobData.errors.length > 0) {
+              toast.warning(`Graded ${jobData.successful} of ${total_papers} papers. ${jobData.errors.length} had errors.`);
+              
+              // Show first 3 errors only
+              jobData.errors.slice(0, 3).forEach(error => {
+                toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
+              });
+              if (jobData.errors.length > 3) {
+                toast.info(`+ ${jobData.errors.length - 3} more errors`);
+              }
+            } else {
+              toast.success(`✓ Successfully graded all ${jobData.successful} papers!`);
+            }
+            
+            setStep(6);
+            setProcessing(false);
+            
+          } else if (jobData.status === 'failed') {
+            clearInterval(pollInterval);
+            toast.error(`Grading failed: ${jobData.error || 'Unknown error'}`);
+            setProcessing(false);
+          }
+          // If status is 'processing' or 'pending', continue polling
+        } catch (pollError) {
+          console.error('Error polling job status:', pollError);
+          // Don't clear interval on network errors - keep trying
+        }
+      }, 2000); // Poll every 2 seconds
       
-      setStep(6);
+      // Safety timeout - stop polling after 20 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (processing) {
+          toast.error("Grading is taking longer than expected. Check Review Papers page.");
+          setProcessing(false);
+        }
+      }, 1200000); // 20 minutes
+      
     } catch (error) {
-      toast.error("Grading failed: " + (error.response?.data?.detail || error.message));
-    } finally {
+      toast.error("Failed to start grading: " + (error.response?.data?.detail || error.message));
       setProcessing(false);
     }
   };
