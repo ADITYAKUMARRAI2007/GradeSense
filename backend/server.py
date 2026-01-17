@@ -4670,14 +4670,29 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     "filename": filename,
                     "error": str(e)
                 })
-    
+        
         # Log final summary
-        logger.info(f"Batch grading complete: {len(submissions)} successful, {len(errors)} errors out of {len(files_data)} total files")
+        logger.info(f"Batch grading complete (Job {job_id}): {len(submissions)} successful, {len(errors)} errors out of {len(files_data)} total files")
         
         # Update exam status
         await db.exams.update_one(
             {"exam_id": exam_id},
             {"$set": {"status": "completed"}}
+        )
+        
+        # Mark job as completed
+        await db.grading_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {
+                "status": "completed",
+                "processed_papers": len(files_data),
+                "successful": len(submissions),
+                "failed": len(errors),
+                "submissions": submissions,
+                "errors": errors,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
         )
         
         # Create notification for teacher
@@ -4688,20 +4703,9 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             message=f"Successfully graded {len(submissions)} papers for {exam['exam_name']}",
             link=f"/teacher/review?exam={exam_id}"
         )
-        
-        result = {
-            "processed": len(submissions),
-            "submissions": submissions
-        }
-        
-        if errors:
-            result["errors"] = errors
-        
-        return result
 
     except Exception as e:
-        logger.error(f"Critical error in background grading job {job_id}: {e}")
-        # Update job status to failed
+        logger.error(f"Critical error in background job {job_id}: {e}")
         await db.grading_jobs.update_one(
             {"job_id": job_id},
             {"$set": {
@@ -4710,7 +4714,6 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
-        raise
 
 # ============== SUBMISSION ROUTES ==============
 
