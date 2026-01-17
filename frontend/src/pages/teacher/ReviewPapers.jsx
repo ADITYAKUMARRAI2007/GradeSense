@@ -1481,7 +1481,7 @@ export default function ReviewPapers({ user }) {
     zoomedImage,
     feedbackDialogOpen,
     feedbackQuestion,
-    feedbackForm,
+    feedbackCorrections,
     submittingFeedback
   ]);
 
