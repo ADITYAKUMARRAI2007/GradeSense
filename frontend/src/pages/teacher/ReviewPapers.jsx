@@ -1334,7 +1334,17 @@ export default function ReviewPapers({ user }) {
               <div>
                 <Label className="text-xs">AI&apos;s Feedback</Label>
                 <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground max-h-20 overflow-y-auto">
-                  {feedbackQuestion.ai_feedback || "No AI feedback available"}
+                  {(() => {
+                    // Show feedback for selected sub-question or whole question
+                    if (feedbackForm.selected_sub_question === "all") {
+                      return feedbackQuestion.ai_feedback || "No AI feedback available";
+                    } else {
+                      const subScore = feedbackQuestion.sub_scores?.find(
+                        s => s.sub_id === feedbackForm.selected_sub_question
+                      );
+                      return subScore?.ai_feedback || feedbackQuestion.ai_feedback || "No AI feedback available";
+                    }
+                  })()}
                 </div>
               </div>
 
