@@ -4553,21 +4553,21 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                         }
                     )
                     continue
-            
-            # Extract student ID and name from the paper using AI
-            student_id, student_name = await extract_student_info_from_paper(images, filename)
-            
-            # Fallback to filename if AI extraction fails
-            if not student_id or not student_name:
-                filename_id, filename_name = parse_student_from_filename(filename)
                 
-                # Use filename ID if AI didn't find it
-                if not student_id and filename_id:
-                    student_id = filename_id
+                # Extract student ID and name from the paper using AI
+                student_id, student_name = await extract_student_info_from_paper(images, filename)
                 
-                # Use filename name if AI didn't find it
-                if not student_name and filename_name:
-                    student_name = filename_name
+                # Fallback to filename if AI extraction fails
+                if not student_id or not student_name:
+                    filename_id, filename_name = parse_student_from_filename(filename)
+                    
+                    # Use filename ID if AI didn't find it
+                    if not student_id and filename_id:
+                        student_id = filename_id
+                    
+                    # Use filename name if AI didn't find it
+                    if not student_name and filename_name:
+                        student_name = filename_name
                 
                 # If still no ID or name, report error
                 if not student_id and not student_name:
