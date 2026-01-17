@@ -1589,18 +1589,18 @@ async def upload_more_papers(
     logger.info(f"=== BATCH GRADING START === Received {len(files)} files for exam {exam_id}")
     for idx, file in enumerate(files):
         file_start_time = datetime.now(timezone.utc)
-        logger.info(f"[File {idx + 1}/{len(files)}] START processing: {file.filename}")
+        logger.info(f"[File {idx + 1}/{len(files)}] START processing: {filename}")
         try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
-            logger.info(f"[File {idx + 1}/{len(files)}] Read {len(pdf_bytes)} bytes from {file.filename}")
+            logger.info(f"[File {idx + 1}/{len(files)}] Read {len(pdf_bytes)} bytes from {filename}")
             
             # Check file size - limit to 30MB for safety
             file_size_mb = len(pdf_bytes) / (1024 * 1024)
             if len(pdf_bytes) > 30 * 1024 * 1024:
                 logger.warning(f"[File {idx + 1}/{len(files)}] File too large: {file_size_mb:.1f}MB")
                 errors.append({
-                    "filename": file.filename,
+                    "filename": filename,
                     "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
                 })
                 continue
@@ -1611,17 +1611,17 @@ async def upload_more_papers(
             if not images:
                 logger.error(f"[File {idx + 1}/{len(files)}] Failed to extract images")
                 errors.append({
-                    "filename": file.filename,
+                    "filename": filename,
                     "error": "Failed to extract images from PDF"
                 })
                 continue
             
             # Extract student ID and name from the paper using AI
-            student_id, student_name = await extract_student_info_from_paper(images, file.filename)
+            student_id, student_name = await extract_student_info_from_paper(images, filename)
             
             # Fallback to filename if AI extraction fails
             if not student_id or not student_name:
-                filename_id, filename_name = parse_student_from_filename(file.filename)
+                filename_id, filename_name = parse_student_from_filename(filename)
                 
                 # Use filename ID if AI didn't find it
                 if not student_id and filename_id:
@@ -1634,7 +1634,7 @@ async def upload_more_papers(
                 # If still no ID or name, report error
                 if not student_id and not student_name:
                     errors.append({
-                        "filename": file.filename,
+                        "filename": filename,
                         "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
                     })
                     continue
@@ -1655,7 +1655,7 @@ async def upload_more_papers(
             
             if error:
                 errors.append({
-                    "filename": file.filename,
+                    "filename": filename,
                     "student_id": student_id,
                     "error": error
                 })
@@ -1704,12 +1704,12 @@ async def upload_more_papers(
                 "total_score": total_score,
                 "percentage": percentage
             })
-            logger.info(f"✓ Successfully graded {file.filename} - Student: {student_name}, Score: {total_score}/{exam['total_marks']}")
+            logger.info(f"✓ Successfully graded {filename} - Student: {student_name}, Score: {total_score}/{exam['total_marks']}")
             
         except Exception as e:
-            logger.error(f"✗ Error processing {file.filename}: {e}", exc_info=True)
+            logger.error(f"✗ Error processing {filename}: {e}", exc_info=True)
             errors.append({
-                "filename": file.filename,
+                "filename": filename,
                 "error": str(e)
             })
     
@@ -4444,7 +4444,7 @@ async def upload_student_papers(
     for file in files:
         file_bytes = await file.read()
         files_data.append({
-            "filename": file.filename,
+            "filename": filename,
             "content": file_bytes
         })
     
@@ -4555,11 +4555,11 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     continue
             
             # Extract student ID and name from the paper using AI
-            student_id, student_name = await extract_student_info_from_paper(images, file.filename)
+            student_id, student_name = await extract_student_info_from_paper(images, filename)
             
             # Fallback to filename if AI extraction fails
             if not student_id or not student_name:
-                filename_id, filename_name = parse_student_from_filename(file.filename)
+                filename_id, filename_name = parse_student_from_filename(filename)
                 
                 # Use filename ID if AI didn't find it
                 if not student_id and filename_id:
@@ -4572,7 +4572,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 # If still no ID or name, report error
                 if not student_id and not student_name:
                     errors.append({
-                        "filename": file.filename,
+                        "filename": filename,
                         "error": "Could not extract student ID/name from paper or filename. Please ensure student writes their roll number and name clearly on the answer sheet."
                     })
                     continue
@@ -4593,7 +4593,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             
             if error:
                 errors.append({
-                    "filename": file.filename,
+                    "filename": filename,
                     "student_id": student_id,
                     "error": error
                 })
@@ -4665,9 +4665,9 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             })
             
         except Exception as e:
-            logger.error(f"Error processing {file.filename}: {e}")
+            logger.error(f"Error processing {filename}: {e}")
             errors.append({
-                "filename": file.filename,
+                "filename": filename,
                 "error": str(e)
             })
     
