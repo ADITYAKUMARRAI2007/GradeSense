@@ -1403,15 +1403,18 @@ export default function ReviewPapers({ user }) {
                 <div className="flex-1">
                   <label
                     htmlFor="apply-to-all"
-                    className="text-sm font-medium leading-none cursor-pointer"
+                    className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
                   >
-                    Apply this correction to all papers
+                    🤖 Intelligently re-grade all papers with AI
                   </label>
                   <p className="text-xs text-muted-foreground mt-1">
                     {feedbackForm.selected_sub_question === "all" 
-                      ? `This will update Question ${feedbackQuestion.question_number} for all students in this exam with your correction`
-                      : `This will update the selected sub-question for all students in this exam with your correction`
+                      ? `AI will re-analyze each student's answer for Question ${feedbackQuestion.question_number} using your grading guidance. Each student will receive an individual grade based on their answer quality.`
+                      : `AI will re-analyze each student's answer for the selected sub-question using your grading guidance. Each student will receive an individual grade based on their answer quality.`
                     }
+                  </p>
+                  <p className="text-xs text-orange-600 mt-1 font-medium">
+                    ⏱️ This will take 1-2 minutes for 30 papers. Uses LLM credits.
                   </p>
                 </div>
               </div>
