@@ -34,7 +34,8 @@ import {
   Send,
   Lightbulb,
   Sparkles,
-  Brain
+  Brain,
+  Trash2
 } from "lucide-react";
 
 export default function ReviewPapers({ user }) {
