@@ -51,6 +51,7 @@ export default function TeacherDashboard({ user }) {
   useEffect(() => {
     fetchDashboard();
     fetchClassSnapshot();
+    fetchBatches();
   }, []);
 
   const fetchDashboard = async () => {
