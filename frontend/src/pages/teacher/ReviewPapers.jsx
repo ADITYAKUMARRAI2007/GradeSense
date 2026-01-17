@@ -60,15 +60,17 @@ export default function ReviewPapers({ user }) {
   const [imageZoom, setImageZoom] = useState(100);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackQuestion, setFeedbackQuestion] = useState(null);
-  const [feedbackForm, setFeedbackForm] = useState({
-    feedback_type: "question_grading",
-    teacher_expected_grade: "",
-    teacher_correction: "",
-    selected_sub_question: "all" // "all" or specific sub_id
-  });
+  const [feedbackCorrections, setFeedbackCorrections] = useState([
+    {
+      id: 1,
+      selected_sub_question: "all",
+      teacher_expected_grade: "",
+      teacher_correction: ""
+    }
+  ]); // Array of corrections for multiple sub-questions
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [applyToBatch, setApplyToBatch] = useState(false);
-  const [applyToAllPapers, setApplyToAllPapers] = useState(false); // New: Apply correction to all students
+  const [applyToAllPapers, setApplyToAllPapers] = useState(false);
   const [extractingQuestions, setExtractingQuestions] = useState(false);
 
   useEffect(() => {
