@@ -4679,25 +4679,25 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             {"exam_id": exam_id},
             {"$set": {"status": "completed"}}
         )
-    
-    # Create notification for teacher
-    await create_notification(
-        user_id=user.user_id,
-        notification_type="grading_complete",
-        title="Grading Complete",
-        message=f"Successfully graded {len(submissions)} papers for {exam['exam_name']}",
-        link=f"/teacher/review?exam={exam_id}"
-    )
-    
-    result = {
-        "processed": len(submissions),
-        "submissions": submissions
-    }
-    
-    if errors:
-        result["errors"] = errors
-    
-    return result
+        
+        # Create notification for teacher
+        await create_notification(
+            user_id=teacher_id,
+            notification_type="grading_complete",
+            title="Grading Complete",
+            message=f"Successfully graded {len(submissions)} papers for {exam['exam_name']}",
+            link=f"/teacher/review?exam={exam_id}"
+        )
+        
+        result = {
+            "processed": len(submissions),
+            "submissions": submissions
+        }
+        
+        if errors:
+            result["errors"] = errors
+        
+        return result
 
 except Exception as e:
     logger.error(f"Critical error in background grading job {job_id}: {e}")
