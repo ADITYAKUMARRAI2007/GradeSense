@@ -4715,6 +4715,86 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             }}
         )
 
+
+# ============== BACKGROUND GRADING (30+ Papers Support) ==============
+
+@api_router.post("/exams/{exam_id}/grade-papers-bg")
+async def grade_papers_background(
+    exam_id: str,
+    files: List[UploadFile] = File(...),
+    user: User = Depends(get_current_user)
+):
+    """
+    Start background grading job - supports 30+ papers without timeout
+    Returns immediately with job_id for progress polling
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can upload papers")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    
+    # Read all files into memory
+    files_data = []
+    for file in files:
+        files_data.append({
+            "filename": file.filename,
+            "content": await file.read()
+        })
+    
+    # Create job record in database
+    await db.grading_jobs.insert_one({
+        "job_id": job_id,
+        "exam_id": exam_id,
+        "teacher_id": user.user_id,
+        "status": "pending",
+        "total_papers": len(files_data),
+        "processed_papers": 0,
+        "successful": 0,
+        "failed": 0,
+        "submissions": [],
+        "errors": [],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
+    
+    # Start background processing
+    from background_grading import process_grading_job_in_background
+    asyncio.create_task(
+        process_grading_job_in_background(
+            job_id, exam_id, files_data, exam, user.user_id, db,
+            pdf_to_images, extract_student_info_from_paper, parse_student_from_filename,
+            get_or_create_student, get_exam_model_answer_images,
+            get_exam_model_answer_text, grade_with_ai, create_notification
+        )
+    )
+    
+    logger.info(f"Background job {job_id} started for {len(files_data)} papers")
+    
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "total_papers": len(files_data),
+        "message": f"Grading job started for {len(files_data)} papers"
+    }
+
+
+@api_router.get("/grading-jobs/{job_id}")
+async def get_grading_job_status(job_id: str, user: User = Depends(get_current_user)):
+    """Poll grading job status - called every 2 seconds by frontend"""
+    job = await db.grading_jobs.find_one({"job_id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if user.role == "teacher" and job["teacher_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return job
+
+
 # ============== SUBMISSION ROUTES ==============
 
 @api_router.get("/submissions")
