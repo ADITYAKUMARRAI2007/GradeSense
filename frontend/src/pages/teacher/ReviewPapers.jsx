@@ -274,8 +274,10 @@ export default function ReviewPapers({ user }) {
     setFeedbackForm({
       feedback_type: "question_grading",
       teacher_expected_grade: questionScore.obtained_marks.toString(),
-      teacher_correction: ""
+      teacher_correction: "",
+      selected_sub_question: "all" // Default to whole question
     });
+    setApplyToAllPapers(false); // Reset checkbox
     setFeedbackDialogOpen(true);
   };
 
