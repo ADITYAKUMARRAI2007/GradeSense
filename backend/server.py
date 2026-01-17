@@ -4428,7 +4428,7 @@ async def upload_student_papers(
     files: List[UploadFile] = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload and grade student papers with auto-student creation"""
+    """Upload and grade student papers with background job processing - supports 30+ papers"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload papers")
     
@@ -4436,7 +4436,35 @@ async def upload_student_papers(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Model answer is now optional
+    # Create a grading job
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    
+    # Read all files into memory first (before returning response)
+    files_data = []
+    for file in files:
+        file_bytes = await file.read()
+        files_data.append({
+            "filename": file.filename,
+            "content": file_bytes
+        })
+    
+    # Create job record
+    job_record = {
+        "job_id": job_id,
+        "exam_id": exam_id,
+        "teacher_id": user.user_id,
+        "status": "pending",  # pending, processing, completed, failed
+        "total_papers": len(files_data),
+        "processed_papers": 0,
+        "successful": 0,
+        "failed": 0,
+        "submissions": [],
+        "errors": [],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.grading_jobs.insert_one(job_record)
     
     # Update exam status
     await db.exams.update_one(
@@ -4444,12 +4472,37 @@ async def upload_student_papers(
         {"$set": {"status": "processing"}}
     )
     
-    submissions = []
-    errors = []
+    # Start background processing
+    asyncio.create_task(process_grading_job_in_background(job_id, exam_id, files_data, exam, user.user_id))
     
-    # Log the number of files received
-    logger.info(f"=== BATCH GRADING START === Received {len(files)} files for exam {exam_id}")
-    for idx, file in enumerate(files):
+    # Return immediately with job_id
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "total_papers": len(files_data),
+        "message": f"Grading job started for {len(files_data)} papers. Use job_id to check progress."
+    }
+
+
+async def process_grading_job_in_background(job_id: str, exam_id: str, files_data: List[dict], exam: dict, teacher_id: str):
+    """Background task to process papers one by one"""
+    try:
+        # Update job status to processing
+        await db.grading_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {
+                "status": "processing",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        submissions = []
+        errors = []
+        
+        # Log the number of files received
+        logger.info(f"=== BATCH GRADING START === Processing {len(files_data)} files for exam {exam_id} (Job: {job_id})")
+        
+        for idx, file_data in enumerate(files_data):
         file_start_time = datetime.now(timezone.utc)
         logger.info(f"[File {idx + 1}/{len(files)}] START processing: {file.filename}")
         try:
