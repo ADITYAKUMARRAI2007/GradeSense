@@ -308,45 +308,59 @@ export default function ReviewPapers({ user }) {
   };
 
   const handleSubmitFeedback = async () => {
-    if (!feedbackQuestion || !feedbackForm.teacher_correction.trim()) {
-      toast.error("Please provide your feedback");
+    // Validate: at least one correction must have feedback
+    const validCorrections = feedbackCorrections.filter(c => c.teacher_correction.trim());
+    
+    if (!feedbackQuestion || validCorrections.length === 0) {
+      toast.error("Please provide feedback for at least one part");
       return;
     }
 
     setSubmittingFeedback(true);
     try {
-      const response = await axios.post(`${API}/feedback/submit`, {
-        submission_id: selectedSubmission?.submission_id,
-        exam_id: selectedSubmission?.exam_id,
-        question_number: feedbackQuestion.question_number,
-        sub_question_id: feedbackForm.selected_sub_question !== "all" ? feedbackForm.selected_sub_question : null,
-        feedback_type: feedbackForm.feedback_type,
-        question_text: feedbackQuestion.question_text || "",
-        ai_grade: feedbackQuestion.obtained_marks,
-        ai_feedback: feedbackQuestion.ai_feedback,
-        teacher_expected_grade: parseFloat(feedbackForm.teacher_expected_grade) || feedbackQuestion.obtained_marks,
-        teacher_correction: feedbackForm.teacher_correction,
-        apply_to_all_papers: applyToAllPapers
-      });
+      // Submit all corrections
+      const feedbackIds = [];
       
-      // If "Apply to All Papers" is checked, trigger bulk update
-      if (applyToAllPapers && response.data.feedback_id) {
-        toast.info("🤖 AI is intelligently re-grading all papers based on your feedback...", { duration: 5000 });
+      for (const correction of validCorrections) {
+        const response = await axios.post(`${API}/feedback/submit`, {
+          submission_id: selectedSubmission?.submission_id,
+          exam_id: selectedSubmission?.exam_id,
+          question_number: feedbackQuestion.question_number,
+          sub_question_id: correction.selected_sub_question !== "all" ? correction.selected_sub_question : null,
+          feedback_type: "question_grading",
+          question_text: feedbackQuestion.question_text || "",
+          ai_grade: feedbackQuestion.obtained_marks,
+          ai_feedback: feedbackQuestion.ai_feedback,
+          teacher_expected_grade: parseFloat(correction.teacher_expected_grade) || 0,
+          teacher_correction: correction.teacher_correction,
+          apply_to_all_papers: false // Will handle bulk after all submissions
+        });
+        
+        if (response.data.feedback_id) {
+          feedbackIds.push({
+            feedback_id: response.data.feedback_id,
+            sub_question_id: correction.selected_sub_question
+          });
+        }
+      }
+      
+      // If "Apply to All Papers" is checked, trigger bulk update with all feedback IDs
+      if (applyToAllPapers && feedbackIds.length > 0) {
+        toast.info(`🤖 AI is intelligently re-grading all papers for ${validCorrections.length} part(s)...`, { duration: 5000 });
         try {
           const bulkResponse = await axios.post(
-            `${API}/feedback/${response.data.feedback_id}/apply-to-all-papers`,
-            {},
-            { timeout: 300000 } // 5 minutes timeout for AI processing
+            `${API}/feedback/apply-multiple-to-all-papers`,
+            { feedback_ids: feedbackIds.map(f => f.feedback_id) },
+            { timeout: 300000 } // 5 minutes
           );
           const { updated_count, failed_count } = bulkResponse.data;
           
           if (failed_count > 0) {
             toast.warning(`✓ Re-graded ${updated_count} papers. ${failed_count} failed to process.`);
           } else {
-            toast.success(`✓ Successfully re-graded all ${updated_count} papers with AI!`);
+            toast.success(`✓ Successfully re-graded all ${updated_count} papers with AI for ${validCorrections.length} part(s)!`);
           }
           
-          // Refresh the current view
           fetchData();
         } catch (bulkError) {
           console.error("Bulk update error:", bulkError);
@@ -356,34 +370,22 @@ export default function ReviewPapers({ user }) {
             toast.error("Failed to apply to all papers. Feedback saved but bulk update failed.");
           }
         }
-      } else if (applyToBatch && response.data.feedback_id) {
-        // Original batch re-grading logic (kept for backward compatibility)
-        toast.info("Re-grading all papers for this question...");
-        try {
-          const batchResponse = await axios.post(
-            `${API}/feedback/${response.data.feedback_id}/apply-to-batch`
-          );
-          toast.success(`${batchResponse.data.message}. Updated ${batchResponse.data.updated_count} papers.`);
-        } catch (batchError) {
-          console.error("Batch re-grading error:", batchError);
-          toast.error("Failed to apply to batch. Feedback saved but re-grading failed.");
-        }
       } else {
-        toast.success("Feedback submitted successfully! This will help improve AI grading.");
+        toast.success(`Feedback submitted successfully for ${validCorrections.length} part(s)!`);
       }
       
       setFeedbackDialogOpen(false);
       setFeedbackQuestion(null);
-      setFeedbackForm({
-        feedback_type: "question_grading",
+      setFeedbackCorrections([{
+        id: 1,
+        selected_sub_question: "all",
         teacher_expected_grade: "",
-        teacher_correction: "",
-        selected_sub_question: "all"
-      });
+        teacher_correction: ""
+      }]);
       setApplyToBatch(false);
+      setApplyToAllPapers(false);
     } catch (error) {
-      console.error("Feedback submission error:", error);
-      toast.error(error.response?.data?.detail || "Failed to submit feedback");
+      toast.error("Failed to submit feedback: " + (error.response?.data?.detail || error.message));
     } finally {
       setSubmittingFeedback(false);
     }
