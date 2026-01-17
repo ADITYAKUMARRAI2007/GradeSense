@@ -4671,8 +4671,8 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     "error": str(e)
                 })
     
-    # Log final summary
-    logger.info(f"Batch grading complete: {len(submissions)} successful, {len(errors)} errors out of {len(files_data)} total files")
+        # Log final summary
+        logger.info(f"Batch grading complete: {len(submissions)} successful, {len(errors)} errors out of {len(files_data)} total files")
     
     # Update exam status
     await db.exams.update_one(
