@@ -8155,7 +8155,6 @@ Re-grade this student's answer based on the teacher's guidance above.
         "failed_count": failed_count
     }
 
-    }
 
 @api_router.post("/feedback/apply-multiple-to-all-papers")
 async def apply_multiple_feedback_to_all_papers(
