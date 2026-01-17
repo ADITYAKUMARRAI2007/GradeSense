@@ -753,7 +753,7 @@ export default function UploadGrade({ user }) {
                     data-testid="total-marks-input"
                   />
                   <p className="text-xs text-muted-foreground">
-                    This will be used as the exam's total marks. Auto-extracted marks will not override this value.
+                    This will be used as the exam&apos;s total marks. Auto-extracted marks will not override this value.
                   </p>
                 </div>
 
