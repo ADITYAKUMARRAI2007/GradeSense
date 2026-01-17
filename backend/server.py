@@ -4673,12 +4673,12 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
     
         # Log final summary
         logger.info(f"Batch grading complete: {len(submissions)} successful, {len(errors)} errors out of {len(files_data)} total files")
-    
-    # Update exam status
-    await db.exams.update_one(
-        {"exam_id": exam_id},
-        {"$set": {"status": "completed"}}
-    )
+        
+        # Update exam status
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {"status": "completed"}}
+        )
     
     # Create notification for teacher
     await create_notification(
