@@ -4503,9 +4503,12 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
         logger.info(f"=== BATCH GRADING START === Processing {len(files_data)} files for exam {exam_id} (Job: {job_id})")
         
         for idx, file_data in enumerate(files_data):
-        file_start_time = datetime.now(timezone.utc)
-        logger.info(f"[File {idx + 1}/{len(files)}] START processing: {file.filename}")
-        try:
+            file_start_time = datetime.now(timezone.utc)
+            filename = file_data["filename"]
+            pdf_bytes = file_data["content"]
+            
+            logger.info(f"[File {idx + 1}/{len(files_data)}] START processing: {filename}")
+            try:
             # Process the PDF first to get images
             pdf_bytes = await file.read()
             logger.info(f"[File {idx + 1}/{len(files)}] Read {len(pdf_bytes)} bytes from {file.filename}")
