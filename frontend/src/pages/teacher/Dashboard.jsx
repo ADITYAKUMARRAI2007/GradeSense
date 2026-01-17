@@ -111,23 +111,6 @@ export default function TeacherDashboard({ user }) {
   const stats = analytics?.stats || {};
   const recentSubmissions = analytics?.recent_submissions || [];
 
-  const statCards = [
-    { 
-      label: "Papers Graded", 
-      value: stats.total_submissions || 0, 
-      icon: FileText, 
-      color: "text-primary",
-      bgColor: "bg-orange-50"
-    },
-    { 
-      label: "Pending Reviews", 
-      value: stats.pending_reviews || 0, 
-      icon: Clock, 
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-50"
-    },
-  ];
-
   return (
     <Layout user={user}>
       <div className="space-y-4 lg:space-y-6" data-testid="teacher-dashboard">
