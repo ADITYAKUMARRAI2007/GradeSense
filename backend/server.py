@@ -728,6 +728,200 @@ async def get_class_snapshot(
 
 
 
+@api_router.get("/dashboard/actionable-stats")
+async def get_actionable_stats(
+    batch_id: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    """
+    Get actionable insights for dashboard heads-up display
+    Returns: pending reviews, quality concerns, performance trends, at-risk students, hardest concepts
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    # Build query
+    exam_query = {"teacher_id": user.user_id}
+    if batch_id:
+        exam_query["batch_id"] = batch_id
+    
+    # Get exams
+    exams = await db.exams.find(exam_query, {"_id": 0}).to_list(100)
+    
+    if not exams:
+        return {
+            "action_required": {
+                "pending_reviews": 0,
+                "quality_concerns": 0,
+                "total": 0,
+                "papers": []
+            },
+            "performance": {
+                "current_avg": 0,
+                "previous_avg": 0,
+                "trend": 0,
+                "trend_direction": "stable"
+            },
+            "at_risk": {
+                "count": 0,
+                "students": [],
+                "threshold": 40
+            },
+            "hardest_concept": None
+        }
+    
+    exam_ids = [e["exam_id"] for e in exams]
+    
+    # Get all submissions
+    submissions = await db.submissions.find(
+        {"exam_id": {"$in": exam_ids}},
+        {"_id": 0, "submission_id": 1, "exam_id": 1, "student_id": 1, "student_name": 1, "percentage": 1, "total_score": 1, "created_at": 1, "status": 1, "question_scores": 1}
+    ).to_list(10000)
+    
+    # 1. ACTION REQUIRED: Pending Reviews + Quality Concerns
+    pending_reviews = len([s for s in submissions if s.get("status") == "pending"])
+    
+    # Quality concerns: Students with long answers but low scores (bluff candidates)
+    quality_concerns = []
+    for sub in submissions:
+        if sub.get("percentage", 0) < 50:  # Failed submissions
+            for qs in sub.get("question_scores", []):
+                answer_text = qs.get("answer_text", "")
+                obtained = qs.get("obtained_marks", 0)
+                max_marks = qs.get("max_marks", 1)
+                percentage = (obtained / max_marks) * 100 if max_marks > 0 else 0
+                
+                # Long answer but very low score = quality concern
+                if len(answer_text) > 100 and percentage < 30:
+                    quality_concerns.append({
+                        "submission_id": sub["submission_id"],
+                        "student_name": sub["student_name"],
+                        "exam_id": sub["exam_id"]
+                    })
+                    break  # One flag per submission
+    
+    quality_concerns = quality_concerns[:10]  # Limit to 10
+    
+    # 2. PERFORMANCE: Current vs Previous Avg
+    sorted_exams = sorted(exams, key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    current_avg = 0
+    previous_avg = 0
+    trend = 0
+    
+    if len(sorted_exams) >= 2:
+        # Recent exams (last 2)
+        recent_exam_ids = [e["exam_id"] for e in sorted_exams[:2]]
+        recent_subs = [s for s in submissions if s["exam_id"] in recent_exam_ids]
+        
+        # Previous exams (2-4)
+        if len(sorted_exams) >= 4:
+            prev_exam_ids = [e["exam_id"] for e in sorted_exams[2:4]]
+            prev_subs = [s for s in submissions if s["exam_id"] in prev_exam_ids]
+            
+            if recent_subs and prev_subs:
+                current_avg = sum(s["percentage"] for s in recent_subs) / len(recent_subs)
+                previous_avg = sum(s["percentage"] for s in prev_subs) / len(prev_subs)
+                trend = current_avg - previous_avg
+    elif submissions:
+        # If not enough exams, just use overall average
+        current_avg = sum(s["percentage"] for s in submissions) / len(submissions)
+    
+    trend_direction = "up" if trend > 2 else "down" if trend < -2 else "stable"
+    
+    # 3. AT RISK: Students scoring <40% in recent exams
+    at_risk_students = {}
+    
+    # Get recent submissions (last 2 exams)
+    if len(sorted_exams) >= 2:
+        recent_exam_ids = [e["exam_id"] for e in sorted_exams[:2]]
+        recent_subs = [s for s in submissions if s["exam_id"] in recent_exam_ids]
+        
+        for sub in recent_subs:
+            if sub["percentage"] < 40:
+                sid = sub["student_id"]
+                if sid not in at_risk_students:
+                    at_risk_students[sid] = {
+                        "student_id": sid,
+                        "student_name": sub["student_name"],
+                        "avg_score": sub["percentage"],
+                        "exams_failed": 1
+                    }
+                else:
+                    at_risk_students[sid]["exams_failed"] += 1
+    
+    at_risk_list = list(at_risk_students.values())
+    at_risk_list.sort(key=lambda x: x["avg_score"])  # Worst first
+    
+    # 4. HARDEST CONCEPT: Question with lowest correct rate
+    question_performance = {}
+    
+    for sub in submissions:
+        for qs in sub.get("question_scores", []):
+            q_key = f"{sub['exam_id']}_{qs.get('question_number')}"
+            
+            if q_key not in question_performance:
+                question_performance[q_key] = {
+                    "exam_id": sub["exam_id"],
+                    "question_number": qs.get("question_number"),
+                    "total_attempts": 0,
+                    "total_score": 0,
+                    "max_marks": qs.get("max_marks", 0)
+                }
+            
+            question_performance[q_key]["total_attempts"] += 1
+            question_performance[q_key]["total_score"] += qs.get("obtained_marks", 0)
+    
+    # Calculate success rates
+    question_stats = []
+    for q_key, data in question_performance.items():
+        if data["total_attempts"] > 0:
+            avg_obtained = data["total_score"] / data["total_attempts"]
+            success_rate = (avg_obtained / data["max_marks"]) * 100 if data["max_marks"] > 0 else 0
+            
+            # Get question details
+            exam = await db.exams.find_one({"exam_id": data["exam_id"]}, {"_id": 0, "exam_name": 1, "questions": 1})
+            if exam:
+                for q in exam.get("questions", []):
+                    if q.get("question_number") == data["question_number"]:
+                        question_stats.append({
+                            "exam_id": data["exam_id"],
+                            "exam_name": exam.get("exam_name", "Unknown"),
+                            "question_number": data["question_number"],
+                            "topic": q.get("rubric", "")[:50] + "..." if len(q.get("rubric", "")) > 50 else q.get("rubric", "Unknown"),
+                            "success_rate": round(success_rate, 1),
+                            "attempts": data["total_attempts"]
+                        })
+                        break
+    
+    # Find hardest (minimum 5 attempts to be statistically relevant)
+    valid_questions = [q for q in question_stats if q["attempts"] >= 5]
+    hardest = min(valid_questions, key=lambda x: x["success_rate"]) if valid_questions else None
+    
+    return {
+        "action_required": {
+            "pending_reviews": pending_reviews,
+            "quality_concerns": len(quality_concerns),
+            "total": pending_reviews + len(quality_concerns),
+            "papers": quality_concerns[:5]  # Top 5 for display
+        },
+        "performance": {
+            "current_avg": round(current_avg, 1),
+            "previous_avg": round(previous_avg, 1),
+            "trend": round(trend, 1),
+            "trend_direction": trend_direction
+        },
+        "at_risk": {
+            "count": len(at_risk_list),
+            "students": at_risk_list[:5],  # Top 5 worst
+            "threshold": 40
+        },
+        "hardest_concept": hardest
+    }
+
+
+
+
 async def create_notification(user_id: str, notification_type: str, title: str, message: str, link: str = None):
     """Helper function to create notifications"""
     notification_id = f"notif_{uuid.uuid4().hex[:12]}"
