@@ -2288,6 +2288,18 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
         {"$set": {"questions": questions}}
     )
     
+    # CRITICAL: Also update the questions collection for consistency
+    for q in questions:
+        await db.questions.update_one(
+            {"exam_id": exam_id, "question_number": q.get("question_number")},
+            {"$set": {
+                "rubric": q.get("rubric", ""),
+                "question_text": q.get("question_text", ""),
+                "sub_questions": q.get("sub_questions", [])
+            }},
+            upsert=True
+        )
+    
     return {
         "message": f"Successfully extracted {updated_count} questions from {source}",
         "updated_count": updated_count,
