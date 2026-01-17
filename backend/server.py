@@ -2268,6 +2268,11 @@ async def extract_and_update_questions(exam_id: str, user: User = Depends(get_cu
             if isinstance(extracted_q, dict):
                 rubric_text = extracted_q.get("rubric", "")
                 question_text = extracted_q.get("question_text", "") or extracted_q.get("rubric", "")
+                
+                # CRITICAL: Also update sub_questions with their full text
+                if "sub_questions" in extracted_q and extracted_q["sub_questions"]:
+                    q["sub_questions"] = extracted_q["sub_questions"]
+                    logger.info(f"Updated Q{q.get('question_number')} with {len(extracted_q['sub_questions'])} sub-questions")
             else:
                 # Fallback if it's already a string
                 rubric_text = str(extracted_q)
