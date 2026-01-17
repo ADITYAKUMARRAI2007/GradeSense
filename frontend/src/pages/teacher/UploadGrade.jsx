@@ -543,7 +543,7 @@ export default function UploadGrade({ user }) {
       // Start background grading job - returns immediately
       const response = await axios.post(`${API}/exams/${examId}/grade-papers-bg`, formDataObj, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 30000  // Only 30 seconds - job starts instantly
+        timeout: 120000  // 2 minutes - enough time to upload and read large files
       });
       
       const { job_id, total_papers } = response.data;
