@@ -7956,6 +7956,204 @@ Analyze the student's response carefully and apply the grading criteria the teac
         "message": f"Intelligently re-graded {updated_count} papers using your feedback",
         "updated_count": updated_count,
         "failed_count": failed_count
+
+
+@api_router.post("/feedback/apply-multiple-to-all-papers")
+async def apply_multiple_feedback_to_all_papers(
+    request: dict,
+    user: User = Depends(get_current_user)
+):
+    """
+    Apply multiple feedback corrections to all papers in ONE batch
+    Efficient processing of multiple sub-question corrections
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can apply corrections")
+    
+    feedback_ids = request.get("feedback_ids", [])
+    if not feedback_ids:
+        raise HTTPException(status_code=400, detail="No feedback IDs provided")
+    
+    # Get all feedback records
+    feedbacks = []
+    for fid in feedback_ids:
+        feedback = await db.grading_feedback.find_one({"feedback_id": fid}, {"_id": 0})
+        if feedback:
+            feedbacks.append(feedback)
+    
+    if not feedbacks:
+        raise HTTPException(status_code=404, detail="No feedback found")
+    
+    # All feedbacks should be for the same exam and question
+    exam_id = feedbacks[0].get("exam_id")
+    question_number = feedbacks[0].get("question_number")
+    
+    logger.info(f"Processing {len(feedbacks)} corrections for Q{question_number} in exam {exam_id}")
+    
+    # Get exam details
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get question details
+    question = await db.questions.find_one(
+        {"exam_id": exam_id, "question_number": question_number},
+        {"_id": 0}
+    )
+    
+    if not question:
+        question = next((q for q in exam.get("questions", []) if q.get("question_number") == question_number), None)
+    
+    if not question:
+        raise HTTPException(status_code=404, detail=f"Question {question_number} not found")
+    
+    # Get model answer text for reference
+    model_answer_text = await get_exam_model_answer_text(exam_id)
+    
+    # Find all submissions for this exam
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "submission_id": 1, "student_name": 1, "question_scores": 1, "file_images": 1, "total_score": 1}
+    ).to_list(1000)
+    
+    if not submissions:
+        return {"message": "No submissions found", "updated_count": 0, "failed_count": 0}
+    
+    updated_count = 0
+    failed_count = 0
+    
+    # Process each submission
+    for idx, submission in enumerate(submissions):
+        try:
+            question_scores = submission.get("question_scores", [])
+            
+            # Find the question
+            q_index = next((i for i, qs in enumerate(question_scores) 
+                           if qs.get("question_number") == question_number), None)
+            
+            if q_index is None:
+                continue
+            
+            question_score = question_scores[q_index]
+            student_images = submission.get("file_images", [])
+            
+            if not student_images:
+                logger.warning(f"No images for submission {submission['submission_id']}")
+                continue
+            
+            old_question_total = question_score.get("obtained_marks", 0)
+            submission_changed = False
+            
+            # Apply each feedback correction
+            for feedback in feedbacks:
+                sub_question_id = feedback.get("sub_question_id")
+                teacher_correction = feedback.get("teacher_correction")
+                
+                if not teacher_correction:
+                    continue
+                
+                # Determine what to re-grade
+                if sub_question_id and sub_question_id != "all":
+                    # Re-grade specific sub-question
+                    sub_scores = question_score.get("sub_scores", [])
+                    sub_index = next((i for i, ss in enumerate(sub_scores) 
+                                     if ss.get("sub_id") == sub_question_id), None)
+                    
+                    if sub_index is None:
+                        continue
+                    
+                    # Get sub-question details
+                    sub_question = next((sq for sq in question.get("sub_questions", []) 
+                                        if sq.get("sub_id") == sub_question_id), None)
+                    
+                    if not sub_question:
+                        continue
+                    
+                    # Create AI prompt
+                    re_grade_prompt = f"""# INTELLIGENT RE-GRADING TASK
+
+## TEACHER'S GRADING GUIDANCE
+{teacher_correction}
+
+## CONTEXT
+- Question {question_number}, Part: {sub_question.get('sub_label', 'Part')}
+- Maximum Marks: {sub_question.get('max_marks')}
+- Sub-question: {sub_question.get('rubric', '')}
+
+## MODEL ANSWER REFERENCE
+{model_answer_text[:2000] if model_answer_text else "No model answer available"}
+
+## YOUR TASK
+Re-grade this student's answer based on the teacher's guidance above.
+
+## OUTPUT FORMAT (JSON ONLY)
+{{
+  "obtained_marks": <marks between 0 and {sub_question.get('max_marks')}>,
+  "ai_feedback": "<brief explanation>"
+}}
+"""
+                    
+                    # Call AI to re-grade
+                    from emergentintegrations import LlmChat, UserMessage, ImageContent
+                    
+                    chat = LlmChat(
+                        api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                        provider="gemini",
+                        response_format="json_object"
+                    ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
+                    
+                    content = [re_grade_prompt]
+                    for img in student_images[:15]:
+                        content.append(ImageContent(image=img, detail="low"))
+                    
+                    result = await chat.send_message(UserMessage(content=content))
+                    re_grade_result = json.loads(result.text)
+                    
+                    # Update sub-question score
+                    new_marks = float(re_grade_result.get("obtained_marks", sub_scores[sub_index]["obtained_marks"]))
+                    new_feedback = f"[Teacher Re-graded] {re_grade_result.get('ai_feedback', '')}"
+                    
+                    sub_scores[sub_index]["obtained_marks"] = new_marks
+                    sub_scores[sub_index]["ai_feedback"] = new_feedback
+                    question_scores[q_index]["sub_scores"] = sub_scores
+                    
+                    submission_changed = True
+                    logger.info(f"[{idx+1}/{len(submissions)}] {submission['student_name']} - Q{question_number} Part {sub_question_id}: {new_marks}/{sub_question.get('max_marks')}")
+            
+            # Recalculate question total from sub-questions
+            if submission_changed:
+                sub_scores = question_scores[q_index].get("sub_scores", [])
+                new_question_total = sum(ss.get("obtained_marks", 0) for ss in sub_scores)
+                question_scores[q_index]["obtained_marks"] = new_question_total
+                
+                # Recalculate submission total
+                old_submission_total = submission.get("total_score", 0)
+                new_submission_total = old_submission_total - old_question_total + new_question_total
+                
+                # Update in database
+                await db.submissions.update_one(
+                    {"submission_id": submission["submission_id"]},
+                    {"$set": {
+                        "question_scores": question_scores,
+                        "total_score": new_submission_total
+                    }}
+                )
+                
+                updated_count += 1
+                
+        except Exception as e:
+            logger.error(f"Error re-grading submission {submission.get('submission_id')}: {e}")
+            failed_count += 1
+            continue
+    
+    logger.info(f"Multi-correction complete: {updated_count} updated, {failed_count} failed")
+    
+    return {
+        "message": f"Intelligently re-graded {updated_count} papers for {len(feedbacks)} corrections",
+        "updated_count": updated_count,
+        "failed_count": failed_count
+    }
+
     }
 
 @api_router.post("/feedback/apply-multiple-to-all-papers")
