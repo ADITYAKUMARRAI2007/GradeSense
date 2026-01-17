@@ -7680,8 +7680,8 @@ async def apply_feedback_to_all_papers(
     user: User = Depends(get_current_user)
 ):
     """
-    Apply teacher's correction to all students' papers for a specific question or sub-question
-    This directly updates grades without re-running AI, saving time and credits
+    Intelligent re-grading: Uses teacher's feedback to re-analyze each student's answer via AI
+    Applies grading criteria individually for fair, differentiated grading
     """
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can apply corrections")
@@ -7700,19 +7700,44 @@ async def apply_feedback_to_all_papers(
     if not exam_id or not question_number:
         raise HTTPException(status_code=400, detail="Missing exam_id or question_number")
     
+    # Get exam details
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get question details from questions collection
+    question = await db.questions.find_one(
+        {"exam_id": exam_id, "question_number": question_number},
+        {"_id": 0}
+    )
+    
+    if not question:
+        # Fallback to exam questions array
+        question = next((q for q in exam.get("questions", []) if q.get("question_number") == question_number), None)
+    
+    if not question:
+        raise HTTPException(status_code=404, detail=f"Question {question_number} not found")
+    
+    # Get model answer text for reference
+    model_answer_text = await get_exam_model_answer_text(exam_id)
+    
     # Find all submissions for this exam
     submissions = await db.submissions.find(
         {"exam_id": exam_id},
-        {"_id": 0, "submission_id": 1, "question_scores": 1, "total_score": 1}
+        {"_id": 0, "submission_id": 1, "student_name": 1, "question_scores": 1, "file_images": 1, "total_score": 1}
     ).to_list(1000)
     
     if not submissions:
         return {"message": "No submissions found", "updated_count": 0}
     
     updated_count = 0
+    failed_count = 0
     
-    # Update each submission
-    for submission in submissions:
+    logger.info(f"Starting intelligent re-grading for {len(submissions)} papers - Question {question_number}" + 
+                (f" Sub-question {sub_question_id}" if sub_question_id and sub_question_id != "all" else ""))
+    
+    # Process each submission with AI re-grading
+    for idx, submission in enumerate(submissions):
         try:
             question_scores = submission.get("question_scores", [])
             
@@ -7724,50 +7749,99 @@ async def apply_feedback_to_all_papers(
                 continue
             
             question_score = question_scores[q_index]
-            old_total = question_score.get("obtained_marks", 0)
+            student_images = submission.get("file_images", [])
             
-            # Update based on whether it's whole question or sub-question
+            if not student_images:
+                logger.warning(f"No images for submission {submission['submission_id']}")
+                continue
+            
+            # Determine what to re-grade: sub-question or whole question
             if sub_question_id and sub_question_id != "all":
-                # Update specific sub-question
+                # Re-grade specific sub-question
                 sub_scores = question_score.get("sub_scores", [])
                 sub_index = next((i for i, ss in enumerate(sub_scores) 
                                  if ss.get("sub_id") == sub_question_id), None)
                 
-                if sub_index is not None:
-                    old_sub_marks = sub_scores[sub_index].get("obtained_marks", 0)
-                    
-                    # Update sub-question marks and feedback
-                    sub_scores[sub_index]["obtained_marks"] = teacher_expected_grade
-                    sub_scores[sub_index]["ai_feedback"] = f"[Teacher Corrected] {teacher_correction}"
-                    
-                    # Recalculate total for this question
-                    new_total = sum(ss.get("obtained_marks", 0) for ss in sub_scores)
-                    question_scores[q_index]["obtained_marks"] = new_total
-                    question_scores[q_index]["sub_scores"] = sub_scores
-                    
-                    # Update submission total score
-                    submission_total = submission.get("total_score", 0)
-                    new_submission_total = submission_total - old_sub_marks + teacher_expected_grade
-                    
-                    # Update in database
-                    await db.submissions.update_one(
-                        {"submission_id": submission["submission_id"]},
-                        {"$set": {
-                            "question_scores": question_scores,
-                            "total_score": new_submission_total,
-                            f"question_scores.{q_index}.obtained_marks": new_total,
-                            f"question_scores.{q_index}.sub_scores": sub_scores
-                        }}
-                    )
-                    updated_count += 1
-            else:
-                # Update whole question
-                question_scores[q_index]["obtained_marks"] = teacher_expected_grade
-                question_scores[q_index]["ai_feedback"] = f"[Teacher Corrected] {teacher_correction}"
+                if sub_index is None:
+                    continue
                 
-                # Update submission total score
-                submission_total = submission.get("total_score", 0)
-                new_submission_total = submission_total - old_total + teacher_expected_grade
+                old_sub_score = sub_scores[sub_index]
+                
+                # Get sub-question details
+                sub_question = next((sq for sq in question.get("sub_questions", []) 
+                                    if sq.get("sub_id") == sub_question_id), None)
+                
+                if not sub_question:
+                    continue
+                
+                # Create AI prompt for intelligent re-grading
+                re_grade_prompt = f"""# INTELLIGENT RE-GRADING TASK
+
+## TEACHER'S GRADING GUIDANCE
+{teacher_correction}
+
+## CONTEXT
+- Question {question_number}, Part/Sub-question: {sub_question.get('sub_label', 'Part')}
+- Maximum Marks: {sub_question.get('max_marks')}
+- Sub-question: {sub_question.get('rubric', '')}
+
+## MODEL ANSWER REFERENCE
+{model_answer_text[:3000] if model_answer_text else "No model answer available"}
+
+## YOUR TASK
+Re-grade this student's answer for the sub-question based on the teacher's guidance above.
+Analyze the student's response carefully and apply the grading criteria the teacher expects.
+Award marks based on:
+1. Understanding demonstrated
+2. Key concepts mentioned
+3. Correctness of approach
+4. Completeness of answer
+
+## IMPORTANT
+- Apply the teacher's grading philosophy consistently
+- Give partial credit where appropriate
+- Be fair and objective
+
+## OUTPUT FORMAT (JSON ONLY)
+{{
+  "obtained_marks": <marks between 0 and {sub_question.get('max_marks')}>,
+  "ai_feedback": "<brief explanation of grading decision>"
+}}
+"""
+                
+                # Call AI to re-grade
+                from emergentintegrations import LlmChat, UserMessage, ImageContent
+                
+                chat = LlmChat(
+                    api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                    provider="gemini",
+                    response_format="json_object"
+                ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
+                
+                # Prepare images for this question
+                content = [re_grade_prompt]
+                for img in student_images[:20]:  # Limit images for API
+                    content.append(ImageContent(image=img, detail="low"))
+                
+                result = await chat.send_message(UserMessage(content=content))
+                re_grade_result = json.loads(result.text)
+                
+                # Update sub-question score
+                new_marks = float(re_grade_result.get("obtained_marks", old_sub_score["obtained_marks"]))
+                new_feedback = f"[Teacher Re-graded] {re_grade_result.get('ai_feedback', '')}"
+                
+                sub_scores[sub_index]["obtained_marks"] = new_marks
+                sub_scores[sub_index]["ai_feedback"] = new_feedback
+                
+                # Recalculate question total
+                new_question_total = sum(ss.get("obtained_marks", 0) for ss in sub_scores)
+                question_scores[q_index]["obtained_marks"] = new_question_total
+                question_scores[q_index]["sub_scores"] = sub_scores
+                
+                # Recalculate submission total
+                old_submission_total = submission.get("total_score", 0)
+                old_question_total = question_score.get("obtained_marks", 0)
+                new_submission_total = old_submission_total - old_question_total + new_question_total
                 
                 # Update in database
                 await db.submissions.update_one(
@@ -7777,15 +7851,94 @@ async def apply_feedback_to_all_papers(
                         "total_score": new_submission_total
                     }}
                 )
+                
                 updated_count += 1
+                logger.info(f"[{idx+1}/{len(submissions)}] Re-graded {submission['student_name']} - Q{question_number} Part: {new_marks}/{sub_question.get('max_marks')}")
+                
+            else:
+                # Re-grade whole question
+                re_grade_prompt = f"""# INTELLIGENT RE-GRADING TASK
+
+## TEACHER'S GRADING GUIDANCE
+{teacher_correction}
+
+## CONTEXT
+- Question {question_number}
+- Maximum Marks: {question.get('max_marks')}
+- Question: {question.get('rubric', '')}
+
+## MODEL ANSWER REFERENCE
+{model_answer_text[:3000] if model_answer_text else "No model answer available"}
+
+## YOUR TASK
+Re-grade this student's entire answer for Question {question_number} based on the teacher's guidance above.
+Analyze the student's response carefully and apply the grading criteria the teacher expects.
+
+## IMPORTANT
+- Apply the teacher's grading philosophy consistently
+- Give partial credit where appropriate
+- Be fair and objective
+- Consider all aspects of the answer
+
+## OUTPUT FORMAT (JSON ONLY)
+{{
+  "obtained_marks": <marks between 0 and {question.get('max_marks')}>,
+  "ai_feedback": "<brief explanation of grading decision>"
+}}
+"""
+                
+                # Call AI to re-grade
+                from emergentintegrations import LlmChat, UserMessage, ImageContent
+                
+                chat = LlmChat(
+                    api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                    provider="gemini",
+                    response_format="json_object"
+                ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
+                
+                # Prepare images
+                content = [re_grade_prompt]
+                for img in student_images[:20]:
+                    content.append(ImageContent(image=img, detail="low"))
+                
+                result = await chat.send_message(UserMessage(content=content))
+                re_grade_result = json.loads(result.text)
+                
+                # Update question score
+                new_marks = float(re_grade_result.get("obtained_marks", question_score.get("obtained_marks", 0)))
+                new_feedback = f"[Teacher Re-graded] {re_grade_result.get('ai_feedback', '')}"
+                
+                question_scores[q_index]["obtained_marks"] = new_marks
+                question_scores[q_index]["ai_feedback"] = new_feedback
+                
+                # Recalculate submission total
+                old_submission_total = submission.get("total_score", 0)
+                old_question_total = question_score.get("obtained_marks", 0)
+                new_submission_total = old_submission_total - old_question_total + new_marks
+                
+                # Update in database
+                await db.submissions.update_one(
+                    {"submission_id": submission["submission_id"]},
+                    {"$set": {
+                        "question_scores": question_scores,
+                        "total_score": new_submission_total
+                    }}
+                )
+                
+                updated_count += 1
+                logger.info(f"[{idx+1}/{len(submissions)}] Re-graded {submission['student_name']} - Q{question_number}: {new_marks}/{question.get('max_marks')}")
                 
         except Exception as e:
-            logger.error(f"Error updating submission {submission.get('submission_id')}: {e}")
+            logger.error(f"Error re-grading submission {submission.get('submission_id')}: {e}")
+            failed_count += 1
             continue
     
+    logger.info(f"Intelligent re-grading complete: {updated_count} updated, {failed_count} failed")
+    
     return {
-        "message": f"Applied correction to {updated_count} papers",
-        "updated_count": updated_count
+        "message": f"Intelligently re-graded {updated_count} papers using your feedback",
+        "updated_count": updated_count,
+        "failed_count": failed_count
     }
 
 
