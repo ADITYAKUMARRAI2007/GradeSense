@@ -305,17 +305,30 @@ export default function ReviewPapers({ user }) {
       
       // If "Apply to All Papers" is checked, trigger bulk update
       if (applyToAllPapers && response.data.feedback_id) {
-        toast.info("Applying correction to all papers...");
+        toast.info("🤖 AI is intelligently re-grading all papers based on your feedback...", { duration: 5000 });
         try {
           const bulkResponse = await axios.post(
-            `${API}/feedback/${response.data.feedback_id}/apply-to-all-papers`
+            `${API}/feedback/${response.data.feedback_id}/apply-to-all-papers`,
+            {},
+            { timeout: 300000 } // 5 minutes timeout for AI processing
           );
-          toast.success(`✓ Updated ${bulkResponse.data.updated_count} papers successfully!`);
+          const { updated_count, failed_count } = bulkResponse.data;
+          
+          if (failed_count > 0) {
+            toast.warning(`✓ Re-graded ${updated_count} papers. ${failed_count} failed to process.`);
+          } else {
+            toast.success(`✓ Successfully re-graded all ${updated_count} papers with AI!`);
+          }
+          
           // Refresh the current view
           fetchData();
         } catch (bulkError) {
           console.error("Bulk update error:", bulkError);
-          toast.error("Failed to apply to all papers. Feedback saved but bulk update failed.");
+          if (bulkError.code === 'ECONNABORTED') {
+            toast.error("Re-grading is taking longer than expected. Please check back in a few minutes.");
+          } else {
+            toast.error("Failed to apply to all papers. Feedback saved but bulk update failed.");
+          }
         }
       } else if (applyToBatch && response.data.feedback_id) {
         // Original batch re-grading logic (kept for backward compatibility)
