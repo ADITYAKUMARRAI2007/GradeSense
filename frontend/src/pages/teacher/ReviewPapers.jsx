@@ -1347,6 +1347,30 @@ export default function ReviewPapers({ user }) {
                 </p>
               </div>
 
+              {/* Apply to All Papers Option */}
+              <div className="flex items-start space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <Checkbox 
+                  id="apply-to-all"
+                  checked={applyToAllPapers}
+                  onCheckedChange={setApplyToAllPapers}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="apply-to-all"
+                    className="text-sm font-medium leading-none cursor-pointer"
+                  >
+                    Apply this correction to all papers
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {feedbackForm.selected_sub_question === "all" 
+                      ? `This will update Question ${feedbackQuestion.question_number} for all students in this exam with your correction`
+                      : `This will update the selected sub-question for all students in this exam with your correction`
+                    }
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button 
                   variant="outline" 
