@@ -4510,25 +4510,49 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             logger.info(f"[File {idx + 1}/{len(files_data)}] START processing: {filename}")
             try:
                 # Check file size - limit to 30MB for safety
-            file_size_mb = len(pdf_bytes) / (1024 * 1024)
-            if len(pdf_bytes) > 30 * 1024 * 1024:
-                logger.warning(f"[File {idx + 1}/{len(files)}] File too large: {file_size_mb:.1f}MB")
-                errors.append({
-                    "filename": file.filename,
-                    "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
-                })
-                continue
-            
-            images = pdf_to_images(pdf_bytes)
-            logger.info(f"[File {idx + 1}/{len(files)}] Extracted {len(images) if images else 0} images from PDF")
-            
-            if not images:
-                logger.error(f"[File {idx + 1}/{len(files)}] Failed to extract images")
-                errors.append({
-                    "filename": file.filename,
-                    "error": "Failed to extract images from PDF"
-                })
-                continue
+                file_size_mb = len(pdf_bytes) / (1024 * 1024)
+                if len(pdf_bytes) > 30 * 1024 * 1024:
+                    logger.warning(f"[File {idx + 1}/{len(files_data)}] File too large: {file_size_mb:.1f}MB")
+                    errors.append({
+                        "filename": filename,
+                        "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
+                    })
+                    # Update job progress
+                    await db.grading_jobs.update_one(
+                        {"job_id": job_id},
+                        {
+                            "$set": {
+                                "processed_papers": idx + 1,
+                                "failed": len(errors),
+                                "errors": errors,
+                                "updated_at": datetime.now(timezone.utc).isoformat()
+                            }
+                        }
+                    )
+                    continue
+                
+                images = pdf_to_images(pdf_bytes)
+                logger.info(f"[File {idx + 1}/{len(files_data)}] Extracted {len(images) if images else 0} images from PDF")
+                
+                if not images:
+                    logger.error(f"[File {idx + 1}/{len(files_data)}] Failed to extract images")
+                    errors.append({
+                        "filename": filename,
+                        "error": "Failed to extract images from PDF"
+                    })
+                    # Update job progress
+                    await db.grading_jobs.update_one(
+                        {"job_id": job_id},
+                        {
+                            "$set": {
+                                "processed_papers": idx + 1,
+                                "failed": len(errors),
+                                "errors": errors,
+                                "updated_at": datetime.now(timezone.utc).isoformat()
+                            }
+                        }
+                    )
+                    continue
             
             # Extract student ID and name from the paper using AI
             student_id, student_name = await extract_student_info_from_paper(images, file.filename)
