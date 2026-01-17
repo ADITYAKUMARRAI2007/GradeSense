@@ -1218,7 +1218,7 @@ export default function ReviewPapers({ user }) {
 
       {/* AI Feedback Dialog */}
       <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lightbulb className="w-5 h-5 text-orange-500" />
@@ -1227,7 +1227,7 @@ export default function ReviewPapers({ user }) {
           </DialogHeader>
           
           {feedbackQuestion && (
-            <div className="space-y-4">
+            <div className="space-y-4 pb-4">
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium mb-1">Question {feedbackQuestion.question_number}</p>
                 {feedbackQuestion.question_text && (
