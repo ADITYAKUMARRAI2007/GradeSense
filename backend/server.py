@@ -4509,11 +4509,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
             
             logger.info(f"[File {idx + 1}/{len(files_data)}] START processing: {filename}")
             try:
-            # Process the PDF first to get images
-            pdf_bytes = await file.read()
-            logger.info(f"[File {idx + 1}/{len(files)}] Read {len(pdf_bytes)} bytes from {file.filename}")
-            
-            # Check file size - limit to 30MB for safety
+                # Check file size - limit to 30MB for safety
             file_size_mb = len(pdf_bytes) / (1024 * 1024)
             if len(pdf_bytes) > 30 * 1024 * 1024:
                 logger.warning(f"[File {idx + 1}/{len(files)}] File too large: {file_size_mb:.1f}MB")
