@@ -1292,7 +1292,19 @@ export default function ReviewPapers({ user }) {
                 <div>
                   <Label className="text-xs">AI Grade</Label>
                   <div className="p-2 bg-muted rounded text-center font-medium">
-                    {feedbackQuestion.obtained_marks} / {feedbackQuestion.max_marks}
+                    {(() => {
+                      // Show grade for selected sub-question or whole question
+                      if (feedbackForm.selected_sub_question === "all") {
+                        return `${feedbackQuestion.obtained_marks} / ${feedbackQuestion.max_marks}`;
+                      } else {
+                        const subScore = feedbackQuestion.sub_scores?.find(
+                          s => s.sub_id === feedbackForm.selected_sub_question
+                        );
+                        return subScore 
+                          ? `${subScore.obtained_marks} / ${subScore.max_marks}`
+                          : `${feedbackQuestion.obtained_marks} / ${feedbackQuestion.max_marks}`;
+                      }
+                    })()}
                   </div>
                 </div>
                 <div>
@@ -1300,7 +1312,17 @@ export default function ReviewPapers({ user }) {
                   <Input 
                     type="number"
                     min="0"
-                    max={feedbackQuestion.max_marks}
+                    max={(() => {
+                      // Set max based on selected sub-question or whole question
+                      if (feedbackForm.selected_sub_question === "all") {
+                        return feedbackQuestion.max_marks;
+                      } else {
+                        const subScore = feedbackQuestion.sub_scores?.find(
+                          s => s.sub_id === feedbackForm.selected_sub_question
+                        );
+                        return subScore?.max_marks || feedbackQuestion.max_marks;
+                      }
+                    })()}
                     step="0.5"
                     value={feedbackForm.teacher_expected_grade}
                     onChange={(e) => setFeedbackForm(prev => ({ ...prev, teacher_expected_grade: e.target.value }))}
