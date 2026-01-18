@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 async def process_grading_job_in_background(
     job_id: str,
     exam_id: str,
-    files_data: List[dict],
+    files: List,  # UploadFile objects
     exam: dict,
     teacher_id: str,
     db,  # MongoDB database instance
@@ -30,6 +30,7 @@ async def process_grading_job_in_background(
     """
     Background task to process papers one by one with progress tracking
     Supports 30+ papers without timeout issues
+    NOW READS FILES IN BACKGROUND - endpoint returns immediately!
     """
     try:
         # Update job status to processing
@@ -44,7 +45,7 @@ async def process_grading_job_in_background(
         submissions = []
         errors = []
         
-        logger.info(f"=== BACKGROUND GRADING START === Job {job_id}: {len(files_data)} files for exam {exam_id}")
+        logger.info(f"=== BACKGROUND GRADING START === Job {job_id}: {len(files)} files for exam {exam_id}")
         
         # Get pre-loaded data (to avoid repeated DB queries)
         model_answer_imgs = await get_exam_model_answer_images(exam_id)
@@ -73,12 +74,15 @@ async def process_grading_job_in_background(
             )
             return
         
-        # Process each paper
-        for idx, file_data in enumerate(files_data):
-            filename = file_data["filename"]
-            pdf_bytes = file_data["content"]
+        # Process each paper - READ FILES HERE IN BACKGROUND
+        for idx, file in enumerate(files):
+            filename = file.filename
             
-            logger.info(f"[Job {job_id}] [{idx + 1}/{len(files_data)}] Processing: {filename}")
+            logger.info(f"[Job {job_id}] [{idx + 1}/{len(files)}] Processing: {filename}")
+            
+            try:
+                # Read file content in background (doesn't block endpoint response)
+                pdf_bytes = await file.read()
             
             try:
                 # Check file size
