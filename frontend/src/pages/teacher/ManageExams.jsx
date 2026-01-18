@@ -53,6 +53,9 @@ export default function ManageExams({ user }) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadingPapers, setUploadingPapers] = useState(false);
   const [paperFiles, setPaperFiles] = useState([]);
+  const [uploadJobId, setUploadJobId] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [extractingQuestions, setExtractingQuestions] = useState(false);
   const [inferringTopics, setInferringTopics] = useState(false);
   const [submissions, setSubmissions] = useState([]);
