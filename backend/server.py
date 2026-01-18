@@ -4765,11 +4765,19 @@ async def grade_papers_background(
     
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     
-    # Read all files into memory (ensures files are available for background task)
+    # Read all files into memory CONCURRENTLY (ensures files are available for background task)
+    # This optimization prevents timeout for large batches (30+ papers)
     logger.info(f"Reading {len(files)} files for job {job_id}...")
+    
+    # Create read tasks for all files
+    read_tasks = [file.read() for file in files]
+    
+    # Execute all reads concurrently
+    file_contents = await asyncio.gather(*read_tasks)
+    
+    # Build files_data with filenames and contents
     files_data = []
-    for file in files:
-        content = await file.read()
+    for file, content in zip(files, file_contents):
         logger.info(f"  Read {file.filename}: {len(content)} bytes")
         files_data.append({
             "filename": file.filename,
