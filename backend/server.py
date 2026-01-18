@@ -4768,9 +4768,11 @@ async def grade_papers_background(
     logger.info(f"Reading {len(files)} files for job {job_id}...")
     files_data = []
     for file in files:
+        content = await file.read()
+        logger.info(f"  Read {file.filename}: {len(content)} bytes")
         files_data.append({
             "filename": file.filename,
-            "content": await file.read()
+            "content": content
         })
     
     logger.info(f"Files read successfully. Creating job record...")
