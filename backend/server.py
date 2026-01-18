@@ -4627,7 +4627,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 })
                 continue
             
-                # Grade with AI using the grading mode from exam
+            # Grade with AI using the grading mode from exam
                 # Get model answer images from separate collection
                 model_answer_imgs = await get_exam_model_answer_images(exam_id)
                 
