@@ -4002,12 +4002,12 @@ Return valid JSON only."""
 
         # Retry logic with exponential backoff
         import asyncio
-        max_retries = 5  # Increased from 3 to 5 for better resilience against 502 errors
-        base_retry_delay = 10  # Increased base delay for API recovery
+        max_retries = 3  # Reduced from 5 to 3 for faster failure
+        base_retry_delay = 5  # Reduced base delay
         
         for attempt in range(max_retries):
             try:
-                # Exponential backoff: 10s, 20s, 40s, 80s, 160s
+                # Exponential backoff: 5s, 10s, 20s
                 if attempt > 0:
                     wait_time = base_retry_delay * (2 ** attempt)
                     logger.info(f"Waiting {wait_time}s before retry {attempt+1}")
