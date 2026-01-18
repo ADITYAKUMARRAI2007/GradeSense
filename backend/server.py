@@ -1656,21 +1656,21 @@ async def upload_more_papers(
                 if not student_name:
                     student_name = f"Student {student_id}"
             
-                # Get or create student
-                user_id, error = await get_or_create_student(
-                    student_id=student_id,
-                    student_name=student_name,
-                    batch_id=exam["batch_id"],
-                    teacher_id=user.user_id
-                )
-                
-                if error:
-                    errors.append({
-                        "filename": filename,
-                        "student_id": student_id,
-                        "error": error
-                    })
-                    continue
+            # Get or create student (FIXED: moved outside the if block)
+            user_id, error = await get_or_create_student(
+                student_id=student_id,
+                student_name=student_name,
+                batch_id=exam["batch_id"],
+                teacher_id=user.user_id
+            )
+            
+            if error:
+                errors.append({
+                    "filename": filename,
+                    "student_id": student_id,
+                    "error": error
+                })
+                continue
             
             # Grade with AI
             # Get model answer images from separate collection
@@ -4611,21 +4611,21 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 if not student_name:
                     student_name = f"Student {student_id}"
             
-                # Get or create student
-                user_id, error = await get_or_create_student(
-                    student_id=student_id,
-                    student_name=student_name,
-                    batch_id=exam["batch_id"],
-                    teacher_id=user.user_id
-                )
-                
-                if error:
-                    errors.append({
-                        "filename": filename,
-                        "student_id": student_id,
-                        "error": error
-                    })
-                    continue
+            # Get or create student (FIXED: moved outside the if block)
+            user_id, error = await get_or_create_student(
+                student_id=student_id,
+                student_name=student_name,
+                batch_id=exam["batch_id"],
+                teacher_id=user.user_id
+            )
+            
+            if error:
+                errors.append({
+                    "filename": filename,
+                    "student_id": student_id,
+                    "error": error
+                })
+                continue
             
                 # Grade with AI using the grading mode from exam
                 # Get model answer images from separate collection
