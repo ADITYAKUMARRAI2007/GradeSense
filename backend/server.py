@@ -4628,29 +4628,29 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 continue
             
             # Grade with AI using the grading mode from exam
-                # Get model answer images from separate collection
-                model_answer_imgs = await get_exam_model_answer_images(exam_id)
-                
-                # Get questions from the separate questions collection (where auto-extraction saves them)
-                # Fallback to exam.questions if questions collection is empty (for backward compatibility)
-                questions_from_collection = await db.questions.find(
-                    {"exam_id": exam_id},
-                    {"_id": 0}
-                ).to_list(1000)
-                
-                if questions_from_collection:
-                    questions_to_grade = questions_from_collection
-                    logger.info(f"Using {len(questions_to_grade)} questions from questions collection")
-                else:
-                    questions_to_grade = exam.get("questions", [])
-                    logger.info(f"Using {len(questions_to_grade)} questions from exam document (fallback)")
-                
-                if not questions_to_grade:
-                    errors.append({
-                        "student": student_name,
-                        "error": "No questions found for this exam. Please ensure questions are extracted or manually added."
-                    })
-                    continue
+            # Get model answer images from separate collection
+            model_answer_imgs = await get_exam_model_answer_images(exam_id)
+            
+            # Get questions from the separate questions collection (where auto-extraction saves them)
+            # Fallback to exam.questions if questions collection is empty (for backward compatibility)
+            questions_from_collection = await db.questions.find(
+                {"exam_id": exam_id},
+                {"_id": 0}
+            ).to_list(1000)
+            
+            if questions_from_collection:
+                questions_to_grade = questions_from_collection
+                logger.info(f"Using {len(questions_to_grade)} questions from questions collection")
+            else:
+                questions_to_grade = exam.get("questions", [])
+                logger.info(f"Using {len(questions_to_grade)} questions from exam document (fallback)")
+            
+            if not questions_to_grade:
+                errors.append({
+                    "student": student_name,
+                    "error": "No questions found for this exam. Please ensure questions are extracted or manually added."
+                })
+                continue
                 
                 # Get pre-extracted model answer text for efficient grading
                 model_answer_text = await get_exam_model_answer_text(exam_id)
