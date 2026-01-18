@@ -200,7 +200,7 @@ async def process_grading_job_in_background(
             {"job_id": job_id},
             {"$set": {
                 "status": "completed",
-                "processed_papers": len(files_data),
+                "processed_papers": len(files),
                 "successful": len(submissions),
                 "failed": len(errors),
                 "submissions": submissions,
@@ -215,7 +215,7 @@ async def process_grading_job_in_background(
             user_id=teacher_id,
             notification_type="grading_complete",
             title="Grading Complete",
-            message=f"Successfully graded {len(submissions)} of {len(files_data)} papers for {exam['exam_name']}",
+            message=f"Successfully graded {len(submissions)} of {len(files)} papers for {exam['exam_name']}",
             link=f"/teacher/review?exam={exam_id}"
         )
         
