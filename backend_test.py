@@ -4097,6 +4097,426 @@ print('Critical Fix #1 test submission created');
         
         return True
 
+    def test_background_grading_system(self):
+        """Test the critical P0 background grading system for 30+ papers"""
+        print("\n🔥 CRITICAL P0 TESTING: Background Grading System for 30+ Papers")
+        print("=" * 80)
+        
+        # First, ensure we have the required test data
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Creating required test data for background grading...")
+            if not self.test_create_batch():
+                print("❌ Failed to create test batch")
+                return None
+            if not self.test_create_subject():
+                print("❌ Failed to create test subject")
+                return None
+        
+        # Phase 1: Create exam for background grading test
+        timestamp = datetime.now().strftime('%H%M%S')
+        bg_exam_data = {
+            "batch_id": self.test_batch_id,
+            "subject_id": self.test_subject_id,
+            "exam_type": "Background Grading Test",
+            "exam_name": f"BG Grading Test {timestamp}",
+            "total_marks": 100.0,
+            "exam_date": "2024-01-15",
+            "grading_mode": "balanced",
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 50.0,
+                    "rubric": "Solve algebraic equations with proper working"
+                },
+                {
+                    "question_number": 2,
+                    "max_marks": 50.0,
+                    "rubric": "Analyze quadratic functions and graph properties"
+                }
+            ]
+        }
+        
+        exam_result = self.run_api_test(
+            "Create Exam for Background Grading Test",
+            "POST",
+            "exams",
+            200,
+            data=bg_exam_data
+        )
+        
+        if not exam_result:
+            print("❌ Failed to create exam for background grading test")
+            return None
+        
+        self.bg_exam_id = exam_result.get('exam_id')
+        print(f"✅ Created background grading test exam: {self.bg_exam_id}")
+        
+        # Phase 2: Create test PDF files programmatically
+        print("\n📄 Creating test PDF files...")
+        test_files = self.create_test_pdf_files()
+        
+        if not test_files:
+            print("❌ Failed to create test PDF files")
+            return None
+        
+        print(f"✅ Created {len(test_files)} test PDF files")
+        
+        # Phase 3: Test background grading endpoint
+        print("\n🚀 Testing background grading endpoint...")
+        
+        # Prepare multipart form data
+        files_for_upload = []
+        for file_data in test_files:
+            files_for_upload.append(
+                ('files', (file_data['filename'], file_data['content'], 'application/pdf'))
+            )
+        
+        # Make request to background grading endpoint
+        url = f"{self.base_url}/exams/{self.bg_exam_id}/grade-papers-bg"
+        headers = {'Authorization': f'Bearer {self.session_token}'}
+        
+        try:
+            import requests
+            response = requests.post(url, files=files_for_upload, headers=headers, timeout=30)
+            
+            print(f"   Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                bg_result = response.json()
+                job_id = bg_result.get('job_id')
+                
+                if job_id:
+                    self.log_test("Background Grading Job Creation", True, f"Job ID: {job_id}")
+                    self.bg_job_id = job_id
+                    
+                    # Verify response structure
+                    expected_fields = ['job_id', 'status', 'total_papers', 'message']
+                    has_all_fields = all(field in bg_result for field in expected_fields)
+                    
+                    if has_all_fields:
+                        self.log_test("Background Grading Response Structure", True, 
+                            f"All required fields present: {list(bg_result.keys())}")
+                    else:
+                        missing = [f for f in expected_fields if f not in bg_result]
+                        self.log_test("Background Grading Response Structure", False, 
+                            f"Missing fields: {missing}")
+                    
+                    # Verify initial status is 'pending'
+                    if bg_result.get('status') == 'pending':
+                        self.log_test("Initial Job Status", True, "Status is 'pending' as expected")
+                    else:
+                        self.log_test("Initial Job Status", False, 
+                            f"Expected 'pending', got '{bg_result.get('status')}'")
+                    
+                    # Phase 4: Monitor job progress
+                    print("\n⏳ Monitoring job progress...")
+                    self.monitor_background_job_progress(job_id)
+                    
+                    # Phase 5: Verify fix resolved issues
+                    print("\n🔍 Verifying fix resolved 'read of closed file' errors...")
+                    self.verify_background_grading_fix()
+                    
+                    return bg_result
+                else:
+                    self.log_test("Background Grading Job Creation", False, "No job_id in response")
+            else:
+                error_msg = "Unknown error"
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('detail', 'No error details')
+                except:
+                    error_msg = response.text[:200]
+                
+                self.log_test("Background Grading Job Creation", False, 
+                    f"Status {response.status_code}: {error_msg}")
+        
+        except Exception as e:
+            self.log_test("Background Grading Job Creation", False, f"Request failed: {str(e)}")
+        
+        return None
+    
+    def create_test_pdf_files(self):
+        """Create simple test PDF files programmatically"""
+        try:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            import io
+            
+            test_files = []
+            
+            # Create 3 test PDF files with different student info
+            students = [
+                {"id": "STU001", "name": "TestStudent", "subject": "Maths"},
+                {"id": "STU002", "name": "AnotherStudent", "subject": "Subject"},
+                {"id": "123", "name": "John Doe", "subject": "Test"}
+            ]
+            
+            for i, student in enumerate(students):
+                # Create PDF in memory
+                buffer = io.BytesIO()
+                p = canvas.Canvas(buffer, pagesize=letter)
+                
+                # Add student info and some content
+                p.drawString(100, 750, f"Student ID: {student['id']}")
+                p.drawString(100, 730, f"Name: {student['name']}")
+                p.drawString(100, 710, f"Subject: {student['subject']}")
+                p.drawString(100, 680, "Answer Sheet")
+                p.drawString(100, 650, "Question 1: This is my answer to question 1...")
+                p.drawString(100, 620, "Question 2: This is my answer to question 2...")
+                
+                p.showPage()
+                p.save()
+                
+                # Get PDF bytes
+                pdf_bytes = buffer.getvalue()
+                buffer.close()
+                
+                filename = f"{student['id']}_{student['name']}_{student['subject']}.pdf"
+                test_files.append({
+                    'filename': filename,
+                    'content': pdf_bytes
+                })
+                
+                print(f"   Created: {filename} ({len(pdf_bytes)} bytes)")
+            
+            return test_files
+            
+        except ImportError:
+            print("⚠️  reportlab not available, creating mock PDF files...")
+            # Create mock PDF files with minimal PDF structure
+            test_files = []
+            
+            students = [
+                {"id": "STU001", "name": "TestStudent", "subject": "Maths"},
+                {"id": "STU002", "name": "AnotherStudent", "subject": "Subject"},
+                {"id": "123", "name": "John Doe", "subject": "Test"}
+            ]
+            
+            # Minimal PDF header and content
+            pdf_template = b"""%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+>>
+endobj
+
+4 0 obj
+<<
+/Length 44
+>>
+stream
+BT
+/F1 12 Tf
+100 700 Td
+(Test PDF Content) Tj
+ET
+endstream
+endobj
+
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000206 00000 n 
+trailer
+<<
+/Size 5
+/Root 1 0 R
+>>
+startxref
+300
+%%EOF"""
+            
+            for student in students:
+                filename = f"{student['id']}_{student['name']}_{student['subject']}.pdf"
+                test_files.append({
+                    'filename': filename,
+                    'content': pdf_template
+                })
+                print(f"   Created mock: {filename} ({len(pdf_template)} bytes)")
+            
+            return test_files
+        
+        except Exception as e:
+            print(f"❌ Error creating test PDF files: {str(e)}")
+            return None
+    
+    def monitor_background_job_progress(self, job_id: str):
+        """Monitor background job progress with polling"""
+        import time
+        
+        max_polls = 30  # Maximum 60 seconds (30 polls * 2 seconds)
+        poll_count = 0
+        
+        while poll_count < max_polls:
+            poll_count += 1
+            
+            # Poll job status
+            job_status = self.run_api_test(
+                f"Poll Job Status (attempt {poll_count})",
+                "GET",
+                f"grading-jobs/{job_id}",
+                200
+            )
+            
+            if job_status:
+                status = job_status.get('status')
+                processed = job_status.get('processed_papers', 0)
+                total = job_status.get('total_papers', 0)
+                successful = job_status.get('successful', 0)
+                failed = job_status.get('failed', 0)
+                
+                print(f"   Status: {status}, Progress: {processed}/{total}, Success: {successful}, Failed: {failed}")
+                
+                # Check for completion
+                if status == 'completed':
+                    self.log_test("Background Job Completion", True, 
+                        f"Job completed successfully: {successful} successful, {failed} failed")
+                    
+                    # Verify submissions were created
+                    submissions = job_status.get('submissions', [])
+                    if submissions and len(submissions) > 0:
+                        self.log_test("Submissions Creation", True, 
+                            f"Created {len(submissions)} submissions")
+                        
+                        # Store for verification
+                        self.bg_submissions = submissions
+                    else:
+                        self.log_test("Submissions Creation", False, "No submissions created")
+                    
+                    # Verify progress tracking worked
+                    if processed == total and processed > 0:
+                        self.log_test("Progress Tracking", True, 
+                            f"All {total} papers processed")
+                    else:
+                        self.log_test("Progress Tracking", False, 
+                            f"Progress mismatch: {processed}/{total}")
+                    
+                    return job_status
+                
+                elif status == 'failed':
+                    error = job_status.get('error', 'Unknown error')
+                    self.log_test("Background Job Completion", False, 
+                        f"Job failed: {error}")
+                    return job_status
+                
+                elif status == 'processing':
+                    # Job is processing, continue polling
+                    time.sleep(2)
+                    continue
+                
+                else:
+                    # Still pending, continue polling
+                    time.sleep(2)
+                    continue
+            else:
+                self.log_test(f"Poll Job Status (attempt {poll_count})", False, 
+                    "Failed to get job status")
+                time.sleep(2)
+        
+        # Timeout reached
+        self.log_test("Background Job Completion", False, 
+            f"Job did not complete within {max_polls * 2} seconds")
+        return None
+    
+    def verify_background_grading_fix(self):
+        """Verify the fix resolved 'read of closed file' errors"""
+        print("🔍 Verifying background grading fix...")
+        
+        # Check backend logs for errors
+        try:
+            import subprocess
+            result = subprocess.run([
+                'tail', '-n', '100', '/var/log/supervisor/backend.err.log'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                log_content = result.stdout
+                
+                # Check for 'read of closed file' errors
+                if 'read of closed file' in log_content.lower():
+                    self.log_test("No 'Read of Closed File' Errors", False, 
+                        "Found 'read of closed file' errors in logs")
+                else:
+                    self.log_test("No 'Read of Closed File' Errors", True, 
+                        "No 'read of closed file' errors found in recent logs")
+                
+                # Check for successful processing messages
+                if hasattr(self, 'bg_job_id'):
+                    job_messages = [
+                        f"Reading {len(getattr(self, 'bg_submissions', []))} files for job",
+                        "File data type: <class 'bytes'>",
+                        f"Job {self.bg_job_id}"
+                    ]
+                    
+                    found_messages = []
+                    for msg in job_messages:
+                        if any(m in log_content for m in [msg, msg.replace('3', '\\d+')]):
+                            found_messages.append(msg)
+                    
+                    if found_messages:
+                        self.log_test("Background Processing Log Messages", True, 
+                            f"Found expected log messages: {len(found_messages)}/{len(job_messages)}")
+                    else:
+                        self.log_test("Background Processing Log Messages", False, 
+                            "Expected log messages not found")
+            else:
+                self.log_test("Backend Log Check", False, 
+                    f"Failed to read backend logs: {result.stderr}")
+        
+        except Exception as e:
+            self.log_test("Backend Log Check", False, f"Error checking logs: {str(e)}")
+        
+        # Verify submissions were created in database
+        if hasattr(self, 'bg_submissions') and self.bg_submissions:
+            # Check if submissions exist in database by querying submissions endpoint
+            submissions_result = self.run_api_test(
+                "Verify Submissions in Database",
+                "GET",
+                f"submissions?exam_id={self.bg_exam_id}",
+                200
+            )
+            
+            if submissions_result and len(submissions_result) > 0:
+                self.log_test("Database Submissions Verification", True, 
+                    f"Found {len(submissions_result)} submissions in database")
+                
+                # Verify submission structure
+                first_sub = submissions_result[0]
+                required_fields = ['submission_id', 'student_name', 'total_score', 'percentage', 'status']
+                has_required = all(field in first_sub for field in required_fields)
+                
+                if has_required:
+                    self.log_test("Submission Structure Verification", True, 
+                        "Submissions have correct structure")
+                else:
+                    missing = [f for f in required_fields if f not in first_sub]
+                    self.log_test("Submission Structure Verification", False, 
+                        f"Missing fields: {missing}")
+            else:
+                self.log_test("Database Submissions Verification", False, 
+                    "No submissions found in database")
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting GradeSense API Testing")
