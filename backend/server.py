@@ -1598,6 +1598,7 @@ async def upload_more_papers(
     # Log the number of files received
     logger.info(f"=== BATCH GRADING START === Received {len(files)} files for exam {exam_id}")
     for idx, file in enumerate(files):
+        filename = file.filename  # FIX: Define filename from file object
         file_start_time = datetime.now(timezone.utc)
         logger.info(f"[File {idx + 1}/{len(files)}] START processing: {filename}")
         try:
