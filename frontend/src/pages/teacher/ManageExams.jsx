@@ -1325,53 +1325,91 @@ export default function ManageExams({ user }) {
       </div>
 
       {/* Upload More Papers Dialog */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+        if (!uploadingPapers) {
+          setUploadDialogOpen(open);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upload Additional Papers</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                Upload additional student papers that were missed earlier. Papers will be auto-graded immediately.
-              </p>
-            </div>
-            <div 
-              {...getRootProps()} 
-              className={`dropzone p-8 text-center border-2 border-dashed rounded-xl ${isDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
-            >
-              <input {...getInputProps()} />
-              <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="font-medium">Drop student answer PDFs here</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Format: StudentID_StudentName.pdf
-              </p>
-            </div>
-            {paperFiles.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Selected Files ({paperFiles.length})</p>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {paperFiles.map((file, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm p-2 bg-muted rounded">
-                      <FileText className="w-4 h-4" />
-                      <span className="truncate">{file.name}</span>
+            {!uploadingPapers ? (
+              <>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    Upload additional student papers that were missed earlier. Papers will be auto-graded immediately.
+                  </p>
+                </div>
+                <div 
+                  {...getRootProps()} 
+                  className={`dropzone p-8 text-center border-2 border-dashed rounded-xl ${isDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
+                >
+                  <input {...getInputProps()} />
+                  <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="font-medium">Drop student answer PDFs here</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Format: StudentID_StudentName.pdf
+                  </p>
+                </div>
+                {paperFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Selected Files ({paperFiles.length})</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {paperFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm p-2 bg-muted rounded">
+                          <FileText className="w-4 h-4" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-800">{uploadStatus}</p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        This may take a few minutes depending on paper count...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium">{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-2" />
                 </div>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleUploadMorePapers} 
-              disabled={paperFiles.length === 0 || uploadingPapers}
-              data-testid="upload-papers-btn"
-            >
-              {uploadingPapers ? "Uploading..." : `Upload & Grade ${paperFiles.length} Papers`}
-            </Button>
+            {!uploadingPapers ? (
+              <>
+                <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUploadMorePapers} 
+                  disabled={paperFiles.length === 0 || uploadingPapers}
+                  data-testid="upload-papers-btn"
+                >
+                  {uploadingPapers ? "Uploading..." : `Upload & Grade ${paperFiles.length} Papers`}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" disabled>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Grading in Progress...
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
