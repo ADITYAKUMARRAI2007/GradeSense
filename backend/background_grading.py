@@ -80,6 +80,10 @@ async def process_grading_job_in_background(
             pdf_bytes = file_data["content"]
             
             logger.info(f"[Job {job_id}] [{idx + 1}/{len(files_data)}] Processing: {filename}")
+            
+            try:
+                # Check file size
+                file_size_mb = len(pdf_bytes) / (1024 * 1024)
                 if file_size_mb > 30:
                     errors.append({
                         "filename": filename,
