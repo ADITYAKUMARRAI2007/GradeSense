@@ -213,7 +213,7 @@ async def process_grading_job_in_background(
             user_id=teacher_id,
             notification_type="grading_complete",
             title="Grading Complete",
-            message=f"Successfully graded {len(submissions)} of {len(files)} papers for {exam['exam_name']}",
+            message=f"Successfully graded {len(submissions)} of {len(files_data)} papers for {exam['exam_name']}",
             link=f"/teacher/review?exam={exam_id}"
         )
         
