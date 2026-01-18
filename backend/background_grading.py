@@ -156,6 +156,16 @@ async def process_grading_job_in_background(
                     model_answer_text=model_answer_text
                 )
                 
+                # Check if grading failed (empty scores)
+                if not scores or len(scores) == 0:
+                    logger.error(f"[Job {job_id}] ✗ Grading failed for {filename} - no scores returned (likely API timeout)")
+                    errors.append({
+                        "filename": filename,
+                        "error": "AI grading failed - API timeout or error"
+                    })
+                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+                    continue
+                
                 total_score = sum(s.obtained_marks for s in scores)
                 percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
                 
