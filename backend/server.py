@@ -3982,7 +3982,8 @@ You must grade based on:
 {partial_instruction}
 
 ## GRADING MODE: {grading_mode.upper()}
-Apply the {grading_mode} mode specifications strictly.
+
+{grading_instruction}
 
 ## CRITICAL REQUIREMENTS:
 1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
