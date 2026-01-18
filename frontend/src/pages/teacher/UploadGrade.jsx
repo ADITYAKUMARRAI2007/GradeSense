@@ -119,7 +119,9 @@ export default function UploadGrade({ user }) {
         axios.get(`${API}/batches`),
         axios.get(`${API}/subjects`)
       ]);
-      setBatches(batchesRes.data);
+      // Filter out closed/archived batches for Upload & Grade
+      const activeBatches = batchesRes.data.filter(batch => batch.status !== 'closed');
+      setBatches(activeBatches);
       setSubjects(subjectsRes.data);
     } catch (error) {
       console.error("Error fetching data:", error);
