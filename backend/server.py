@@ -3891,7 +3891,8 @@ Below is the complete model answer content. Use this as your grading reference:
 - Compare student answers against the model answer text above
 
 ## GRADING MODE: {grading_mode.upper()}
-Apply the {grading_mode} mode specifications strictly.
+
+{grading_instruction}
 
 ## CRITICAL REQUIREMENTS:
 1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
