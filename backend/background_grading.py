@@ -198,7 +198,7 @@ async def process_grading_job_in_background(
             {"job_id": job_id},
             {"$set": {
                 "status": "completed",
-                "processed_papers": len(files),
+                "processed_papers": len(files_data),
                 "successful": len(submissions),
                 "failed": len(errors),
                 "submissions": submissions,
