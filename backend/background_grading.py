@@ -146,15 +146,36 @@ async def process_grading_job_in_background(
                     await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
                     continue
                 
-                # Grade with AI
-                scores = await grade_with_ai(
-                    images=images,
-                    model_answer_images=model_answer_imgs,
-                    questions=questions_to_grade,
-                    grading_mode=exam.get("grading_mode", "balanced"),
-                    total_marks=exam.get("total_marks", 100),
-                    model_answer_text=model_answer_text
-                )
+                # Grade with AI (with timeout to prevent hanging)
+                try:
+                    # Set a maximum timeout of 4 minutes for grading
+                    scores = await asyncio.wait_for(
+                        grade_with_ai(
+                            images=images,
+                            model_answer_images=model_answer_imgs,
+                            questions=questions_to_grade,
+                            grading_mode=exam.get("grading_mode", "balanced"),
+                            total_marks=exam.get("total_marks", 100),
+                            model_answer_text=model_answer_text
+                        ),
+                        timeout=240  # 4 minutes max per paper
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"[Job {job_id}] ✗ Grading timeout for {filename} (exceeded 4 minutes)")
+                    errors.append({
+                        "filename": filename,
+                        "error": "Grading timeout - paper took too long to grade (API issues)"
+                    })
+                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+                    continue
+                except Exception as e:
+                    logger.error(f"[Job {job_id}] ✗ Grading exception for {filename}: {e}")
+                    errors.append({
+                        "filename": filename,
+                        "error": f"Grading error: {str(e)}"
+                    })
+                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+                    continue
                 
                 # Check if grading failed (empty scores)
                 if not scores or len(scores) == 0:
