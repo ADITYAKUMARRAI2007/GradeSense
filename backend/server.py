@@ -4648,49 +4648,49 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 if not questions_to_grade:
                     errors.append({
                         "student": student_name,
-                    "error": "No questions found for this exam. Please ensure questions are extracted or manually added."
+                        "error": "No questions found for this exam. Please ensure questions are extracted or manually added."
+                    })
+                    continue
+                
+                # Get pre-extracted model answer text for efficient grading
+                model_answer_text = await get_exam_model_answer_text(exam_id)
+                
+                scores = await grade_with_ai(
+                    images=images,
+                    model_answer_images=model_answer_imgs,
+                    questions=questions_to_grade,
+                    grading_mode=exam.get("grading_mode", "balanced"),
+                    total_marks=exam.get("total_marks", 100),
+                    model_answer_text=model_answer_text
+                )
+                
+                total_score = sum(s.obtained_marks for s in scores)
+                percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
+                
+                submission_id = f"sub_{uuid.uuid4().hex[:8]}"
+                submission = {
+                    "submission_id": submission_id,
+                    "exam_id": exam_id,
+                    "student_id": user_id,
+                    "student_name": student_name,
+                    "file_data": base64.b64encode(pdf_bytes).decode(),
+                    "file_images": images,
+                    "total_score": total_score,
+                    "percentage": round(percentage, 2),
+                    "question_scores": [s.model_dump() for s in scores],
+                    "status": "ai_graded",
+                    "graded_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                
+                await db.submissions.insert_one(submission)
+                submissions.append({
+                    "submission_id": submission_id,
+                    "student_id": student_id,
+                    "student_name": student_name,
+                    "total_score": total_score,
+                    "percentage": percentage
                 })
-                continue
-            
-            # Get pre-extracted model answer text for efficient grading
-            model_answer_text = await get_exam_model_answer_text(exam_id)
-            
-            scores = await grade_with_ai(
-                images=images,
-                model_answer_images=model_answer_imgs,
-                questions=questions_to_grade,
-                grading_mode=exam.get("grading_mode", "balanced"),
-                total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_text
-            )
-            
-            total_score = sum(s.obtained_marks for s in scores)
-            percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
-            
-            submission_id = f"sub_{uuid.uuid4().hex[:8]}"
-            submission = {
-                "submission_id": submission_id,
-                "exam_id": exam_id,
-                "student_id": user_id,
-                "student_name": student_name,
-                "file_data": base64.b64encode(pdf_bytes).decode(),
-                "file_images": images,
-                "total_score": total_score,
-                "percentage": round(percentage, 2),
-                "question_scores": [s.model_dump() for s in scores],
-                "status": "ai_graded",
-                "graded_at": datetime.now(timezone.utc).isoformat(),
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            await db.submissions.insert_one(submission)
-            submissions.append({
-                "submission_id": submission_id,
-                "student_id": student_id,
-                "student_name": student_name,
-                "total_score": total_score,
-                "percentage": percentage
-            })
             
             except Exception as e:
                 logger.error(f"Error processing {filename}: {e}")
