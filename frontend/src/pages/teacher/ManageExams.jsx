@@ -159,31 +159,122 @@ export default function ManageExams({ user }) {
 
     try {
       setUploadingPapers(true);
+      setUploadProgress(0);
+      setUploadStatus("Uploading files...");
+      
       const formData = new FormData();
       paperFiles.forEach(file => {
         formData.append("files", file);
       });
 
-      const response = await axios.post(`${API}/exams/${selectedExam.exam_id}/upload-more-papers`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      // Use background grading endpoint for better progress tracking
+      const response = await axios.post(
+        `${API}/exams/${selectedExam.exam_id}/grade-papers-bg`, 
+        formData, 
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 120000 // 2 minute timeout
+        }
+      );
 
-      if (response.data.errors && response.data.errors.length > 0) {
-        toast.warning(`Uploaded ${response.data.processed} papers. ${response.data.errors.length} files had errors.`);
-        response.data.errors.forEach(error => {
-          toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
-        });
+      // Start polling for job status
+      if (response.data.job_id) {
+        setUploadJobId(response.data.job_id);
+        setUploadStatus("Grading in progress...");
+        pollJobStatus(response.data.job_id);
       } else {
-        toast.success(`Successfully graded ${response.data.processed} additional papers!`);
+        // Fallback to old sync response handling
+        handleUploadComplete(response.data);
       }
 
-      setUploadDialogOpen(false);
-      setPaperFiles([]);
-      fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to upload papers");
-    } finally {
       setUploadingPapers(false);
+      setUploadProgress(0);
+      setUploadStatus("");
+    }
+  };
+
+  const pollJobStatus = async (jobId) => {
+    const maxAttempts = 300; // 5 minutes max (300 * 1 second)
+    let attempts = 0;
+
+    const checkStatus = async () => {
+      try {
+        const response = await axios.get(`${API}/grading-jobs/${jobId}`);
+        const job = response.data;
+
+        // Update progress
+        const progress = job.total_papers > 0 
+          ? Math.round((job.processed_papers / job.total_papers) * 100)
+          : 0;
+        
+        setUploadProgress(progress);
+        setUploadStatus(`Grading papers: ${job.processed_papers}/${job.total_papers}`);
+
+        if (job.status === "completed") {
+          // Job completed
+          handleUploadComplete({
+            processed: job.successful,
+            errors: job.errors || []
+          });
+          return;
+        } else if (job.status === "failed") {
+          toast.error("Grading job failed");
+          setUploadingPapers(false);
+          setUploadProgress(0);
+          setUploadStatus("");
+          return;
+        }
+
+        // Continue polling if still processing
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 1000);
+        } else {
+          toast.error("Grading timeout - please check Review Papers later");
+          setUploadingPapers(false);
+          setUploadProgress(0);
+          setUploadStatus("");
+        }
+      } catch (error) {
+        console.error("Error polling job status:", error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 1000);
+        } else {
+          setUploadingPapers(false);
+          setUploadProgress(0);
+          setUploadStatus("");
+        }
+      }
+    };
+
+    checkStatus();
+  };
+
+  const handleUploadComplete = (data) => {
+    if (data.errors && data.errors.length > 0) {
+      toast.warning(`Uploaded ${data.processed} papers. ${data.errors.length} files had errors.`);
+      data.errors.slice(0, 3).forEach(error => {
+        toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
+      });
+      if (data.errors.length > 3) {
+        toast.info(`...and ${data.errors.length - 3} more errors`);
+      }
+    } else {
+      toast.success(`Successfully graded ${data.processed} additional papers!`);
+    }
+
+    setUploadDialogOpen(false);
+    setPaperFiles([]);
+    setUploadingPapers(false);
+    setUploadProgress(0);
+    setUploadStatus("");
+    setUploadJobId(null);
+    fetchData();
+    if (selectedExam) {
+      fetchSubmissions(selectedExam.exam_id);
     }
   };
 
