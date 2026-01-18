@@ -4255,6 +4255,11 @@ print('Critical Fix #1 test submission created');
         self.test_delete_submission_edge_cases()
         self.test_delete_submission_cleanup()
         
+        # 🔥 CRITICAL P0 TEST: Background Grading System for 30+ Papers
+        print("\n🔥 CRITICAL P0 TEST: Background Grading System for 30+ Papers")
+        print("-" * 60)
+        self.test_background_grading_system()
+        
         # Cleanup
         self.cleanup_test_data()
         
