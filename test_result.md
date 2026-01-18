@@ -1343,7 +1343,30 @@ agent_communication:
           agent: "main"
           comment: "IMPLEMENTED: AI Tools section in ManageExams. 1) Extract Questions from Model Answer button - calls POST /api/exams/{exam_id}/extract-questions 2) Auto-Infer Topic Tags button - calls POST /api/exams/{exam_id}/infer-topics. Questions section now shows topic_tags badges. Topic tags stored in questions array."
 
+  - task: "Background Grading System for 30+ Papers"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/server.py"
+        - "/app/backend/background_grading.py"
+        - "/app/frontend/src/pages/teacher/UploadGrade.jsx"
+    stuck_count: 2
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "main (previous fork)"
+          comment: "CRITICAL BUG: Background grading system broken. Users upload multiple papers and UI shows success, but background job fails silently. Database shows 'read of closed file' errors for all papers. Root cause: UploadFile objects being passed to background tasks become invalid after HTTP response completes."
+        - working: "NA"
+          agent: "main (previous fork)"
+          comment: "FIX ATTEMPTED: Started reverting to stable implementation - read file contents into memory within API endpoint before creating background task. Modified server.py to read files into memory (lines 4767-4774), modified background_grading.py to accept files_data list of dicts. Revert incomplete - needs verification and testing."
+        - working: "NA"
+          agent: "main (current)"
+          comment: "P0 FIX COMPLETED: Completed the revert started by previous agent. Code structure verified as correct: 1) server.py endpoint /api/exams/{exam_id}/grade-papers-bg reads all files into memory before starting background task (lines 4767-4774) 2) background_grading.py receives files_data as List[dict] with filename and content bytes (line 17) 3) Added debugging logs to track file reading and processing 4) Added type checking for pdf_bytes to ensure it's bytes type 5) Backend restarted successfully. Database shows old failed jobs with 'read of closed file' errors, but these are from before the fix. Code structure is now complete and correct. NEEDS COMPREHENSIVE TESTING to verify new grading jobs work correctly with 2-3 sample papers, then full E2E testing with testing subagent."
+
     - agent: "main"
       message: "ADVANCED ANALYTICS IMPLEMENTATION COMPLETE: Implemented comprehensive analytics enhancements including: 1) Why Engine - Common Misconceptions with AI analysis showing confusion patterns 2) Topic Mastery Heatmap with color-coded grid and hover tooltips 3) Student Deep Dive modal with AI-generated insights and recommendations 4) Generate Review Packet button for AI-created practice questions 5) AI Tools section in ManageExams for question extraction and topic inference. All features use GPT-4o via Emergent LLM Key. Need comprehensive testing with teacher authentication."
+    - agent: "main"
+      message: "P0 BACKGROUND GRADING FIX READY FOR TESTING: Completed the revert of batch grading system started by previous agent. The issue was that UploadFile objects were being passed to background tasks, causing 'read of closed file' errors. Fix implemented: 1) Read all file contents into memory within the API endpoint BEFORE starting background task 2) Pass file data as bytes in a list of dicts to background worker 3) Added comprehensive debugging logs and type checking. Code structure is complete and correct. Old failed jobs in database are from before the fix. Need testing subagent to verify with actual file uploads: a) Upload 2-3 test papers to an exam b) Monitor backend logs for file reading and processing c) Verify papers are graded successfully d) Check job status updates correctly e) Full E2E test with progress polling and result display."
     - agent: "testing"
       message: "🔥 CRITICAL FIXES TESTING COMPLETE - 4 P0 BUGS COMPREHENSIVE ANALYSIS! ✅ CRITICAL FIX #1 (Auto-Extracted Questions): Backend implementation is CORRECT with proper database persistence (delete old + batch insert + update exam), but requires model answer upload to function. Endpoint returns 520 'No documents available' without uploaded documents. ✅ CRITICAL FIX #2 (Optional Questions): FULLY WORKING! Smart total marks calculation correctly handles 'Attempt any X out of Y' scenarios. Tested 4 questions @ 10 marks requiring 2 = 20 total (not 40). All optional question fields properly stored. ✅ CRITICAL FIX #3 (Review Papers UI): FULLY WORKING! All checkboxes (showAnnotations, showModelAnswer, showQuestionPaper) now default to true in ReviewPapers.jsx lines 54-56. ❌ CRITICAL FIX #4 (Manual Entry Form): NOT IMPLEMENTED! Found old buggy condition at line 922: '{!showManualEntry && !questionsSkipped && (' - still includes questionsSkipped. Manual entry form will still show incorrectly when auto-extract is selected. NEEDS FIX: Change condition to only check 'showManualEntry' without questionsSkipped."
