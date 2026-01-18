@@ -83,8 +83,7 @@ async def process_grading_job_in_background(
             try:
                 # Read file content in background (doesn't block endpoint response)
                 pdf_bytes = await file.read()
-            
-            try:
+                
                 # Check file size
                 file_size_mb = len(pdf_bytes) / (1024 * 1024)
                 if file_size_mb > 30:
