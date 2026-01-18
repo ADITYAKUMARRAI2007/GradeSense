@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-01-15T07:50:15.057125",
-  "total_tests": 231,
-  "passed_tests": 218,
-  "success_rate": 94.37229437229438,
+  "timestamp": "2026-01-18T05:33:03.025170",
+  "total_tests": 245,
+  "passed_tests": 227,
+  "success_rate": 92.65306122448979,
   "test_details": [
     {
       "test": "Health Check",
@@ -56,13 +56,13 @@
     },
     {
       "test": "Critical Fix #3: Checkbox Default Values",
-      "success": true,
-      "details": "All checkboxes (showAnnotations, showModelAnswer, showQuestionPaper) default to true"
+      "success": false,
+      "details": "Could not find all checkbox useState declarations: ['Line 56: const [showModelAnswer, setShowModelAnswer] = useState(true);', 'Line 57: const [showQuestionPaper, setShowQuestionPaper] = useState(true);']"
     },
     {
       "test": "Critical Fix #4: Manual Entry Form Condition",
       "success": false,
-      "details": "Old logic still present (includes questionsSkipped): Line 922: {!showManualEntry && !questionsSkipped && ("
+      "details": "Old logic still present (includes questionsSkipped): Line 972: {!showManualEntry && !questionsSkipped && ("
     },
     {
       "test": "Auth Me",
@@ -106,8 +106,8 @@
     },
     {
       "test": "Create Subject",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Expected 200, got 400 - Subject already exists"
     },
     {
       "test": "Get Subjects",
@@ -230,7 +230,7 @@
       "details": ""
     },
     {
-      "test": "Create Student with Valid ID (STU074927)",
+      "test": "Create Student with Valid ID (STU053124)",
       "success": true,
       "details": ""
     },
@@ -272,20 +272,20 @@
     {
       "test": "Student Auto-Added to Batch Verification",
       "success": true,
-      "details": "Student user_47bfd1865c43 found in batch batch_d202dfa0"
+      "details": "Student user_f46a5ceaedef found in batch batch_92ecc731"
     },
     {
-      "test": "Create Student with Format STU0749281 (John Doe)",
+      "test": "Create Student with Format STU0531251 (John Doe)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format ROLL074928 (Alice Smith)",
+      "test": "Create Student with Format ROLL053125 (Alice Smith)",
       "success": true,
       "details": ""
     },
     {
-      "test": "Create Student with Format A074928 (Bob Jones)",
+      "test": "Create Student with Format A053125 (Bob Jones)",
       "success": true,
       "details": ""
     },
@@ -472,7 +472,7 @@
     {
       "test": "Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_3c6efd57"
+      "details": "Generated feedback_id: feedback_1b4001bb"
     },
     {
       "test": "Submit General Feedback",
@@ -482,7 +482,7 @@
     {
       "test": "General Feedback ID Generation",
       "success": true,
-      "details": "Generated feedback_id: feedback_1a1f9a97"
+      "details": "Generated feedback_id: feedback_b221a4af"
     },
     {
       "test": "Submit Feedback Without Auth (should fail)",
@@ -597,7 +597,7 @@
     {
       "test": "Student Deep Dive: Basic Analysis",
       "success": false,
-      "details": "Request failed: HTTPSConnectionPool(host='teachassist-12.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
+      "details": "Request failed: HTTPSConnectionPool(host='ai-paper-grader.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)"
     },
     {
       "test": "Student Deep Dive: With Exam Filter",
@@ -632,7 +632,7 @@
     {
       "test": "Topics Mapping Structure",
       "success": true,
-      "details": "Topics correctly mapped: Q1 -> ['Algebra - Equation Solving', 'Algebra - Linear Equations']"
+      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations', 'Equation Solving']"
     },
     {
       "test": "Infer Topics: Authentication Required",
@@ -682,7 +682,7 @@
     {
       "test": "Topics Mapping Structure",
       "success": true,
-      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations', 'Algebra - Algebraic Manipulation']"
+      "details": "Topics correctly mapped: Q1 -> ['Algebra - Solving Equations', 'Algebra - Linear Equations']"
     },
     {
       "test": "Infer Topics: Authentication Required",
@@ -1002,7 +1002,7 @@
     {
       "test": "Existing Student Handling",
       "success": true,
-      "details": "Created test student EXIST075011 for upload-more-papers testing"
+      "details": "Created test student EXIST053202 for upload-more-papers testing"
     },
     {
       "test": "Get Exam Submissions - Teacher Access",
@@ -1042,7 +1042,7 @@
     {
       "test": "Submission Exists Before Deletion",
       "success": true,
-      "details": "Submission delete_test_sub_1768463412 found in exam submissions"
+      "details": "Submission delete_test_sub_1768714322 found in exam submissions"
     },
     {
       "test": "Delete Submission - Valid Request",
@@ -1091,8 +1091,8 @@
     },
     {
       "test": "Cleanup Permission Test Submission",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='ai-paper-grader.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/submissions/perm_test_sub_1768714323 (Caused by ConnectTimeoutError(<HTTPSConnection(host='ai-paper-grader.preview.emergentagent.com', port=443) at 0xf8cb31314810>, 'Connection to ai-paper-grader.preview.emergentagent.com timed out. (connect timeout=10)'))"
     },
     {
       "test": "Delete Non-existent Submission",
@@ -1101,28 +1101,13 @@
     },
     {
       "test": "Delete Already Deleted Submission",
-      "success": true,
-      "details": ""
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='ai-paper-grader.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/submissions/delete_test_sub_1768714322 (Caused by ConnectTimeoutError(<HTTPSConnection(host='ai-paper-grader.preview.emergentagent.com', port=443) at 0xf8cb31317310>, 'Connection to ai-paper-grader.preview.emergentagent.com timed out. (connect timeout=10)'))"
     },
     {
       "test": "Get Exam Details for Submission Count",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Get Current Submissions Count",
-      "success": true,
-      "details": ""
-    },
-    {
-      "test": "Submission Count After Deletions",
-      "success": true,
-      "details": "Current submission count: 1"
-    },
-    {
-      "test": "Submission Count Consistency",
-      "success": true,
-      "details": "Submission count consistent with performed deletions"
+      "success": false,
+      "details": "Request failed: HTTPSConnectionPool(host='ai-paper-grader.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/exams/exam_13ac44db (Caused by ConnectTimeoutError(<HTTPSConnection(host='ai-paper-grader.preview.emergentagent.com', port=443) at 0xf8cb31308850>, 'Connection to ai-paper-grader.preview.emergentagent.com timed out. (connect timeout=10)'))"
     },
     {
       "test": "Verify Re-evaluations Exist Before Cleanup",
@@ -1158,6 +1143,91 @@
       "test": "Complete Submission Removal",
       "success": true,
       "details": "Submission completely removed from all listings"
+    },
+    {
+      "test": "Create Exam for Background Grading Test",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Background Grading Job Creation",
+      "success": true,
+      "details": "Job ID: job_0364018c6af1"
+    },
+    {
+      "test": "Background Grading Response Structure",
+      "success": true,
+      "details": "All required fields present: ['job_id', 'status', 'total_papers', 'message']"
+    },
+    {
+      "test": "Initial Job Status",
+      "success": true,
+      "details": "Status is 'pending' as expected"
+    },
+    {
+      "test": "Poll Job Status (attempt 1)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Poll Job Status (attempt 2)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Poll Job Status (attempt 3)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Poll Job Status (attempt 4)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Poll Job Status (attempt 5)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Background Job Completion",
+      "success": true,
+      "details": "Job completed successfully: 3 successful, 0 failed"
+    },
+    {
+      "test": "Submissions Creation",
+      "success": true,
+      "details": "Created 3 submissions"
+    },
+    {
+      "test": "Progress Tracking",
+      "success": true,
+      "details": "All 3 papers processed"
+    },
+    {
+      "test": "No 'Read of Closed File' Errors",
+      "success": true,
+      "details": "No 'read of closed file' errors found in recent logs"
+    },
+    {
+      "test": "Background Processing Log Messages",
+      "success": true,
+      "details": "Found expected log messages: 3/3"
+    },
+    {
+      "test": "Verify Submissions in Database",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Database Submissions Verification",
+      "success": true,
+      "details": "Found 3 submissions in database"
+    },
+    {
+      "test": "Submission Structure Verification",
+      "success": true,
+      "details": "Submissions have correct structure"
     }
   ]
 }
