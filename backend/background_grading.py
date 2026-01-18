@@ -80,8 +80,19 @@ async def process_grading_job_in_background(
             pdf_bytes = file_data["content"]
             
             logger.info(f"[Job {job_id}] [{idx + 1}/{len(files_data)}] Processing: {filename}")
+            logger.info(f"[Job {job_id}] File data type: {type(pdf_bytes)}, length: {len(pdf_bytes) if isinstance(pdf_bytes, bytes) else 'NOT BYTES'}")
             
             try:
+                # Ensure we have bytes
+                if not isinstance(pdf_bytes, bytes):
+                    logger.error(f"[Job {job_id}] ERROR: pdf_bytes is not bytes type, it is {type(pdf_bytes)}")
+                    errors.append({
+                        "filename": filename,
+                        "error": f"Invalid file data type: {type(pdf_bytes)}"
+                    })
+                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+                    continue
+                
                 # Check file size
                 file_size_mb = len(pdf_bytes) / (1024 * 1024)
                 if file_size_mb > 30:
