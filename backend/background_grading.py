@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 async def process_grading_job_in_background(
     job_id: str,
     exam_id: str,
-    files: List,  # UploadFile objects
+    files_data: List[dict],  # Files with content already read
     exam: dict,
     teacher_id: str,
     db,  # MongoDB database instance
@@ -30,7 +30,7 @@ async def process_grading_job_in_background(
     """
     Background task to process papers one by one with progress tracking
     Supports 30+ papers without timeout issues
-    NOW READS FILES IN BACKGROUND - endpoint returns immediately!
+    Files are already read - content is in files_data
     """
     try:
         # Update job status to processing
@@ -45,7 +45,7 @@ async def process_grading_job_in_background(
         submissions = []
         errors = []
         
-        logger.info(f"=== BACKGROUND GRADING START === Job {job_id}: {len(files)} files for exam {exam_id}")
+        logger.info(f"=== BACKGROUND GRADING START === Job {job_id}: {len(files_data)} files for exam {exam_id}")
         
         # Get pre-loaded data (to avoid repeated DB queries)
         model_answer_imgs = await get_exam_model_answer_images(exam_id)
@@ -74,18 +74,12 @@ async def process_grading_job_in_background(
             )
             return
         
-        # Process each paper - READ FILES HERE IN BACKGROUND
-        for idx, file in enumerate(files):
-            filename = file.filename
+        # Process each paper - content already read
+        for idx, file_data in enumerate(files_data):
+            filename = file_data["filename"]
+            pdf_bytes = file_data["content"]
             
-            logger.info(f"[Job {job_id}] [{idx + 1}/{len(files)}] Processing: {filename}")
-            
-            try:
-                # Read file content in background (doesn't block endpoint response)
-                pdf_bytes = await file.read()
-                
-                # Check file size
-                file_size_mb = len(pdf_bytes) / (1024 * 1024)
+            logger.info(f"[Job {job_id}] [{idx + 1}/{len(files_data)}] Processing: {filename}")
                 if file_size_mb > 30:
                     errors.append({
                         "filename": filename,
