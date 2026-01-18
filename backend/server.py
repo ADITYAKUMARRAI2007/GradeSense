@@ -4764,21 +4764,17 @@ async def grade_papers_background(
     
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     
-    # Read all files into memory
-    files_data = []
-    for file in files:
-        files_data.append({
-            "filename": file.filename,
-            "content": await file.read()
-        })
+    # Store file references (don't read content yet - too slow!)
+    # Background task will read them
+    file_count = len(files)
     
-    # Create job record in database
+    # Create job record in database IMMEDIATELY
     await db.grading_jobs.insert_one({
         "job_id": job_id,
         "exam_id": exam_id,
         "teacher_id": user.user_id,
         "status": "pending",
-        "total_papers": len(files_data),
+        "total_papers": file_count,
         "processed_papers": 0,
         "successful": 0,
         "failed": 0,
@@ -4790,24 +4786,24 @@ async def grade_papers_background(
     
     await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
     
-    # Start background processing
+    # Start background processing - pass files directly
     from background_grading import process_grading_job_in_background
     asyncio.create_task(
         process_grading_job_in_background(
-            job_id, exam_id, files_data, exam, user.user_id, db,
+            job_id, exam_id, files, exam, user.user_id, db,
             pdf_to_images, extract_student_info_from_paper, parse_student_from_filename,
             get_or_create_student, get_exam_model_answer_images,
             get_exam_model_answer_text, grade_with_ai, create_notification
         )
     )
     
-    logger.info(f"Background job {job_id} started for {len(files_data)} papers")
+    logger.info(f"Background job {job_id} started for {file_count} papers")
     
     return {
         "job_id": job_id,
         "status": "pending",
-        "total_papers": len(files_data),
-        "message": f"Grading job started for {len(files_data)} papers"
+        "total_papers": file_count,
+        "message": f"Grading job started for {file_count} papers"
     }
 
 
