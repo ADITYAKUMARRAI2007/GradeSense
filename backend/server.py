@@ -3940,7 +3940,8 @@ First, analyze the MODEL ANSWER thoroughly:
 **IMPORTANT**: The student paper part has {len(chunk_imgs)} pages. You MUST examine EVERY page and grade ALL questions found. Do not skip any page.
 
 ## GRADING MODE: {grading_mode.upper()}
-Apply the {grading_mode} mode specifications strictly.
+
+{grading_instruction}
 
 ## CRITICAL REQUIREMENTS:
 1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
