@@ -4692,12 +4692,12 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 "percentage": percentage
             })
             
-        except Exception as e:
-            logger.error(f"Error processing {filename}: {e}")
-            errors.append({
-                "filename": filename,
-                "error": str(e)
-            })
+            except Exception as e:
+                logger.error(f"Error processing {filename}: {e}")
+                errors.append({
+                    "filename": filename,
+                    "error": str(e)
+                })
         
         # Log final summary
         logger.info(f"Batch grading complete (Job {job_id}): {len(submissions)} successful, {len(errors)} errors out of {len(files_data)} total files")
