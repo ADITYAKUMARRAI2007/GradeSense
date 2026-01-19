@@ -4,27 +4,39 @@ import { API } from '../../App';
 import Layout from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Badge } from '../../components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { ScrollArea } from '../../components/ui/scroll-area';
 import { toast } from 'sonner';
 import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  ChevronRight,
-  ArrowLeft,
-  Users,
-  Target,
-  Layers,
-  FileText,
-  Zap,
   Brain,
-  Award,
-  Eye,
-  RefreshCw
+  Sparkles,
+  Send,
+  Loader2,
+  TrendingUp,
+  BarChart3,
+  PieChart,
+  ListOrdered,
+  Hash
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart as RePieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+
+const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#ef4444', '#14b8a6'];
 
 export default function Analytics({ user }) {
   const [exams, setExams] = useState([]);
@@ -32,42 +44,24 @@ export default function Analytics({ user }) {
   const [selectedExam, setSelectedExam] = useState('');
   const [selectedBatch, setSelectedBatch] = useState('');
   
-  // Drill-down state
-  const [drillLevel, setDrillLevel] = useState('overview'); // overview, topic, question
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const [selectedQuestion, setSelectedQuestion] = useState(null);
-  
-  // Data states
-  const [topicMastery, setTopicMastery] = useState(null);
-  const [topicDrillDown, setTopicDrillDown] = useState(null);
-  const [questionDrillDown, setQuestionDrillDown] = useState(null);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [responses, setResponses] = useState([]);
   
-  // Modal states
-  const [studentJourneyModal, setStudentJourneyModal] = useState(false);
-  const [selectedStudentJourney, setSelectedStudentJourney] = useState(null);
-  
-  // Phase 2: Advanced Metrics
-  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
-  const [bluffIndex, setBluffIndex] = useState(null);
-  const [syllabusCoverage, setSyllabusCoverage] = useState(null);
-  const [peerGroups, setPeerGroups] = useState(null);
-  const [loadingAdvanced, setLoadingAdvanced] = useState(false);
-  
-  // Ask Your Data (NL Query)
-  const [nlQuery, setNlQuery] = useState('');
-  const [nlResult, setNlResult] = useState(null);
-  const [loadingNlQuery, setLoadingNlQuery] = useState(false);
+  const [suggestions] = useState([
+    "List students who scored below 50%",
+    "Show me a histogram of student performance",
+    "Which topics do students struggle with most?",
+    "How many students gave the exam?",
+    "Show top 5 performing students",
+    "Which questions had the lowest average score?",
+    "Compare performance across different batches",
+    "Show me students who need attention"
+  ]);
 
   useEffect(() => {
     fetchFilters();
   }, []);
-
-  useEffect(() => {
-    if (selectedExam || selectedBatch) {
-      fetchTopicMastery();
-    }
-  }, [selectedExam, selectedBatch]);
 
   const fetchFilters = async () => {
     try {
@@ -82,226 +76,235 @@ export default function Analytics({ user }) {
     }
   };
 
-  const fetchTopicMastery = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedExam) params.append('exam_id', selectedExam);
-      if (selectedBatch) params.append('batch_id', selectedBatch);
-      
-      const response = await axios.get(`${API}/analytics/topic-mastery?${params}`);
-      setTopicMastery(response.data);
-    } catch (error) {
-      console.error('Error fetching topic mastery:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTopicClick = async (topic) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedExam) params.append('exam_id', selectedExam);
-      if (selectedBatch) params.append('batch_id', selectedBatch);
-      
-      const response = await axios.get(
-        `${API}/analytics/drill-down/topic/${encodeURIComponent(topic.topic)}?${params}`
-      );
-      setTopicDrillDown(response.data);
-      setSelectedTopic(topic);
-      setDrillLevel('topic');
-    } catch (error) {
-      console.error('Error fetching topic drill-down:', error);
-      toast.error('Failed to load topic details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuestionClick = async (question) => {
-    if (!selectedExam) {
-      toast.error('Please select a specific exam to view question details');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        `${API}/analytics/drill-down/question?exam_id=${selectedExam}&question_number=${question.question_number}`
-      );
-      setQuestionDrillDown(response.data);
-      setSelectedQuestion(question);
-      setDrillLevel('question');
-    } catch (error) {
-      console.error('Error fetching question drill-down:', error);
-      toast.error('Failed to load question details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStudentClick = async (studentId) => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API}/analytics/student-journey/${studentId}`);
-      setSelectedStudentJourney(response.data);
-      setStudentJourneyModal(true);
-    } catch (error) {
-      console.error('Error fetching student journey:', error);
-      toast.error('Failed to load student details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const goBack = () => {
-    if (drillLevel === 'question') {
-      setDrillLevel('topic');
-      setQuestionDrillDown(null);
-    } else if (drillLevel === 'topic') {
-      setDrillLevel('overview');
-      setTopicDrillDown(null);
-    }
-  };
-  
-  // Phase 2: Advanced Metrics Functions
-  const fetchBluffIndex = async () => {
-    if (!selectedExam) {
-      toast.error('Please select an exam to analyze bluff patterns');
-      return;
-    }
-    
-    setLoadingAdvanced(true);
-    try {
-      const response = await axios.get(`${API}/analytics/bluff-index?exam_id=${selectedExam}`);
-      setBluffIndex(response.data);
-    } catch (error) {
-      console.error('Error fetching bluff index:', error);
-      toast.error('Failed to load bluff analysis');
-    } finally {
-      setLoadingAdvanced(false);
-    }
-  };
-  
-  const fetchSyllabusCoverage = async () => {
-    setLoadingAdvanced(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedBatch) params.append('batch_id', selectedBatch);
-      
-      const response = await axios.get(`${API}/analytics/syllabus-coverage?${params}`);
-      setSyllabusCoverage(response.data);
-    } catch (error) {
-      console.error('Error fetching syllabus coverage:', error);
-      toast.error('Failed to load syllabus coverage');
-    } finally {
-      setLoadingAdvanced(false);
-    }
-  };
-  
-  const fetchPeerGroups = async () => {
-    if (!selectedBatch) {
-      toast.error('Please select a batch to find peer groups');
-      return;
-    }
-    
-    setLoadingAdvanced(true);
-    try {
-      const response = await axios.get(`${API}/analytics/peer-groups?batch_id=${selectedBatch}`);
-      setPeerGroups(response.data);
-    } catch (error) {
-      console.error('Error fetching peer groups:', error);
-      toast.error('Failed to load peer group suggestions');
-    } finally {
-      setLoadingAdvanced(false);
-    }
-  };
-  
-  const sendPeerGroupNotification = async (student1Id, student2Id, message) => {
-    try {
-      await axios.post(`${API}/analytics/send-peer-group-email`, {
-        student1_id: student1Id,
-        student2_id: student2Id,
-        message: message
-      });
-      toast.success('Notifications sent to both students!');
-    } catch (error) {
-      console.error('Error sending notifications:', error);
-      toast.error('Failed to send notifications');
-    }
-  };
-  
-  // Natural Language Query
-  const handleAskData = async () => {
-    if (!nlQuery.trim()) {
+  const handleAskAI = async () => {
+    if (!query.trim()) {
       toast.error('Please enter a question');
       return;
     }
+
+    setLoading(true);
     
-    setLoadingNlQuery(true);
     try {
-      const response = await axios.post(`${API}/analytics/ask`, {
-        query: nlQuery,
-        batch_id: selectedBatch,
-        exam_id: selectedExam
+      const response = await axios.post(`${API}/analytics/ask-ai`, {
+        query: query.trim(),
+        exam_id: selectedExam || undefined,
+        batch_id: selectedBatch || undefined
       });
-      setNlResult(response.data);
+
+      // Add to responses with timestamp
+      setResponses(prev => [...prev, {
+        query: query.trim(),
+        result: response.data,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+      
+      setQuery('');
+      toast.success('Analysis complete!');
     } catch (error) {
-      console.error('Error processing natural language query:', error);
-      toast.error('Failed to process your question');
-      setNlResult({
-        type: 'error',
-        message: error.response?.data?.detail || 'Failed to process query'
-      });
+      console.error('Error asking AI:', error);
+      toast.error(error.response?.data?.detail || 'Failed to process your question');
+      
+      // Add error response
+      setResponses(prev => [...prev, {
+        query: query.trim(),
+        result: {
+          type: 'error',
+          message: error.response?.data?.detail || 'Failed to process your question'
+        },
+        timestamp: new Date().toLocaleTimeString()
+      }]);
     } finally {
-      setLoadingNlQuery(false);
+      setLoading(false);
     }
   };
 
-  const getScoreColor = (percentage) => {
-    if (percentage >= 70) return 'text-green-600';
-    if (percentage >= 50) return 'text-amber-600';
-    return 'text-red-600';
+  const handleSuggestionClick = (suggestion) => {
+    setQuery(suggestion);
   };
 
-  const getScoreBg = (percentage) => {
-    if (percentage >= 70) return 'bg-green-50 border-green-200';
-    if (percentage >= 50) return 'bg-amber-50 border-amber-200';
-    return 'bg-red-50 border-red-200';
-  };
+  const renderResponse = (response) => {
+    const { result } = response;
 
-  // Prepare radar chart data for overview
-  const radarData = topicMastery?.topics?.slice(0, 6).map(t => ({
-    topic: t.topic.substring(0, 15),
-    score: t.avg_percentage,
-    fullMark: 100
-  })) || [];
+    if (!result) return null;
+
+    switch (result.type) {
+      case 'text':
+        return (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{result.response}</p>
+            {result.key_points && result.key_points.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-semibold">Key Points:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {result.key_points.map((point, idx) => (
+                    <li key={idx} className="text-sm text-muted-foreground">{point}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'number':
+        return (
+          <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg">
+            <div className="text-5xl font-bold text-primary mb-2">{result.value}</div>
+            <div className="text-lg font-medium text-center">{result.label}</div>
+            {result.description && (
+              <p className="text-sm text-muted-foreground text-center mt-3 max-w-md">
+                {result.description}
+              </p>
+            )}
+          </div>
+        );
+
+      case 'list':
+        return (
+          <div className="space-y-3">
+            {result.title && <h3 className="font-semibold text-lg">{result.title}</h3>}
+            {result.description && (
+              <p className="text-sm text-muted-foreground">{result.description}</p>
+            )}
+            <ScrollArea className="h-[300px] rounded-md border p-4">
+              <div className="space-y-2">
+                {result.items && result.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Badge variant="outline" className="w-8 h-8 flex items-center justify-center">
+                      {idx + 1}
+                    </Badge>
+                    <div className="flex-1">
+                      {typeof item === 'string' ? (
+                        <p className="text-sm">{item}</p>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-medium">{item.name || item.label || item.student}</p>
+                          {item.score !== undefined && (
+                            <p className="text-xs text-muted-foreground">Score: {item.score}</p>
+                          )}
+                          {item.percentage !== undefined && (
+                            <p className="text-xs text-muted-foreground">Percentage: {item.percentage}%</p>
+                          )}
+                          {item.details && (
+                            <p className="text-xs text-muted-foreground">{item.details}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        );
+
+      case 'chart':
+        return (
+          <div className="space-y-3">
+            {result.title && <h3 className="font-semibold text-lg">{result.title}</h3>}
+            {result.description && (
+              <p className="text-sm text-muted-foreground">{result.description}</p>
+            )}
+            <div className="w-full h-[400px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                {result.chart_type === 'bar' || result.chart_type === 'histogram' ? (
+                  <BarChart data={result.data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey={result.data[0]?.name ? "name" : result.data[0]?.range ? "range" : "label"} 
+                      label={{ value: result.x_label, position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis label={{ value: result.y_label, angle: -90, position: 'insideLeft' }} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar 
+                      dataKey={result.data[0]?.value !== undefined ? "value" : result.data[0]?.count !== undefined ? "count" : "score"} 
+                      fill="#3b82f6"
+                    >
+                      {result.data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                ) : result.chart_type === 'line' ? (
+                  <LineChart data={result.data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="x" 
+                      label={{ value: result.x_label, position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis label={{ value: result.y_label, angle: -90, position: 'insideLeft' }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="y" stroke="#3b82f6" strokeWidth={2} />
+                  </LineChart>
+                ) : result.chart_type === 'pie' ? (
+                  <RePieChart>
+                    <Pie
+                      data={result.data}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry) => `${entry.name}: ${entry.value}`}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {result.data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </RePieChart>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    Unsupported chart type
+                  </div>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+
+      case 'multi':
+        return (
+          <div className="space-y-6">
+            {result.components && result.components.map((component, idx) => (
+              <div key={idx} className="border-l-4 border-primary pl-4">
+                {renderResponse({ result: component })}
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'error':
+        return (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">{result.message}</p>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="p-4 bg-muted rounded-lg">
+            <pre className="text-xs overflow-auto">{JSON.stringify(result, null, 2)}</pre>
+          </div>
+        );
+    }
+  };
 
   return (
     <Layout user={user}>
-      <div className="space-y-6" data-testid="analytics-page">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {drillLevel !== 'overview' && (
-              <Button variant="outline" onClick={goBack}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            )}
-            <div>
-              <h1 className="text-2xl font-bold">
-                {drillLevel === 'overview' && 'Data Studio - Deep Analytics'}
-                {drillLevel === 'topic' && `Topic DNA: ${selectedTopic?.topic}`}
-                {drillLevel === 'question' && `Question Analysis: Q${selectedQuestion?.question_number}`}
-              </h1>
-              <p className="text-muted-foreground">
-                {drillLevel === 'overview' && 'Click any metric to drill down into details'}
-                {drillLevel === 'topic' && 'Sub-skill breakdown and student performance'}
-                {drillLevel === 'question' && 'Error patterns and student grouping'}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Brain className="w-8 h-8 text-primary" />
+              Ask AI
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Ask any question about your students, exams, and performance data
+            </p>
           </div>
 
           {/* Filters */}
@@ -336,1055 +339,110 @@ export default function Analytics({ user }) {
           </div>
         </div>
 
-        {/* LEVEL 1: OVERVIEW */}
-        {drillLevel === 'overview' && (
-          <>
-            {/* Ask Your Data - Natural Language Query */}
-            <Card className="border-2 border-primary">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-primary" />
-                  Ask Your Data (AI-Powered)
-                </CardTitle>
-                <CardDescription>
-                  Ask questions in plain English - e.g., "Show me top 5 students in Math" or "Who failed Question 3?"
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Search Bar */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder='Try: "Show me top 5 students" or "Compare Section A vs Section B"'
-                      className="flex-1 border p-3 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
-                      value={nlQuery}
-                      onChange={(e) => setNlQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAskData()}
-                      disabled={loadingNlQuery}
-                    />
-                    <Button
-                      onClick={handleAskData}
-                      disabled={loadingNlQuery || !nlQuery.trim()}
-                      className="px-8"
-                    >
-                      {loadingNlQuery ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4 mr-2" />
-                          Ask AI
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Suggested Questions */}
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-xs text-muted-foreground">Quick questions:</span>
-                    {[
-                      "Show me top 5 students",
-                      "Who failed in Math?",
-                      "Show students below 40%",
-                      "Top performers in last exam"
-                    ].map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setNlQuery(suggestion);
-                          setNlResult(null);
-                        }}
-                        className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Results */}
-                  {nlResult && (
-                    <div className="mt-4 border rounded-lg p-4 bg-white">
-                      {nlResult.type === 'error' ? (
-                        <div className="text-center py-8">
-                          <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-red-500" />
-                          <p className="font-semibold text-red-700">Could not process query</p>
-                          <p className="text-sm text-muted-foreground mt-2">{nlResult.message}</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="mb-4">
-                            <h4 className="font-semibold text-lg">{nlResult.title}</h4>
-                            {nlResult.description && (
-                              <p className="text-sm text-muted-foreground mt-1">{nlResult.description}</p>
-                            )}
-                          </div>
-
-                          {/* Bar Chart */}
-                          {nlResult.type === 'bar' && nlResult.data?.length > 0 && (
-                            <div className="h-80">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={nlResult.data}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis
-                                    dataKey={nlResult.xAxis || 'name'}
-                                    tick={{ fontSize: 12 }}
-                                    angle={-45}
-                                    textAnchor="end"
-                                    height={100}
-                                  />
-                                  <YAxis />
-                                  <Tooltip />
-                                  <Bar
-                                    dataKey={nlResult.yAxis || 'value'}
-                                    fill="#F97316"
-                                    radius={[4, 4, 0, 0]}
-                                  />
-                                </BarChart>
-                              </ResponsiveContainer>
-                            </div>
-                          )}
-
-                          {/* Table */}
-                          {nlResult.type === 'table' && nlResult.data?.length > 0 && (
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse">
-                                <thead>
-                                  <tr className="bg-gray-50">
-                                    {Object.keys(nlResult.data[0]).map((key, idx) => (
-                                      <th key={idx} className="border p-2 text-left text-sm font-semibold">
-                                        {key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {nlResult.data.map((row, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
-                                      {Object.values(row).map((val, vidx) => (
-                                        <td key={vidx} className="border p-2 text-sm">
-                                          {typeof val === 'number' ? val.toFixed(1) : val}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* No Data */}
-                          {nlResult.data?.length === 0 && (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                              <p>No results found for your query.</p>
-                              <p className="text-sm">Try rephrasing or selecting different filters.</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Topic Mastery Radar */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-primary" />
-                  Topic Mastery Overview
-                </CardTitle>
-                <CardDescription>Click any topic to see detailed breakdown</CardDescription>
-              </CardHeader>
-              <CardContent>
+        {/* AI Query Input */}
+        <Card className="border-2 border-primary shadow-lg">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              What would you like to know?
+            </CardTitle>
+            <CardDescription>
+              Ask questions in plain English about student performance, exam results, trends, or any other data
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Input */}
+            <div className="flex gap-2">
+              <Input
+                placeholder='e.g., "Show me students scoring below 50%" or "Create a histogram of performance"'
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAskAI()}
+                className="flex-1 text-base"
+                disabled={loading}
+              />
+              <Button 
+                onClick={handleAskAI} 
+                disabled={loading || !query.trim()}
+                size="lg"
+              >
                 {loading ? (
-                  <div className="h-80 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                  </div>
-                ) : !topicMastery?.topics?.length ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Layers className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p>No data available. Select an exam or batch with graded submissions.</p>
-                  </div>
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <>
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm text-muted-foreground">Topics Analyzed</p>
-                        <p className="text-2xl font-bold text-blue-700">{topicMastery.topics.length}</p>
-                      </div>
-                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-sm text-muted-foreground">Avg Performance</p>
-                        <p className="text-2xl font-bold text-green-700">
-                          {topicMastery.topics.length > 0 
-                            ? Math.round(topicMastery.topics.reduce((sum, t) => sum + t.avg_percentage, 0) / topicMastery.topics.length)
-                            : 0}%
-                        </p>
-                      </div>
-                      <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                        <p className="text-sm text-muted-foreground">Needs Attention</p>
-                        <p className="text-2xl font-bold text-amber-700">
-                          {topicMastery.topics.filter(t => t.color === 'red').length}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Adaptive Visualization */}
-                    {topicMastery.topics.length >= 5 ? (
-                      // Show Radar Chart for 5+ topics
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart data={radarData}>
-                              <PolarGrid />
-                              <PolarAngleAxis dataKey="topic" />
-                              <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                              <Radar
-                                name="Score"
-                                dataKey="score"
-                                stroke="#F97316"
-                                fill="#F97316"
-                                fillOpacity={0.6}
-                              />
-                              <Tooltip />
-                            </RadarChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          {topicMastery.topics.slice(0, 6).map((topic, idx) => (
-                            <div
-                              key={idx}
-                              className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${
-                                topic.color === 'green' ? 'bg-green-50 border-green-300 hover:border-green-500' :
-                                topic.color === 'amber' ? 'bg-amber-50 border-amber-300 hover:border-amber-500' :
-                                'bg-red-50 border-red-300 hover:border-red-500'
-                              }`}
-                              onClick={() => handleTopicClick(topic)}
-                            >
-                              <p className="font-medium text-sm truncate mb-1" title={topic.topic}>
-                                {topic.topic}
-                              </p>
-                              <p className={`text-2xl font-bold ${
-                                topic.color === 'green' ? 'text-green-700' :
-                                topic.color === 'amber' ? 'text-amber-700' :
-                                'text-red-700'
-                              }`}>
-                                {topic.avg_percentage}%
-                              </p>
-                              <div className="flex items-center justify-between mt-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {topic.question_count} Q
-                                </Badge>
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      // Show Progress Bars for <5 topics (Better for limited data)
-                      <div className="space-y-3">
-                        {topicMastery.topics.map((topic, idx) => (
-                          <div
-                            key={idx}
-                            className="p-4 bg-white border rounded-lg hover:shadow-md transition-all cursor-pointer"
-                            onClick={() => handleTopicClick(topic)}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <span className="font-semibold text-lg">{topic.topic}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {topic.question_count} questions
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-2xl font-bold ${
-                                  topic.color === 'green' ? 'text-green-600' :
-                                  topic.color === 'amber' ? 'text-amber-600' :
-                                  'text-red-600'
-                                }`}>
-                                  {topic.avg_percentage}%
-                                </span>
-                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                              </div>
-                            </div>
-                            
-                            {/* Progress Bar */}
-                            <div className="relative">
-                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all ${
-                                    topic.color === 'green' ? 'bg-green-500' :
-                                    topic.color === 'amber' ? 'bg-amber-500' :
-                                    'bg-red-500'
-                                  }`}
-                                  style={{ width: `${topic.avg_percentage}%` }}
-                                />
-                              </div>
-                              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                <span>0%</span>
-                                <span>50%</span>
-                                <span>100%</span>
-                              </div>
-                            </div>
-
-                            {/* Status indicator */}
-                            <div className="mt-2 flex items-center gap-2">
-                              {topic.color === 'green' && (
-                                <Badge className="bg-green-100 text-green-700">✓ Strong Performance</Badge>
-                              )}
-                              {topic.color === 'amber' && (
-                                <Badge className="bg-amber-100 text-amber-700">⚠ Needs Practice</Badge>
-                              )}
-                              {topic.color === 'red' && (
-                                <Badge className="bg-red-100 text-red-700">⚠ Critical - Needs Attention</Badge>
-                              )}
-                              {topic.struggling_count > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {topic.struggling_count} students struggling
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
+                  <Send className="w-5 h-5" />
                 )}
-              </CardContent>
-            </Card>
-
-            {/* All Topics Grid */}
-            {topicMastery?.topics?.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>All Topics Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                    {topicMastery.topics.map((topic, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 ${
-                          topic.color === 'green' ? 'bg-green-50 border-green-200' :
-                          topic.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                          'bg-red-50 border-red-200'
-                        }`}
-                        onClick={() => handleTopicClick(topic)}
-                      >
-                        <p className="font-medium text-xs truncate" title={topic.topic}>
-                          {topic.topic}
-                        </p>
-                        <p className={`text-xl font-bold ${
-                          topic.color === 'green' ? 'text-green-700' :
-                          topic.color === 'amber' ? 'text-amber-700' :
-                          'text-red-700'
-                        }`}>
-                          {topic.avg_percentage}%
-                        </p>
-                        {topic.struggling_count > 0 && (
-                          <Badge variant="outline" className="text-xs text-red-600 border-red-300 mt-1">
-                            {topic.struggling_count} need help
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
-        
-        {/* PHASE 2: ADVANCED METRICS (Toggle) */}
-        {drillLevel === 'overview' && (
-          <>
-            <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-white">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <Brain className="w-5 h-5 text-purple-600" />
-                      Advanced AI Metrics (Beta)
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Bluff detection, syllabus gaps, and peer group suggestions
-                    </p>
-                  </div>
-                  <Button
-                    variant={showAdvancedMetrics ? "default" : "outline"}
-                    onClick={() => setShowAdvancedMetrics(!showAdvancedMetrics)}
-                  >
-                    {showAdvancedMetrics ? 'Hide' : 'Show'} Advanced Metrics
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {showAdvancedMetrics && (
-              <div className="space-y-6">
-                {/* Action Buttons */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col items-start gap-2 hover:border-amber-500 hover:bg-amber-50"
-                    onClick={fetchBluffIndex}
-                    disabled={!selectedExam || loadingAdvanced}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <AlertTriangle className="w-5 h-5 text-amber-600" />
-                      <span className="font-semibold">Bluff Index</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground text-left">
-                      Detect students writing long but irrelevant answers
-                    </span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col items-start gap-2 hover:border-blue-500 hover:bg-blue-50"
-                    onClick={fetchSyllabusCoverage}
-                    disabled={loadingAdvanced}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <Layers className="w-5 h-5 text-blue-600" />
-                      <span className="font-semibold">Syllabus Coverage</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground text-left">
-                      See which topics you've tested and assessment gaps
-                    </span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col items-start gap-2 hover:border-green-500 hover:bg-green-50"
-                    onClick={fetchPeerGroups}
-                    disabled={!selectedBatch || loadingAdvanced}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <Users className="w-5 h-5 text-green-600" />
-                      <span className="font-semibold">Peer Groups</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground text-left">
-                      Find study partners with complementary skills
-                    </span>
-                  </Button>
-                </div>
-
-                {/* Bluff Index Results */}
-                {bluffIndex && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-amber-700">
-                        <AlertTriangle className="w-5 h-5" />
-                        Bluff Index - {bluffIndex.exam_name}
-                      </CardTitle>
-                      <CardDescription>{bluffIndex.summary}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {bluffIndex.bluff_candidates.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Award className="w-12 h-12 mx-auto mb-3 opacity-30 text-green-600" />
-                          <p className="font-medium text-green-700">Great! No bluffing patterns detected.</p>
-                          <p className="text-sm">All students appear to be writing meaningful answers.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {bluffIndex.bluff_candidates.map((candidate, idx) => (
-                            <div key={idx} className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <AlertTriangle className="w-5 h-5 text-amber-600" />
-                                  <span className="font-semibold">{candidate.student_name}</span>
-                                </div>
-                                <Badge variant="outline" className="bg-amber-100 text-amber-700">
-                                  {candidate.bluff_score} suspicious answers
-                                </Badge>
-                              </div>
-                              
-                              <div className="space-y-2">
-                                {candidate.suspicious_answers.map((answer, aidx) => (
-                                  <div key={aidx} className="p-3 bg-white border border-amber-100 rounded text-sm">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="font-medium">Question {answer.question_number}</span>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-xs">
-                                          {answer.answer_length} chars
-                                        </Badge>
-                                        <Badge variant="destructive" className="text-xs">
-                                          {answer.score_percentage}%
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                      AI Feedback: {answer.feedback_snippet}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full mt-3"
-                                onClick={() => handleStudentClick(candidate.student_id)}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Full Student Profile
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Syllabus Coverage Results */}
-                {syllabusCoverage && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Layers className="w-5 h-5 text-blue-600" />
-                        Syllabus Coverage - {syllabusCoverage.subject}
-                      </CardTitle>
-                      <CardDescription>{syllabusCoverage.summary}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                        {syllabusCoverage.tested_topics.map((topic, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-lg border-2 ${
-                              topic.color === 'green' ? 'bg-green-50 border-green-200' :
-                              topic.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                              topic.color === 'red' ? 'bg-red-50 border-red-200' :
-                              'bg-gray-50 border-gray-200'
-                            }`}
-                          >
-                            <p className="font-medium text-xs truncate mb-1" title={topic.topic}>
-                              {topic.topic}
-                            </p>
-                            <p className={`text-xl font-bold ${
-                              topic.color === 'green' ? 'text-green-700' :
-                              topic.color === 'amber' ? 'text-amber-700' :
-                              topic.color === 'red' ? 'text-red-700' :
-                              'text-gray-700'
-                            }`}>
-                              {topic.avg_score}%
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {topic.exam_count} exam{topic.exam_count !== 1 ? 's' : ''}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Peer Groups Results */}
-                {peerGroups && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-green-700">
-                        <Users className="w-5 h-5" />
-                        Peer Group Suggestions - {peerGroups.batch_name}
-                      </CardTitle>
-                      <CardDescription>{peerGroups.summary}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {peerGroups.suggestions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                          <p>No complementary peer groups found.</p>
-                          <p className="text-sm">Students may have similar skill profiles.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {peerGroups.suggestions.map((pair, idx) => (
-                            <div key={idx} className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                              <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-semibold flex items-center gap-2">
-                                  <Users className="w-4 h-4 text-green-600" />
-                                  Suggested Pair #{idx + 1}
-                                </h4>
-                                <Badge className="bg-green-100 text-green-700">
-                                  {pair.synergy_score} complementary topics
-                                </Badge>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-4 mb-3">
-                                <div className="p-3 bg-white rounded border">
-                                  <p className="font-medium mb-2">{pair.student1.name}</p>
-                                  <div className="space-y-1">
-                                    <div>
-                                      <p className="text-xs font-semibold text-green-600">Strengths:</p>
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {pair.student1.strengths.slice(0, 3).map((s, i) => (
-                                          <Badge key={i} variant="outline" className="text-xs bg-green-50">
-                                            {s}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-semibold text-red-600">Needs help:</p>
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {pair.student1.weaknesses.slice(0, 3).map((w, i) => (
-                                          <Badge key={i} variant="outline" className="text-xs bg-red-50">
-                                            {w}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="p-3 bg-white rounded border">
-                                  <p className="font-medium mb-2">{pair.student2.name}</p>
-                                  <div className="space-y-1">
-                                    <div>
-                                      <p className="text-xs font-semibold text-green-600">Strengths:</p>
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {pair.student2.strengths.slice(0, 3).map((s, i) => (
-                                          <Badge key={i} variant="outline" className="text-xs bg-green-50">
-                                            {s}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-semibold text-red-600">Needs help:</p>
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {pair.student2.weaknesses.slice(0, 3).map((w, i) => (
-                                          <Badge key={i} variant="outline" className="text-xs bg-red-50">
-                                            {w}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="p-3 bg-blue-50 border border-blue-200 rounded mb-3">
-                                <p className="text-xs font-semibold mb-2">Why this pairing works:</p>
-                                <div className="space-y-1">
-                                  {pair.complementary_topics.map((topic, tidx) => (
-                                    <p key={tidx} className="text-xs">
-                                      • <strong>{topic.helper}</strong> can help <strong>{topic.learner}</strong> with <em>{topic.topic}</em>
-                                    </p>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <Button
-                                className="w-full bg-green-600 hover:bg-green-700"
-                                onClick={() => sendPeerGroupNotification(
-                                  pair.student1.id,
-                                  pair.student2.id,
-                                  `You both have complementary skills. Consider studying together!`
-                                )}
-                              >
-                                <Users className="w-4 h-4 mr-2" />
-                                Send Notification to Both Students
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* LEVEL 2: TOPIC DNA */}
-        {drillLevel === 'topic' && topicDrillDown && (
-          <>
-            {/* AI Insight */}
-            <Card className="border-l-4 border-l-primary">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <Brain className="w-5 h-5 text-primary mt-1" />
-                  <p className="text-sm">{topicDrillDown.insight}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Sub-Skills Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5 text-primary" />
-                  Sub-Skill Analysis
-                </CardTitle>
-                <CardDescription>
-                  Understanding which specific skills students struggle with
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {topicDrillDown.sub_skills.map((skill, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-lg border-2 ${
-                        skill.color === 'green' ? 'bg-green-50 border-green-200' :
-                        skill.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                        'bg-red-50 border-red-200'
-                      }`}
-                    >
-                      <p className="font-semibold text-sm mb-2">{skill.name}</p>
-                      <p className={`text-3xl font-bold ${
-                        skill.color === 'green' ? 'text-green-700' :
-                        skill.color === 'amber' ? 'text-amber-700' :
-                        'text-red-700'
-                      }`}>
-                        {skill.avg_percentage}%
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {skill.question_count} question{skill.question_count !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Questions in this Topic */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  Questions - Click to See Error Patterns
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {topicDrillDown.questions.map((q, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                        getScoreBg(q.avg_percentage)
-                      }`}
-                      onClick={() => handleQuestionClick(q)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">
-                            {q.exam_name} - Q{q.question_number}
-                          </span>
-                          <Badge variant="outline">{q.max_marks} marks</Badge>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`font-bold ${getScoreColor(q.avg_percentage)}`}>
-                            {q.avg_percentage}% avg
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                      {q.rubric && (
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-1">
-                          {q.rubric}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Struggling Students */}
-            {topicDrillDown.struggling_students?.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-700">
-                    <AlertTriangle className="w-5 h-5" />
-                    Students Needing Attention ({topicDrillDown.struggling_students.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {topicDrillDown.struggling_students.map((student, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
-                        onClick={() => handleStudentClick(student.student_id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{student.student_name}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="destructive">{student.avg_percentage}%</Badge>
-                            <Eye className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {student.attempts} attempt{student.attempts !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
-
-        {/* LEVEL 3: QUESTION ERROR PATTERNS */}
-        {drillLevel === 'question' && questionDrillDown && (
-          <>
-            {/* Question Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <Users className="w-8 h-8 text-blue-500" />
-                    <div>
-                      <p className="text-2xl font-bold">{questionDrillDown.statistics.total_students}</p>
-                      <p className="text-xs text-muted-foreground">Total Students</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={getScoreBg(questionDrillDown.statistics.avg_percentage)}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <Target className="w-8 h-8 text-amber-500" />
-                    <div>
-                      <p className={`text-2xl font-bold ${getScoreColor(questionDrillDown.statistics.avg_percentage)}`}>
-                        {questionDrillDown.statistics.avg_percentage}%
-                      </p>
-                      <p className="text-xs text-muted-foreground">Average Score</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className="w-8 h-8 text-green-500" />
-                    <div>
-                      <p className="text-2xl font-bold text-green-600">{questionDrillDown.statistics.pass_count}</p>
-                      <p className="text-xs text-muted-foreground">Passed (≥50%)</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-red-50 border-red-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <TrendingDown className="w-8 h-8 text-red-500" />
-                    <div>
-                      <p className="text-2xl font-bold text-red-600">{questionDrillDown.statistics.fail_count}</p>
-                      <p className="text-xs text-muted-foreground">Failed (&lt;50%)</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              </Button>
             </div>
 
-            {/* Error Groups - The "Aha!" Moment */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-amber-500" />
-                  Error Pattern Analysis
-                </CardTitle>
-                <CardDescription>
-                  Students grouped by their specific mistakes - Generate targeted practice for each group
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {questionDrillDown.error_groups.map((group, idx) => (
-                    <div key={idx} className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold text-red-800 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            {group.type}
-                          </h4>
-                          <p className="text-sm text-red-600 mt-1">{group.description}</p>
-                        </div>
-                        <Badge variant="destructive">{group.count} students</Badge>
-                      </div>
-
-                      {/* Students in this group */}
-                      <div className="mt-3">
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Students:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {group.students.map((student, sidx) => (
-                            <div
-                              key={sidx}
-                              className="px-3 py-1 bg-white border border-red-200 rounded-full text-sm cursor-pointer hover:bg-red-100 transition-colors"
-                              onClick={() => handleStudentClick(student.student_id)}
-                            >
-                              {student.student_name} ({student.score})
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Action Button */}
-                      <div className="mt-4">
-                        <Button 
-                          variant="outline" 
-                          className="w-full bg-white hover:bg-red-100"
-                          onClick={() => toast.info(`Generate practice worksheet for ${group.type} - Coming soon!`)}
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Generate Practice Worksheet for This Group
-                        </Button>
-                      </div>
-                    </div>
+            {/* Suggestions */}
+            {responses.length === 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Try these examples:</p>
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((suggestion, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="text-xs"
+                      disabled={loading}
+                    >
+                      {suggestion}
+                    </Button>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            {/* Top Performers */}
-            {questionDrillDown.top_performers?.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="w-5 h-5 text-green-600" />
-                    Top Performers
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-3">
-                    {questionDrillDown.top_performers.map((student, idx) => (
-                      <div key={idx} className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="font-medium">{student.student_name}</p>
-                        <p className="text-sm text-green-600">
-                          {student.score}/{student.max_marks}
-                        </p>
+        {/* Responses */}
+        {responses.length > 0 && (
+          <div className="space-y-4">
+            {responses.map((response, idx) => (
+              <Card key={idx} className="overflow-hidden">
+                <CardHeader className="bg-muted/50 pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                        <span className="text-sm font-semibold text-primary">{idx + 1}</span>
                       </div>
-                    ))}
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{response.query}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{response.timestamp}</p>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      {response.result.type === 'chart' && <BarChart3 className="w-5 h-5 text-primary" />}
+                      {response.result.type === 'list' && <ListOrdered className="w-5 h-5 text-primary" />}
+                      {response.result.type === 'number' && <Hash className="w-5 h-5 text-primary" />}
+                      {response.result.type === 'text' && <TrendingUp className="w-5 h-5 text-primary" />}
+                    </div>
                   </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {renderResponse(response)}
                 </CardContent>
               </Card>
-            )}
-          </>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {responses.length === 0 && !loading && (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Brain className="w-16 h-16 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Ready to analyze your data</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Ask any question about student performance, exam trends, or specific insights you need.
+                The AI will provide answers with charts, lists, or detailed analysis.
+              </p>
+            </CardContent>
+          </Card>
         )}
       </div>
-
-      {/* Student Journey Modal */}
-      <Dialog open={studentJourneyModal} onOpenChange={setStudentJourneyModal}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              Academic Health Record: {selectedStudentJourney?.student?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Complete performance journey with class comparisons and blind spot analysis
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedStudentJourney && (
-            <div className="space-y-6">
-              {/* Overall Stats */}
-              <div className="grid grid-cols-4 gap-3">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">{selectedStudentJourney.overall_stats.total_exams}</p>
-                  <p className="text-xs text-muted-foreground">Total Exams</p>
-                </div>
-                <div className={`p-3 rounded-lg ${getScoreBg(selectedStudentJourney.overall_stats.avg_percentage)}`}>
-                  <p className={`text-2xl font-bold ${getScoreColor(selectedStudentJourney.overall_stats.avg_percentage)}`}>
-                    {selectedStudentJourney.overall_stats.avg_percentage}%
-                  </p>
-                  <p className="text-xs text-muted-foreground">Average</p>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{selectedStudentJourney.overall_stats.highest}%</p>
-                  <p className="text-xs text-muted-foreground">Highest</p>
-                </div>
-                <div className="p-3 bg-red-50 rounded-lg">
-                  <p className="text-2xl font-bold text-red-600">{selectedStudentJourney.overall_stats.lowest}%</p>
-                  <p className="text-xs text-muted-foreground">Lowest</p>
-                </div>
-              </div>
-
-              {/* Performance vs Class Average */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Performance vs Class Average</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={selectedStudentJourney.vs_class_avg}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="exam_name" tick={{ fontSize: 10 }} />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="student_score" fill="#F97316" name="Student" />
-                        <Bar dataKey="class_avg" fill="#94A3B8" name="Class Avg" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Blind Spots */}
-              {selectedStudentJourney.blind_spots?.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base text-red-700 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      Blind Spots - Topics Needing Urgent Attention
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {selectedStudentJourney.blind_spots.map((spot, idx) => (
-                        <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <p className="font-medium text-sm">{spot.topic}</p>
-                          <p className="text-xl font-bold text-red-600">{spot.avg_score}%</p>
-                          <p className="text-xs text-muted-foreground">{spot.attempts} attempts</p>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Strengths */}
-              {selectedStudentJourney.strengths?.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base text-green-700 flex items-center gap-2">
-                      <Award className="w-4 h-4" />
-                      Strengths
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedStudentJourney.strengths.map((strength, idx) => (
-                        <Badge key={idx} className="bg-green-100 text-green-700">
-                          {strength.topic} ({strength.avg_score}%)
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </Layout>
   );
 }
