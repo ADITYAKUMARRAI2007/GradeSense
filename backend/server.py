@@ -7062,16 +7062,19 @@ Now analyze and respond:"""
         if not api_key:
             raise HTTPException(status_code=500, detail="AI service not configured")
         
-        client = LlmChat(api_key=api_key)
+        chat = LlmChat(
+            api_key=api_key,
+            provider="gemini",
+            model="gemini-2.0-flash-exp",
+            response_format="json_object"
+        )
         
         user_msg = UserMessage(text=prompt)
         
-        response = client.create(
-            messages=[user_msg]
-        ).with_model("gemini", "gemini-2.0-flash-exp").with_params(
-            temperature=0.3,
-            response_format={"type": "json_object"}
-        ).execute()
+        response = chat.send_message(
+            messages=[user_msg],
+            temperature=0.3
+        )
         
         # Parse AI response
         import json
