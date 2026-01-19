@@ -417,6 +417,36 @@ async def get_current_user(request: Request) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     
+    # Update last_login timestamp (throttled - only update if more than 5 minutes since last update)
+    last_login = user.get("last_login")
+    should_update = False
+    
+    if not last_login:
+        should_update = True
+    else:
+        try:
+            if isinstance(last_login, str):
+                last_login_dt = datetime.fromisoformat(last_login.replace('Z', '+00:00'))
+            else:
+                last_login_dt = last_login
+            
+            if last_login_dt.tzinfo is None:
+                last_login_dt = last_login_dt.replace(tzinfo=timezone.utc)
+            
+            # Update if more than 5 minutes have passed
+            time_since_last_update = datetime.now(timezone.utc) - last_login_dt
+            if time_since_last_update.total_seconds() > 300:  # 5 minutes
+                should_update = True
+        except:
+            should_update = True
+    
+    if should_update:
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+        )
+        user["last_login"] = datetime.now(timezone.utc).isoformat()
+    
     return User(**user)
 
 # ============== AUTH ROUTES ==============
