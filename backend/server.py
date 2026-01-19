@@ -7064,8 +7064,9 @@ Now analyze and respond:"""
         
         chat = LlmChat(
             api_key=api_key,
-            provider="gemini",
-            model="gemini-2.0-flash-exp",
+            session_id=f"analytics_{uuid.uuid4().hex[:8]}"
+        ).with_model("gemini", "gemini-2.5-flash").with_params(
+            temperature=0.3,
             response_format="json_object"
         )
         
