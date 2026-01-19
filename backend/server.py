@@ -545,6 +545,114 @@ async def create_session(request: Request, response: Response):
     }
 
 
+# ============== ADMIN ROUTES (PROTECTED) ==============
+
+@api_router.get("/admin/export-users")
+async def admin_export_users(
+    api_key: str,
+    format: str = "json",
+    role: Optional[str] = None,
+    created_after: Optional[str] = None,
+    last_login_after: Optional[str] = None,
+    fields: Optional[str] = None
+):
+    """
+    Protected admin endpoint to export user data
+    Only accessible with valid ADMIN_API_KEY
+    
+    Parameters:
+    - api_key: Admin API key (required)
+    - format: json, csv (default: json)
+    - role: Filter by role (teacher/student)
+    - created_after: Filter users created after date (YYYY-MM-DD)
+    - last_login_after: Filter users who logged in after date (YYYY-MM-DD)
+    - fields: Comma-separated list of fields to include
+    """
+    import csv
+    from io import StringIO
+    from fastapi.responses import StreamingResponse
+    
+    # Verify admin API key
+    ADMIN_API_KEY = os.environ.get('ADMIN_API_KEY')
+    if not ADMIN_API_KEY or api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized - Invalid API key")
+    
+    # Build query filter
+    query = {}
+    if role:
+        query["role"] = role
+    if created_after:
+        query["created_at"] = {"$gte": created_after}
+    if last_login_after:
+        query["last_login"] = {"$gte": last_login_after}
+    
+    # Fetch users
+    users = await db.users.find(query, {"_id": 0}).to_list(10000)
+    
+    # Enrich with session data
+    for user in users:
+        # Get active sessions
+        sessions = await db.user_sessions.find(
+            {"user_id": user["user_id"]},
+            {"_id": 0}
+        ).to_list(100)
+        
+        user["active_sessions_count"] = len(sessions)
+        user["sessions"] = sessions
+        
+        # Count submissions (for teachers)
+        if user.get("role") == "teacher":
+            exam_count = await db.exams.count_documents({"teacher_id": user["user_id"]})
+            user["exams_created"] = exam_count
+        
+        # Count submissions (for students)
+        if user.get("role") == "student":
+            submission_count = await db.submissions.count_documents({"student_id": user["user_id"]})
+            user["submissions_count"] = submission_count
+    
+    # Filter fields if specified
+    if fields:
+        field_list = [f.strip() for f in fields.split(",")]
+        users = [
+            {k: v for k, v in user.items() if k in field_list}
+            for user in users
+        ]
+    
+    # Return in requested format
+    if format.lower() == "csv":
+        # Convert to CSV
+        if not users:
+            return StreamingResponse(
+                iter(["No data found"]),
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=users_export.csv"}
+            )
+        
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=users[0].keys())
+        writer.writeheader()
+        writer.writerows(users)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=users_export.csv"}
+        )
+    
+    # Default: JSON format
+    return {
+        "total_users": len(users),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "filters_applied": {
+            "role": role,
+            "created_after": created_after,
+            "last_login_after": last_login_after,
+            "fields": fields
+        },
+        "users": users
+    }
+
+
 # ============== NOTIFICATIONS ROUTES ==============
 
 @api_router.get("/notifications")
