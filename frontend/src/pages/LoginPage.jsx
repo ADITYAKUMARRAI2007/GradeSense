@@ -1,8 +1,39 @@
-import { GraduationCap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { GraduationCap, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
+
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
+
+  // Check for existing session on page load
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
+        
+        if (response.data) {
+          // User has valid session, redirect to appropriate dashboard
+          const redirectPath = response.data.role === "teacher" 
+            ? "/teacher/dashboard" 
+            : "/student/dashboard";
+          navigate(redirectPath, { replace: true });
+        }
+      } catch (error) {
+        // No valid session, show login page
+        setChecking(false);
+      }
+    };
+
+    checkExistingSession();
+  }, [navigate]);
+
   // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
   const handleGoogleLogin = (role) => {
     // Store role preference for after auth
@@ -12,6 +43,18 @@ export default function LoginPage() {
     // The auth callback will handle routing based on role
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(window.location.origin)}`;
   };
+
+  // Show loading state while checking session
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-white">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-white p-4">
