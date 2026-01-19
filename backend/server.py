@@ -7056,15 +7056,15 @@ IMPORTANT:
 Now analyze and respond:"""
 
         # Call AI
-        from emergentintegrations import LLMMessage, CompletionClient
+        from emergentintegrations import LlmChat, UserMessage
         
         api_key = os.environ.get('EMERGENT_LLM_KEY')
         if not api_key:
             raise HTTPException(status_code=500, detail="AI service not configured")
         
-        client = CompletionClient(api_key=api_key)
+        client = LlmChat(api_key=api_key)
         
-        user_msg = LLMMessage(role="user", text=prompt)
+        user_msg = UserMessage(text=prompt)
         
         response = client.create(
             messages=[user_msg]
