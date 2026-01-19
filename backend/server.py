@@ -629,9 +629,22 @@ async def admin_export_users(
             )
         
         output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=users[0].keys())
+        
+        # Get all unique field names from all users
+        all_fields = set()
+        for user in users:
+            all_fields.update(user.keys())
+        
+        # Sort fields for consistent ordering
+        fieldnames = sorted(list(all_fields))
+        
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
-        writer.writerows(users)
+        
+        # Write each user, filling missing fields with empty string
+        for user in users:
+            row = {field: user.get(field, '') for field in fieldnames}
+            writer.writerow(row)
         
         return StreamingResponse(
             iter([output.getvalue()]),
