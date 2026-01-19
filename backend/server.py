@@ -7071,14 +7071,11 @@ Now analyze and respond:"""
         
         user_msg = UserMessage(text=prompt)
         
-        response = chat.send_message(
-            messages=[user_msg],
-            temperature=0.3
-        )
+        response = await chat.send_message(user_msg)
+        ai_response_text = response.strip() if response else "{}"
         
         # Parse AI response
         import json
-        ai_response_text = response.message.text.strip()
         
         # Try to extract JSON if wrapped in markdown
         if "```json" in ai_response_text:
