@@ -6905,6 +6905,204 @@ async def get_student_journey(
 
 
 
+
+# ============== COMPREHENSIVE AI ANALYTICS ==============
+
+@api_router.post("/analytics/ask-ai")
+async def ask_ai_comprehensive(
+    request: dict,
+    user: User = Depends(get_current_user)
+):
+    """
+    Comprehensive AI Analytics Assistant
+    Can answer ANY question about the data with text, numbers, charts, lists
+    
+    Examples:
+    - "List students who scored below 50%"
+    - "Show me a histogram of student performance"
+    - "Which topics do students struggle with most?"
+    - "How many students gave the exam?"
+    - "Show performance trend over time"
+    """
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Teacher only")
+    
+    query = request.get("query", "").strip()
+    exam_id = request.get("exam_id")
+    batch_id = request.get("batch_id")
+    
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+    
+    logger.info(f"AI Analytics Query from {user.email}: {query}")
+    
+    try:
+        # Gather all relevant data for the teacher
+        exam_query = {"teacher_id": user.user_id}
+        if exam_id:
+            exam_query["exam_id"] = exam_id
+        if batch_id:
+            exam_query["batch_id"] = batch_id
+        
+        # Fetch data
+        exams = await db.exams.find(exam_query, {"_id": 0}).to_list(100)
+        exam_ids = [e["exam_id"] for e in exams]
+        
+        if not exam_ids:
+            return {
+                "type": "text",
+                "response": "No exams found matching your criteria. Please create an exam first."
+            }
+        
+        # Get submissions
+        submissions = await db.submissions.find(
+            {"exam_id": {"$in": exam_ids}},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        # Get students
+        students = await db.users.find(
+            {"teacher_id": user.user_id, "role": "student"},
+            {"_id": 0, "user_id": 1, "name": 1, "email": 1}
+        ).to_list(500)
+        
+        # Get batches
+        batches = await db.batches.find(
+            {"teacher_id": user.user_id},
+            {"_id": 0}
+        ).to_list(100)
+        
+        # Prepare context data for AI
+        context_data = {
+            "total_exams": len(exams),
+            "total_students": len(students),
+            "total_submissions": len(submissions),
+            "total_batches": len(batches),
+            "exams_summary": [
+                {
+                    "exam_id": e.get("exam_id"),
+                    "exam_name": e.get("exam_name"),
+                    "total_marks": e.get("total_marks"),
+                    "status": e.get("status"),
+                    "batch_id": e.get("batch_id")
+                } for e in exams
+            ],
+            "submissions_data": [
+                {
+                    "submission_id": s.get("submission_id"),
+                    "student_name": s.get("student_name"),
+                    "student_id": s.get("student_id"),
+                    "exam_id": s.get("exam_id"),
+                    "total_score": s.get("total_score"),
+                    "percentage": s.get("percentage"),
+                    "status": s.get("status"),
+                    "question_scores": s.get("question_scores", [])
+                } for s in submissions
+            ],
+            "students_list": [
+                {
+                    "user_id": st.get("user_id"),
+                    "name": st.get("name"),
+                    "email": st.get("email")
+                } for st in students
+            ]
+        }
+        
+        # Build AI prompt
+        prompt = f"""You are an AI analytics assistant for a teacher using GradeSense (an AI-powered grading platform).
+
+The teacher asked: "{query}"
+
+Here's the data context:
+- Total Exams: {context_data['total_exams']}
+- Total Students: {context_data['total_students']}
+- Total Submissions: {context_data['total_submissions']}
+- Total Batches: {context_data['total_batches']}
+
+Submissions Data Summary:
+{context_data['submissions_data'][:50] if len(submissions) > 0 else "No submissions yet"}
+
+Analyze this data and provide a comprehensive answer to the teacher's question.
+
+IMPORTANT RESPONSE FORMAT:
+1. If the query asks for a LIST (e.g., "list students who...", "which students...", "show me students..."):
+   Return JSON: {{"type": "list", "title": "descriptive title", "items": [list of items], "description": "brief explanation"}}
+
+2. If the query asks for a CHART/GRAPH/HISTOGRAM/VISUALIZATION:
+   Return JSON: {{"type": "chart", "chart_type": "bar|line|pie|histogram", "title": "chart title", "data": [chart data], "x_label": "x axis label", "y_label": "y axis label", "description": "brief explanation"}}
+   
+   For histogram: data should be [{{"range": "0-10", "count": 5}}, {{"range": "11-20", "count": 8}}, ...]
+   For bar chart: data should be [{{"name": "label", "value": number}}, ...]
+   For line chart: data should be [{{"x": "label", "y": number}}, ...]
+   For pie chart: data should be [{{"name": "label", "value": number}}, ...]
+
+3. If the query asks for a NUMBER/STATISTIC (e.g., "how many...", "what percentage..."):
+   Return JSON: {{"type": "number", "value": number, "label": "what this number represents", "description": "additional context"}}
+
+4. If the query asks for COMPARISON or ANALYSIS (general question):
+   Return JSON: {{"type": "text", "response": "detailed text response", "key_points": ["point 1", "point 2", ...]}}
+
+5. If you need to show multiple types of data:
+   Return JSON: {{"type": "multi", "components": [component1, component2, ...]}}
+
+IMPORTANT: 
+- Always use actual data from the submissions_data
+- Be specific with student names, scores, and details
+- If data is insufficient, mention it clearly
+- Format numbers properly (e.g., percentages with 1 decimal place)
+- For student lists, include their scores/performance metrics
+- Return ONLY valid JSON, no extra text
+
+Now analyze and respond:"""
+
+        # Call AI
+        from emergentintegrations import LLMMessage, CompletionClient
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="AI service not configured")
+        
+        client = CompletionClient(api_key=api_key)
+        
+        user_msg = LLMMessage(role="user", text=prompt)
+        
+        response = client.create(
+            messages=[user_msg]
+        ).with_model("gemini", "gemini-2.0-flash-exp").with_params(
+            temperature=0.3,
+            response_format={"type": "json_object"}
+        ).execute()
+        
+        # Parse AI response
+        import json
+        ai_response_text = response.message.text.strip()
+        
+        # Try to extract JSON if wrapped in markdown
+        if "```json" in ai_response_text:
+            ai_response_text = ai_response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in ai_response_text:
+            ai_response_text = ai_response_text.split("```")[1].split("```")[0].strip()
+        
+        try:
+            result = json.loads(ai_response_text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response: {ai_response_text}")
+            result = {
+                "type": "text",
+                "response": ai_response_text
+            }
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in AI analytics: {str(e)}", exc_info=True)
+        return {
+            "type": "error",
+            "message": f"Sorry, I couldn't process your question. Error: {str(e)}"
+        }
+
+
+
 # ============== PHASE 2: ADVANCED AI METRICS ==============
 
 @api_router.get("/analytics/bluff-index")
