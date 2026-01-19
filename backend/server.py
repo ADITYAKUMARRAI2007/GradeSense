@@ -7056,7 +7056,7 @@ IMPORTANT:
 Now analyze and respond:"""
 
         # Call AI
-        from emergentintegrations import LlmChat, UserMessage
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         api_key = os.environ.get('EMERGENT_LLM_KEY')
         if not api_key:
