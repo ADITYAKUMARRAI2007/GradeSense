@@ -8918,6 +8918,12 @@ async def health_check():
 # Include router and add middleware
 app.include_router(api_router)
 
+# Root-level health check endpoint (for Kubernetes probes)
+@app.get("/health")
+async def root_health_check():
+    """Health check for Kubernetes liveness/readiness probes"""
+    return {"status": "healthy", "service": "GradeSense API"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
