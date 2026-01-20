@@ -7076,10 +7076,7 @@ CRITICAL: You MUST respond in valid JSON format matching one of these types:
 - {"type": "chart", "chart_type": "bar|line|pie|histogram", "title": "...", "data": [...], "x_label": "...", "y_label": "...", "description": "..."}
 
 Always use actual data from the context provided. Be specific with student names and scores."""
-        ).with_model("gemini", "gemini-2.5-flash").with_params(
-            temperature=0.3,
-            response_format="json_object"
-        )
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0.3)
         
         user_msg = UserMessage(text=prompt)
         
