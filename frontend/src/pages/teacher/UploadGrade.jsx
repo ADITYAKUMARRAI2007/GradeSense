@@ -554,7 +554,9 @@ export default function UploadGrade({ user }) {
       // Poll for job status every 2 seconds
       const pollInterval = setInterval(async () => {
         try {
-          const jobResponse = await axios.get(`${API}/grading-jobs/${job_id}`);
+          const jobResponse = await axios.get(`${API}/grading-jobs/${job_id}`, {
+            withCredentials: true
+          });
           const jobData = jobResponse.data;
           
           // Update progress bar
