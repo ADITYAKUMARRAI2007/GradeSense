@@ -202,7 +202,9 @@ export default function ManageExams({ user }) {
 
     const checkStatus = async () => {
       try {
-        const response = await axios.get(`${API}/grading-jobs/${jobId}`);
+        const response = await axios.get(`${API}/grading-jobs/${jobId}`, {
+          withCredentials: true
+        });
         const job = response.data;
 
         // Update progress
