@@ -4910,73 +4910,90 @@ async def grade_papers_background(
     Start background grading job - supports 30+ papers without timeout
     Returns immediately with job_id for progress polling
     """
-    if user.role != "teacher":
-        raise HTTPException(status_code=403, detail="Only teachers can upload papers")
-    
-    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
-    if not exam:
-        raise HTTPException(status_code=404, detail="Exam not found")
-    
-    job_id = f"job_{uuid.uuid4().hex[:12]}"
-    
-    # Read all files into memory CONCURRENTLY (ensures files are available for background task)
-    # This optimization prevents timeout for large batches (30+ papers)
-    logger.info(f"Reading {len(files)} files for job {job_id}...")
-    
-    # Create read tasks for all files
-    read_tasks = [file.read() for file in files]
-    
-    # Execute all reads concurrently
-    file_contents = await asyncio.gather(*read_tasks)
-    
-    # Build files_data with filenames and contents
-    files_data = []
-    for file, content in zip(files, file_contents):
-        logger.info(f"  Read {file.filename}: {len(content)} bytes")
-        files_data.append({
-            "filename": file.filename,
-            "content": content
-        })
-    
-    logger.info(f"Files read successfully. Creating job record...")
-    
-    # Create job record in database
-    await db.grading_jobs.insert_one({
-        "job_id": job_id,
-        "exam_id": exam_id,
-        "teacher_id": user.user_id,
-        "status": "pending",
-        "total_papers": len(files_data),
-        "processed_papers": 0,
-        "successful": 0,
-        "failed": 0,
-        "submissions": [],
-        "errors": [],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
-    
-    # Start background processing with file contents
-    from background_grading import process_grading_job_in_background
-    asyncio.create_task(
-        process_grading_job_in_background(
-            job_id, exam_id, files_data, exam, user.user_id, db,
-            pdf_to_images, extract_student_info_from_paper, parse_student_from_filename,
-            get_or_create_student, get_exam_model_answer_images,
-            get_exam_model_answer_text, grade_with_ai, create_notification
+    try:
+        logger.info(f"=== GRADE PAPERS BG START === User: {user.user_id}, Exam: {exam_id}, Files: {len(files)}")
+        
+        if user.role != "teacher":
+            logger.error(f"Non-teacher attempted to grade: {user.role}")
+            raise HTTPException(status_code=403, detail="Only teachers can upload papers")
+        
+        exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+        if not exam:
+            logger.error(f"Exam not found: {exam_id}")
+            raise HTTPException(status_code=404, detail="Exam not found")
+        
+        job_id = f"job_{uuid.uuid4().hex[:12]}"
+        logger.info(f"Generated job_id: {job_id}")
+        
+        # Read all files into memory CONCURRENTLY (ensures files are available for background task)
+        # This optimization prevents timeout for large batches (30+ papers)
+        logger.info(f"Reading {len(files)} files for job {job_id}...")
+        
+        # Create read tasks for all files
+        read_tasks = [file.read() for file in files]
+        
+        # Execute all reads concurrently
+        file_contents = await asyncio.gather(*read_tasks)
+        logger.info(f"All files read successfully")
+        
+        # Build files_data with filenames and contents
+        files_data = []
+        for file, content in zip(files, file_contents):
+            logger.info(f"  Read {file.filename}: {len(content)} bytes")
+            files_data.append({
+                "filename": file.filename,
+                "content": content
+            })
+        
+        logger.info(f"Files read successfully. Creating job record in database...")
+        
+        # Create job record in database
+        job_record = {
+            "job_id": job_id,
+            "exam_id": exam_id,
+            "teacher_id": user.user_id,
+            "status": "pending",
+            "total_papers": len(files_data),
+            "processed_papers": 0,
+            "successful": 0,
+            "failed": 0,
+            "submissions": [],
+            "errors": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        insert_result = await db.grading_jobs.insert_one(job_record)
+        logger.info(f"Job record created in DB. Insert ID: {insert_result.inserted_id}")
+        
+        await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
+        logger.info(f"Exam status updated to processing")
+        
+        # Start background processing with file contents
+        logger.info(f"Starting background task...")
+        from background_grading import process_grading_job_in_background
+        asyncio.create_task(
+            process_grading_job_in_background(
+                job_id, exam_id, files_data, exam, user.user_id, db,
+                pdf_to_images, extract_student_info_from_paper, parse_student_from_filename,
+                get_or_create_student, get_exam_model_answer_images,
+                get_exam_model_answer_text, grade_with_ai, create_notification
+            )
         )
-    )
-    
-    logger.info(f"Background job {job_id} started for {len(files_data)} papers")
-    
-    return {
-        "job_id": job_id,
-        "status": "pending",
-        "total_papers": len(files_data),
-        "message": f"Grading job started for {len(files_data)} papers"
-    }
+        
+        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} started for {len(files_data)} papers")
+        
+        return {
+            "job_id": job_id,
+            "status": "pending",
+            "total_papers": len(files_data),
+            "message": f"Grading job started for {len(files_data)} papers"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"=== GRADE PAPERS BG ERROR === {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start grading job: {str(e)}")
 
 
 @api_router.get("/grading-jobs/{job_id}")
