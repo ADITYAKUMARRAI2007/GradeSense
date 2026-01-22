@@ -4448,8 +4448,15 @@ async def upload_model_answer(
     user: User = Depends(get_current_user)
 ):
     """Upload model answer PDF and AUTO-EXTRACT questions"""
-    if user.role != "teacher":
-        raise HTTPException(status_code=403, detail="Only teachers can upload model answers")
+    try:
+        # Set processing flag immediately
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {"model_answer_processing": True}}
+        )
+        
+        if user.role != "teacher":
+            raise HTTPException(status_code=403, detail="Only teachers can upload model answers")
     
     exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
     if not exam:
