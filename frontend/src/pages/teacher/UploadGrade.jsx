@@ -109,15 +109,15 @@ export default function UploadGrade({ user }) {
   const [examId, setExamId] = useState(null);
   const [results, setResults] = useState(null);
   const [activeJobId, setActiveJobId] = useState(null);
-  const [pollIntervalRef, setPollIntervalRef] = useState(null);
+  const pollIntervalRef = useRef(null);
 
   // Centralized polling function
   const startPollingJob = useCallback((job_id) => {
     console.log('Starting polling for job:', job_id);
     
     // Clear any existing interval first
-    if (pollIntervalRef) {
-      clearInterval(pollIntervalRef);
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
     }
     
     const interval = setInterval(async () => {
@@ -138,7 +138,7 @@ export default function UploadGrade({ user }) {
         // Check if job completed
         if (jobData.status === 'completed') {
           clearInterval(interval);
-          setPollIntervalRef(null);
+          pollIntervalRef.current = null;
           setProcessingProgress(100);
           
           console.log('Job completed! Setting results and moving to step 6');
@@ -175,7 +175,7 @@ export default function UploadGrade({ user }) {
           
         } else if (jobData.status === 'failed') {
           clearInterval(interval);
-          setPollIntervalRef(null);
+          pollIntervalRef.current = null;
           console.error('Job failed:', jobData.error);
           toast.error(`Grading failed: ${jobData.error || 'Unknown error'}`);
           setProcessing(false);
@@ -190,28 +190,28 @@ export default function UploadGrade({ user }) {
       }
     }, 2000); // Poll every 2 seconds
     
-    setPollIntervalRef(interval);
+    pollIntervalRef.current = interval;
     
     // Safety timeout - stop polling after 20 minutes
     setTimeout(() => {
-      clearInterval(interval);
-      setPollIntervalRef(null);
-      if (processing) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
         toast.error("Grading is taking longer than expected. Check Review Papers page.");
         setProcessing(false);
       }
     }, 1200000); // 20 minutes
-  }, [processing]);
+  }, []);
 
   // Cleanup polling interval on unmount
   useEffect(() => {
     return () => {
-      if (pollIntervalRef) {
+      if (pollIntervalRef.current) {
         console.log('Cleaning up polling interval on unmount');
-        clearInterval(pollIntervalRef);
+        clearInterval(pollIntervalRef.current);
       }
     };
-  }, [pollIntervalRef]);
+  }, []);
 
   // Restore state from localStorage on mount
   useEffect(() => {
