@@ -141,6 +141,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/profile/setup" element={<ProfileSetup />} />
       
       {/* Teacher Routes */}
       <Route
