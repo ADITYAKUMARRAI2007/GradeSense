@@ -334,6 +334,9 @@ export default function Layout({ children, user }) {
 
       {/* Global Search Modal */}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} user={user} />
+      
+      {/* Global Grading Progress Indicator */}
+      <GlobalGradingProgress />
     </div>
   );
 }
