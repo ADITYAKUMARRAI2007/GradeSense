@@ -203,6 +203,16 @@ export default function UploadGrade({ user }) {
     }, 1200000); // 20 minutes
   }, [processing]);
 
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef) {
+        console.log('Cleaning up polling interval on unmount');
+        clearInterval(pollIntervalRef);
+      }
+    };
+  }, [pollIntervalRef]);
+
   // Restore state from localStorage on mount
   useEffect(() => {
     const restoreState = async () => {
