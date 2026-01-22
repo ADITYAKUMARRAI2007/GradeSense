@@ -6,6 +6,7 @@ import { Toaster } from "./components/ui/sonner";
 // Pages
 import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
+import ProfileSetup from "./pages/ProfileSetup";
 import TeacherDashboard from "./pages/teacher/Dashboard";
 import UploadGrade from "./pages/teacher/UploadGrade";
 import ReviewPapers from "./pages/teacher/ReviewPapers";
@@ -62,6 +63,7 @@ export const useAuth = () => {
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [user, setUser] = useState(null);
+  const [profileCheck, setProfileCheck] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const checkedRef = useRef(false);
@@ -83,6 +85,20 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         setUser(response.data);
         setIsAuthenticated(true);
 
+        // Check profile completion status
+        try {
+          const profileResponse = await axios.get(`${API}/profile/check`);
+          setProfileCheck(profileResponse.data);
+          
+          // If profile not completed and not on profile setup page, redirect
+          if (!profileResponse.data.profile_completed && location.pathname !== '/profile/setup') {
+            navigate('/profile/setup', { replace: true });
+            return;
+          }
+        } catch (profileError) {
+          console.error('Profile check error:', profileError);
+        }
+
         // Check role
         if (allowedRoles && !allowedRoles.includes(response.data.role)) {
           const redirectPath = response.data.role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
@@ -95,9 +111,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     };
 
     checkAuth();
-  }, [navigate, allowedRoles, location.state]);
+  }, [navigate, allowedRoles, location.state, location.pathname]);
 
-  if (isAuthenticated === null) {
+  if (isAuthenticated === null || profileCheck === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
