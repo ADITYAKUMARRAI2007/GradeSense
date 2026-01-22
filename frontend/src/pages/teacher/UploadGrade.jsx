@@ -126,7 +126,24 @@ export default function UploadGrade({ user }) {
         
         console.log('Restoring state:', state);
         
-        // If we have an examId, check with backend what's actually happening
+        // PRIORITY: Handle active grading job FIRST
+        if (state.activeJobId) {
+          console.log('Active grading job found:', state.activeJobId);
+          setExamId(state.examId);
+          setActiveJobId(state.activeJobId);
+          setProcessing(true);
+          setStep(5); // Always go to step 5 for active grading
+          
+          // Restore form data
+          if (state.formData) {
+            setFormData(state.formData);
+          }
+          
+          toast.info('Resuming grading progress...');
+          return; // Exit early - grading is top priority
+        }
+        
+        // If we have an examId but no active job, check with backend
         if (state.examId) {
           try {
             const examResponse = await axios.get(`${API}/exams/${state.examId}`);
@@ -174,14 +191,6 @@ export default function UploadGrade({ user }) {
               setExamId(null);
             }
           }
-        }
-        
-        // Handle active grading job
-        if (state.activeJobId) {
-          console.log('Restoring active grading job:', state.activeJobId);
-          setActiveJobId(state.activeJobId);
-          setProcessing(true);
-          setStep(Math.max(state.step || 5, 5)); // At least step 5 for grading
         }
         
       } catch (error) {
