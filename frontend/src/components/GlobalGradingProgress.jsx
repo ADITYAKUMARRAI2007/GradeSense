@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { API } from '../App';
 import { X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Progress } from './ui/progress';
+
+// Get API URL from environment
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const GlobalGradingProgress = () => {
   const [activeJob, setActiveJob] = useState(null);
@@ -28,33 +30,44 @@ const GlobalGradingProgress = () => {
       const stored = localStorage.getItem('activeGradingJob');
       if (!stored) {
         setVisible(false);
+        setActiveJob(null);
+        setJobData(null);
         return;
       }
 
       const job = JSON.parse(stored);
       setActiveJob(job);
+      
+      console.log('GlobalGradingProgress: Checking job', job.job_id);
 
-      // Fetch current status
+      // Fetch current status with credentials
       const response = await axios.get(`${API}/grading-jobs/${job.job_id}`, {
         withCredentials: true
       });
 
+      console.log('GlobalGradingProgress: Job data', response.data);
+      
       setJobData(response.data);
       setVisible(true);
 
-      // If completed or failed, remove from storage
+      // If completed or failed, remove from storage after delay
       if (response.data.status === 'completed' || response.data.status === 'failed') {
         setTimeout(() => {
           localStorage.removeItem('activeGradingJob');
           setVisible(false);
+          setActiveJob(null);
+          setJobData(null);
         }, 5000); // Show completion message for 5 seconds
       }
     } catch (error) {
-      console.error('Error checking active job:', error);
-      // If job not found (404), clear from storage
-      if (error.response?.status === 404) {
+      console.error('GlobalGradingProgress: Error checking job:', error);
+      // If job not found (404) or unauthorized (401), clear from storage
+      if (error.response?.status === 404 || error.response?.status === 401) {
+        console.log('GlobalGradingProgress: Job not found or unauthorized, clearing');
         localStorage.removeItem('activeGradingJob');
         setVisible(false);
+        setActiveJob(null);
+        setJobData(null);
       }
     }
   };
