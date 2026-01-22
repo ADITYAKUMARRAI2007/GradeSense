@@ -109,6 +109,99 @@ export default function UploadGrade({ user }) {
   const [examId, setExamId] = useState(null);
   const [results, setResults] = useState(null);
   const [activeJobId, setActiveJobId] = useState(null);
+  const [pollIntervalRef, setPollIntervalRef] = useState(null);
+
+  // Centralized polling function
+  const startPollingJob = useCallback((job_id) => {
+    console.log('Starting polling for job:', job_id);
+    
+    // Clear any existing interval first
+    if (pollIntervalRef) {
+      clearInterval(pollIntervalRef);
+    }
+    
+    const interval = setInterval(async () => {
+      try {
+        const jobResponse = await axios.get(`${API}/grading-jobs/${job_id}`, {
+          withCredentials: true
+        });
+        const jobData = jobResponse.data;
+        
+        console.log('Polling job status:', jobData.status, `${jobData.processed_papers}/${jobData.total_papers}`);
+        
+        // Update progress bar
+        const progress = jobData.total_papers > 0 
+          ? Math.round((jobData.processed_papers / jobData.total_papers) * 100)
+          : 0;
+        setProcessingProgress(progress);
+        
+        // Check if job completed
+        if (jobData.status === 'completed') {
+          clearInterval(interval);
+          setPollIntervalRef(null);
+          setProcessingProgress(100);
+          
+          console.log('Job completed! Setting results and moving to step 6');
+          
+          // Set results in the expected format
+          setResults({
+            processed: jobData.successful,
+            submissions: jobData.submissions || [],
+            errors: jobData.errors || []
+          });
+          
+          // Show success/error messages
+          if (jobData.errors && jobData.errors.length > 0) {
+            toast.warning(`Graded ${jobData.successful} of ${jobData.total_papers} papers. ${jobData.errors.length} had errors.`);
+            
+            // Show first 3 errors only
+            jobData.errors.slice(0, 3).forEach(error => {
+              toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
+            });
+            if (jobData.errors.length > 3) {
+              toast.info(`+ ${jobData.errors.length - 3} more errors`);
+            }
+          } else {
+            toast.success(`✓ Successfully graded all ${jobData.successful} papers!`);
+          }
+          
+          setStep(6);
+          setProcessing(false);
+          setActiveJobId(null);
+          
+          // Clear from localStorage
+          localStorage.removeItem('activeGradingJob');
+          localStorage.removeItem('uploadGradeState');
+          
+        } else if (jobData.status === 'failed') {
+          clearInterval(interval);
+          setPollIntervalRef(null);
+          console.error('Job failed:', jobData.error);
+          toast.error(`Grading failed: ${jobData.error || 'Unknown error'}`);
+          setProcessing(false);
+          setActiveJobId(null);
+          localStorage.removeItem('activeGradingJob');
+          localStorage.removeItem('uploadGradeState');
+        }
+        // If status is 'processing' or 'pending', continue polling
+      } catch (pollError) {
+        console.error('Error polling job status:', pollError);
+        // Don't clear interval on network errors - keep trying
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    setPollIntervalRef(interval);
+    
+    // Safety timeout - stop polling after 20 minutes
+    setTimeout(() => {
+      clearInterval(interval);
+      setPollIntervalRef(null);
+      if (processing) {
+        toast.error("Grading is taking longer than expected. Check Review Papers page.");
+        setProcessing(false);
+      }
+    }, 1200000); // 20 minutes
+  }, [processing]);
 
   // Restore state from localStorage on mount
   useEffect(() => {
