@@ -73,8 +73,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     if (location.state?.user) {
       setUser(location.state.user);
       setIsAuthenticated(true);
-      setProfileCheck({profile_completed: true});
-      return;
+      // Don't check profile here - let the profile check endpoint handle it
+      setProfileCheck(null);
+      checkedRef.current = false; // Allow profile check to run
     }
 
     if (checkedRef.current) return;
@@ -91,13 +92,18 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           const profileResponse = await axios.get(`${API}/profile/check`);
           setProfileCheck(profileResponse.data);
           
-          // Only redirect to profile setup if EXPLICITLY marked as incomplete (false)
-          // null or true means user can proceed (existing users have null)
+          console.log('Profile check response:', profileResponse.data);
+          
+          // ONLY redirect to profile setup if EXPLICITLY marked as incomplete (false)
+          // AND not already on profile setup page
           if (profileResponse.data.profile_completed === false && location.pathname !== '/profile/setup') {
-            console.log('Profile incomplete, redirecting to setup');
+            console.log('Profile incomplete (new user), redirecting to setup');
             navigate('/profile/setup', { replace: true });
             return;
           }
+          
+          // If profile is complete (true or null for existing users), continue normally
+          console.log('Profile complete, allowing navigation');
         } catch (profileError) {
           console.error('Profile check error:', profileError);
           // If profile check fails, assume profile is complete (existing user)
