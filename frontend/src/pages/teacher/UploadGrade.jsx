@@ -962,18 +962,19 @@ export default function UploadGrade({ user }) {
                           variant="ghost" 
                           size="icon"
                           onClick={(e) => { e.stopPropagation(); setModelAnswerFile(null); }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="font-medium text-sm">Drop your model answer PDF here</p>
-                      <p className="text-xs text-muted-foreground mt-1">Used as reference for AI grading</p>
-                    </>
-                  )}
-                </div>
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="font-medium text-sm">Drop your model answer PDF here</p>
+                        <p className="text-xs text-muted-foreground mt-1">Used as reference for AI grading</p>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
