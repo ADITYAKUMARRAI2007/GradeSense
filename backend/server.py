@@ -1321,11 +1321,6 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
         "exam_category": user.exam_category if hasattr(user, 'exam_category') else None
     }
 
-        await db.user_sessions.delete_one({"session_token": session_token})
-    
-    response.delete_cookie(key="session_token", path="/")
-    return {"message": "Logged out"}
-
 # ============== BATCH ROUTES ==============
 
 @api_router.get("/batches")
