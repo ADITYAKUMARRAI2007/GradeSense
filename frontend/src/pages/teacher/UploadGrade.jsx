@@ -808,77 +808,8 @@ export default function UploadGrade({ user }) {
       
       toast.success(`Grading started for ${total_papers} papers. Processing in background...`);
       
-      // Poll for job status every 2 seconds
-      const pollInterval = setInterval(async () => {
-        try {
-          const jobResponse = await axios.get(`${API}/grading-jobs/${job_id}`, {
-            withCredentials: true
-          });
-          const jobData = jobResponse.data;
-          
-          // Update progress bar
-          const progress = jobData.total_papers > 0 
-            ? Math.round((jobData.processed_papers / jobData.total_papers) * 100)
-            : 0;
-          setProcessingProgress(progress);
-          
-          // Check if job completed
-          if (jobData.status === 'completed') {
-            clearInterval(pollInterval);
-            setProcessingProgress(100);
-            
-            // Set results in the expected format
-            setResults({
-              processed: jobData.successful,
-              submissions: jobData.submissions || [],
-              errors: jobData.errors || []
-            });
-            
-            // Show success/error messages
-            if (jobData.errors && jobData.errors.length > 0) {
-              toast.warning(`Graded ${jobData.successful} of ${total_papers} papers. ${jobData.errors.length} had errors.`);
-              
-              // Show first 3 errors only
-              jobData.errors.slice(0, 3).forEach(error => {
-                toast.error(`${error.filename}: ${error.error}`, { duration: 5000 });
-              });
-              if (jobData.errors.length > 3) {
-                toast.info(`+ ${jobData.errors.length - 3} more errors`);
-              }
-            } else {
-              toast.success(`✓ Successfully graded all ${jobData.successful} papers!`);
-            }
-            
-            setStep(6);
-            setProcessing(false);
-            setActiveJobId(null);
-            
-            // Clear from localStorage
-            localStorage.removeItem('activeGradingJob');
-            localStorage.removeItem('uploadGradeState');
-            
-          } else if (jobData.status === 'failed') {
-            clearInterval(pollInterval);
-            toast.error(`Grading failed: ${jobData.error || 'Unknown error'}`);
-            setProcessing(false);
-            setActiveJobId(null);
-            localStorage.removeItem('activeGradingJob');
-          }
-          // If status is 'processing' or 'pending', continue polling
-        } catch (pollError) {
-          console.error('Error polling job status:', pollError);
-          // Don't clear interval on network errors - keep trying
-        }
-      }, 2000); // Poll every 2 seconds
-      
-      // Safety timeout - stop polling after 20 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (processing) {
-          toast.error("Grading is taking longer than expected. Check Review Papers page.");
-          setProcessing(false);
-        }
-      }, 1200000); // 20 minutes
+      // Start polling using centralized function
+      startPollingJob(job_id);
       
     } catch (error) {
       toast.error("Failed to start grading: " + (error.response?.data?.detail || error.message));
