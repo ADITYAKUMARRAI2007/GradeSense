@@ -929,25 +929,39 @@ export default function UploadGrade({ user }) {
               {/* Model Answer Upload */}
               <div>
                 <Label className="text-sm font-medium mb-2 block">Model Answer (Optional)</Label>
-                <div 
-                  {...getModelRootProps()} 
-                  className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isModelDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
-                  data-testid="model-answer-dropzone"
-                >
-                  <input {...getModelInputProps()} />
-                  {modelAnswerFile ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <FileText className="w-6 h-6 text-primary" />
-                      <div className="text-left">
-                        <p className="font-medium text-sm">{modelAnswerFile.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(modelAnswerFile.size / 1024 / 1024).toFixed(2)} MB
+                
+                {paperUploaded && !modelAnswerFile ? (
+                  <div className="p-4 bg-green-50 border-2 border-green-200 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                      <div>
+                        <p className="font-medium text-sm text-green-900">Model answer already uploaded</p>
+                        <p className="text-xs text-green-700 mt-1">
+                          You can continue to the next step or upload a new one to replace it
                         </p>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); setModelAnswerFile(null); }}
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    {...getModelRootProps()} 
+                    className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isModelDragActive ? "border-primary bg-primary/5" : "border-gray-300"}`}
+                    data-testid="model-answer-dropzone"
+                  >
+                    <input {...getModelInputProps()} />
+                    {modelAnswerFile ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <FileText className="w-6 h-6 text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium text-sm">{modelAnswerFile.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(modelAnswerFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); setModelAnswerFile(null); }}
                       >
                         <X className="w-4 h-4" />
                       </Button>
