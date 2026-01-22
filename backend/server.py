@@ -1316,8 +1316,17 @@ async def complete_profile(
 @api_router.get("/profile/check")
 async def check_profile_completion(user: User = Depends(get_current_user)):
     """Check if user has completed profile setup"""
+    # For existing users (profile_completed is None/null), assume profile is complete
+    # Only new users will have profile_completed explicitly set to False
+    profile_completed = user.profile_completed if hasattr(user, 'profile_completed') else None
+    
+    # If profile_completed is None (existing user), treat as completed
+    # If it's explicitly False (new user), they need to complete setup
+    if profile_completed is None:
+        profile_completed = True
+    
     return {
-        "profile_completed": user.profile_completed if hasattr(user, 'profile_completed') else False,
+        "profile_completed": profile_completed,
         "user_id": user.user_id,
         "email": user.email,
         "name": user.name,
