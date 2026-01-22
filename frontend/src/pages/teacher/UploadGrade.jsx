@@ -132,13 +132,34 @@ export default function UploadGrade({ user }) {
           setExamId(state.examId);
           setActiveJobId(state.activeJobId);
           setProcessing(true);
-          setStep(5); // Always go to step 5 for active grading
           
           // Restore form data
           if (state.formData) {
             setFormData(state.formData);
           }
           
+          // IMPORTANT: Check backend for uploaded files to set flags correctly
+          try {
+            const examResponse = await axios.get(`${API}/exams/${state.examId}`);
+            const examData = examResponse.data;
+            
+            console.log('Exam data during grading restore:', examData);
+            
+            // Set file upload flags based on backend data
+            if (examData.model_answer_file_id) {
+              setPaperUploaded(true);
+              console.log('Model answer confirmed uploaded');
+            }
+            
+            if (examData.question_paper_file_id) {
+              setQuestionsSkipped(false);
+              console.log('Question paper confirmed uploaded');
+            }
+          } catch (error) {
+            console.error('Error fetching exam data during restore:', error);
+          }
+          
+          setStep(5); // Always go to step 5 for active grading
           toast.info('Resuming grading progress...');
           return; // Exit early - grading is top priority
         }
