@@ -1258,6 +1258,10 @@ async def logout(request: Request, response: Response):
     """Logout and clear session"""
     session_token = request.cookies.get("session_token")
     if session_token:
+        await db.user_sessions.delete_one({"session_token": session_token})
+    
+    response.delete_cookie(key="session_token", path="/")
+    return {"message": "Logged out"}
 
 # ============== PROFILE MANAGEMENT ==============
 
