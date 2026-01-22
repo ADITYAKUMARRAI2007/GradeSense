@@ -146,7 +146,14 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/profile/setup" element={<ProfileSetup />} />
+      <Route
+        path="/profile/setup"
+        element={
+          <ProtectedRoute>
+            {(props) => <ProfileSetup {...props} />}
+          </ProtectedRoute>
+        }
+      />
       
       {/* Teacher Routes */}
       <Route
