@@ -588,6 +588,16 @@ export default function UploadGrade({ user }) {
       });
       
       const { job_id, total_papers } = response.data;
+      setActiveJobId(job_id);
+      
+      // Save to global storage for cross-page access
+      localStorage.setItem('activeGradingJob', JSON.stringify({
+        job_id,
+        exam_id: examId,
+        total_papers: studentFiles.length,
+        started_at: Date.now()
+      }));
+      
       toast.success(`Grading started for ${total_papers} papers. Processing in background...`);
       
       // Poll for job status every 2 seconds
