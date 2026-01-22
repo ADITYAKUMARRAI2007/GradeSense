@@ -119,32 +119,42 @@ export default function UploadGrade({ user }) {
           const state = JSON.parse(savedState);
           // Only restore if the state is recent (within last 2 hours)
           if (state.timestamp && Date.now() - state.timestamp < 2 * 60 * 60 * 1000) {
-            setStep(state.step || 1);
-            setExamId(state.examId || null);
-            setActiveJobId(state.activeJobId || null);
             
-            // If we have an examId, check with backend what's actually uploaded
+            // If we have an examId, check with backend what's actually happening
             if (state.examId) {
               try {
                 const examResponse = await axios.get(`${API}/exams/${state.examId}`);
                 const examData = examResponse.data;
                 
+                setExamId(state.examId);
+                
+                // Check if model answer is being processed
+                if (examData.model_answer_processing) {
+                  // Show processing UI for Step 2
+                  setStep(2);
+                  setUploading(true);
+                  setPaperUploaded(false);
+                  toast.info('Model answer is being processed. Please wait...');
+                  return;
+                }
+                
                 // Mark files as uploaded based on backend data
                 if (examData.model_answer_file_id) {
                   setPaperUploaded(true);
-                  // Don't set modelAnswerFile since we don't have the actual File object
-                  // But backend knows it's uploaded
                 }
                 
                 if (examData.question_paper_file_id) {
                   setQuestionsSkipped(false);
-                  // Question paper was uploaded
                 }
                 
                 // Restore form data if available
                 if (state.formData) {
                   setFormData(state.formData);
                 }
+                
+                // Restore step
+                setStep(state.step || 1);
+                
               } catch (error) {
                 console.error('Error fetching exam data:', error);
                 // If exam not found, clear state
@@ -156,9 +166,11 @@ export default function UploadGrade({ user }) {
               }
             }
             
+            // Handle active grading job
             if (state.activeJobId) {
+              setActiveJobId(state.activeJobId);
               setProcessing(true);
-              // Resume polling for this job
+              setStep(state.step || 5);
             }
           } else {
             localStorage.removeItem('uploadGradeState');
