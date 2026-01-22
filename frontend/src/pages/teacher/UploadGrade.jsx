@@ -643,11 +643,18 @@ export default function UploadGrade({ user }) {
             
             setStep(6);
             setProcessing(false);
+            setActiveJobId(null);
+            
+            // Clear from localStorage
+            localStorage.removeItem('activeGradingJob');
+            localStorage.removeItem('uploadGradeState');
             
           } else if (jobData.status === 'failed') {
             clearInterval(pollInterval);
             toast.error(`Grading failed: ${jobData.error || 'Unknown error'}`);
             setProcessing(false);
+            setActiveJobId(null);
+            localStorage.removeItem('activeGradingJob');
           }
           // If status is 'processing' or 'pending', continue polling
         } catch (pollError) {
