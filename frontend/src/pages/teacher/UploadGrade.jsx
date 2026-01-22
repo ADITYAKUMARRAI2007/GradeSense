@@ -108,6 +108,45 @@ export default function UploadGrade({ user }) {
   const [studentFiles, setStudentFiles] = useState([]);
   const [examId, setExamId] = useState(null);
   const [results, setResults] = useState(null);
+  const [activeJobId, setActiveJobId] = useState(null);
+
+  // Restore state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('uploadGradeState');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        // Only restore if the state is recent (within last 2 hours)
+        if (state.timestamp && Date.now() - state.timestamp < 2 * 60 * 60 * 1000) {
+          setStep(state.step || 1);
+          setExamId(state.examId || null);
+          setActiveJobId(state.activeJobId || null);
+          if (state.activeJobId) {
+            setProcessing(true);
+            // Resume polling for this job
+          }
+        } else {
+          localStorage.removeItem('uploadGradeState');
+        }
+      } catch (error) {
+        console.error('Error restoring state:', error);
+        localStorage.removeItem('uploadGradeState');
+      }
+    }
+  }, []);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    if (examId || activeJobId || step > 1) {
+      const state = {
+        step,
+        examId,
+        activeJobId,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('uploadGradeState', JSON.stringify(state));
+    }
+  }, [step, examId, activeJobId]);
 
   useEffect(() => {
     fetchData();
