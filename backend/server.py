@@ -517,6 +517,7 @@ async def create_session(request: Request, response: Response):
             {"$set": {
                 "name": user_name,  # Update with Google name
                 "picture": user_picture,
+                "profile_completed": True,  # Existing students are considered complete
                 "last_login": datetime.now(timezone.utc).isoformat()
             }}
         )
