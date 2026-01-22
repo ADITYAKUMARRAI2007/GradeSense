@@ -527,12 +527,13 @@ async def create_session(request: Request, response: Response):
         
         if existing_user:
             user_id = existing_user["user_id"]
-            # Update user data
+            # Update user data and mark profile as completed for existing users
             await db.users.update_one(
                 {"user_id": user_id},
                 {"$set": {
                     "name": user_name,
                     "picture": user_picture,
+                    "profile_completed": True,  # Existing users are considered complete
                     "last_login": datetime.now(timezone.utc).isoformat()
                 }}
             )
@@ -548,6 +549,7 @@ async def create_session(request: Request, response: Response):
                 "picture": user_picture,
                 "role": user_role,
                 "batches": [],
+                "profile_completed": False,  # New users need to complete profile
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "last_login": datetime.now(timezone.utc).isoformat()
             }
