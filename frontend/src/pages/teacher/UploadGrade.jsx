@@ -328,7 +328,7 @@ export default function UploadGrade({ user }) {
     };
     
     restoreState();
-  }, []);
+  }, [startPollingJob]);
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
