@@ -254,6 +254,10 @@ export default function UploadGrade({ user }) {
           
           setStep(5); // Always go to step 5 for active grading
           toast.info('Resuming grading progress...');
+          
+          // CRITICAL FIX: Restart polling for the active job
+          startPollingJob(state.activeJobId);
+          
           return; // Exit early - grading is top priority
         }
         
