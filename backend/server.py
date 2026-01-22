@@ -1258,6 +1258,65 @@ async def logout(request: Request, response: Response):
     """Logout and clear session"""
     session_token = request.cookies.get("session_token")
     if session_token:
+
+# ============== PROFILE MANAGEMENT ==============
+
+@api_router.put("/profile/complete")
+async def complete_profile(
+    profile: ProfileUpdate,
+    user: User = Depends(get_current_user)
+):
+    """Complete user profile on first login"""
+    try:
+        # Validate teacher_type
+        valid_teacher_types = ["school", "college", "competitive", "others"]
+        if profile.teacher_type not in valid_teacher_types:
+            raise HTTPException(status_code=400, detail="Invalid teacher type")
+        
+        # Validate exam_category if competitive
+        if profile.teacher_type == "competitive":
+            valid_exam_categories = ["UPSC", "CA", "CLAT", "JEE", "NEET", "others"]
+            if not profile.exam_category or profile.exam_category not in valid_exam_categories:
+                raise HTTPException(status_code=400, detail="Exam category required for competitive exams")
+        
+        # Update user profile
+        update_data = {
+            "name": profile.name,
+            "contact": profile.contact,
+            "email": profile.email,
+            "teacher_type": profile.teacher_type,
+            "exam_category": profile.exam_category if profile.teacher_type == "competitive" else None,
+            "profile_completed": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.users.update_one(
+            {"user_id": user.user_id},
+            {"$set": update_data}
+        )
+        
+        # Return updated user
+        updated_user = await db.users.find_one({"user_id": user.user_id}, {"_id": 0})
+        return updated_user
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error completing profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to complete profile: {str(e)}")
+
+@api_router.get("/profile/check")
+async def check_profile_completion(user: User = Depends(get_current_user)):
+    """Check if user has completed profile setup"""
+    return {
+        "profile_completed": user.profile_completed if hasattr(user, 'profile_completed') else False,
+        "user_id": user.user_id,
+        "email": user.email,
+        "name": user.name,
+        "teacher_type": user.teacher_type if hasattr(user, 'teacher_type') else None,
+        "exam_category": user.exam_category if hasattr(user, 'exam_category') else None
+    }
+
         await db.user_sessions.delete_one({"session_token": session_token})
     
     response.delete_cookie(key="session_token", path="/")
