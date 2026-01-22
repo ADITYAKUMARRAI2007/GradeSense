@@ -560,7 +560,18 @@ export default function UploadGrade({ user }) {
     setLoading(true);
     try {
       const response = await axios.post(`${API}/exams`, formData);
-      setExamId(response.data.exam_id);
+      const newExamId = response.data.exam_id;
+      setExamId(newExamId);
+      
+      // Save to localStorage immediately
+      localStorage.setItem('uploadGradeState', JSON.stringify({
+        step: 2,
+        examId: newExamId,
+        activeJobId: null,
+        formData: formData,
+        timestamp: Date.now()
+      }));
+      
       toast.success("Exam configuration saved");
       setStep(2);
     } catch (error) {
@@ -649,13 +660,24 @@ export default function UploadGrade({ user }) {
       const { job_id, total_papers } = response.data;
       setActiveJobId(job_id);
       
-      // Save to global storage for cross-page access
+      // Save to BOTH localStorage keys for cross-page access
       localStorage.setItem('activeGradingJob', JSON.stringify({
         job_id,
         exam_id: examId,
         total_papers: studentFiles.length,
         started_at: Date.now()
       }));
+      
+      localStorage.setItem('uploadGradeState', JSON.stringify({
+        step: 5,
+        examId: examId,
+        activeJobId: job_id,
+        formData: formData,
+        timestamp: Date.now()
+      }));
+      
+      console.log('Grading job started:', job_id);
+      console.log('Saved to localStorage - activeGradingJob and uploadGradeState');
       
       toast.success(`Grading started for ${total_papers} papers. Processing in background...`);
       
