@@ -4986,7 +4986,7 @@ async def grade_papers_background(
     user: User = Depends(get_current_user)
 ):
     """
-    Start background grading job - supports 30+ papers without timeout
+    Start background grading job - creates a task in MongoDB for worker to process
     Returns immediately with job_id for progress polling
     """
     try:
@@ -5004,14 +5004,9 @@ async def grade_papers_background(
         job_id = f"job_{uuid.uuid4().hex[:12]}"
         logger.info(f"Generated job_id: {job_id}")
         
-        # Read all files into memory CONCURRENTLY (ensures files are available for background task)
-        # This optimization prevents timeout for large batches (30+ papers)
+        # Read all files into memory CONCURRENTLY
         logger.info(f"Reading {len(files)} files for job {job_id}...")
-        
-        # Create read tasks for all files
         read_tasks = [file.read() for file in files]
-        
-        # Execute all reads concurrently
         file_contents = await asyncio.gather(*read_tasks)
         logger.info(f"All files read successfully")
         
@@ -5024,7 +5019,7 @@ async def grade_papers_background(
                 "content": content
             })
         
-        logger.info(f"Files read successfully. Creating job record in database...")
+        logger.info(f"Files read successfully. Creating job record and task...")
         
         # Create job record in database
         job_record = {
@@ -5042,31 +5037,37 @@ async def grade_papers_background(
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        insert_result = await db.grading_jobs.insert_one(job_record)
-        logger.info(f"Job record created in DB. Insert ID: {insert_result.inserted_id}")
+        await db.grading_jobs.insert_one(job_record)
+        logger.info(f"Job record created in DB")
+        
+        # Create task for worker to process
+        task_id = f"task_{uuid.uuid4().hex[:12]}"
+        task_record = {
+            "task_id": task_id,
+            "type": "grade_papers",
+            "status": "pending",
+            "data": {
+                "job_id": job_id,
+                "exam_id": exam_id,
+                "files_data": files_data,
+                "teacher_id": user.user_id
+            },
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.tasks.insert_one(task_record)
+        logger.info(f"Task {task_id} created for worker. Job will be processed in background.")
         
         await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
-        logger.info(f"Exam status updated to processing")
         
-        # Start background processing with file contents
-        logger.info(f"Starting background task...")
-        from background_grading import process_grading_job_in_background
-        asyncio.create_task(
-            process_grading_job_in_background(
-                job_id, exam_id, files_data, exam, user.user_id, db,
-                pdf_to_images, extract_student_info_from_paper, parse_student_from_filename,
-                get_or_create_student, get_exam_model_answer_images,
-                get_exam_model_answer_text, grade_with_ai, create_notification
-            )
-        )
-        
-        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} started for {len(files_data)} papers")
+        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} queued for {len(files_data)} papers")
         
         return {
             "job_id": job_id,
+            "task_id": task_id,
             "status": "pending",
             "total_papers": len(files_data),
-            "message": f"Grading job started for {len(files_data)} papers"
+            "message": f"Grading job queued for {len(files_data)} papers. Worker will process in background."
         }
     except HTTPException:
         raise
