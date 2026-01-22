@@ -4454,11 +4454,10 @@ async def upload_model_answer(
         {"$set": {"model_answer_processing": True}}
     )
     
-    try:
-        if user.role != "teacher":
-            raise HTTPException(status_code=403, detail="Only teachers can upload model answers")
-        
-        exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can upload model answers")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
