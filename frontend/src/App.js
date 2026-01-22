@@ -69,13 +69,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const checkedRef = useRef(false);
 
   useEffect(() => {
-    // If user was passed from AuthCallback, use it
+    // If user was passed from AuthCallback, use it directly
     if (location.state?.user) {
       setUser(location.state.user);
       setIsAuthenticated(true);
-      // Don't check profile here - let the profile check endpoint handle it
-      setProfileCheck(null);
-      checkedRef.current = false; // Allow profile check to run
+      setProfileCheck({ profile_completed: true }); // User passed from AuthCallback is already validated
+      return;
     }
 
     if (checkedRef.current) return;
