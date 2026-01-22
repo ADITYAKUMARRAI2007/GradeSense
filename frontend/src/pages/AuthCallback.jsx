@@ -51,7 +51,23 @@ export default function AuthCallback() {
         window.history.replaceState(null, "", window.location.pathname);
         localStorage.removeItem("preferredRole");
 
-        // Redirect based on role
+        // Check profile completion status for new users
+        try {
+          const profileResponse = await axios.get(`${API}/profile/check`);
+          console.log("Profile check:", profileResponse.data);
+          
+          // If this is a NEW user (profile_completed === false), redirect to profile setup
+          if (profileResponse.data.profile_completed === false) {
+            console.log("New user detected, redirecting to profile setup");
+            navigate('/profile/setup', { replace: true });
+            return;
+          }
+        } catch (profileError) {
+          console.error("Profile check error:", profileError);
+          // If profile check fails, proceed to dashboard
+        }
+
+        // Existing user - redirect to dashboard based on role
         const redirectPath = user.role === "student" 
           ? "/student/dashboard" 
           : "/teacher/dashboard";
