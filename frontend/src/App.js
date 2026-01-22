@@ -91,9 +91,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           const profileResponse = await axios.get(`${API}/profile/check`);
           setProfileCheck(profileResponse.data);
           
-          // Only redirect to profile setup if explicitly marked as incomplete
-          // (New users will have profile_completed: false)
+          // Only redirect to profile setup if EXPLICITLY marked as incomplete (false)
+          // null or true means user can proceed (existing users have null)
           if (profileResponse.data.profile_completed === false && location.pathname !== '/profile/setup') {
+            console.log('Profile incomplete, redirecting to setup');
             navigate('/profile/setup', { replace: true });
             return;
           }
