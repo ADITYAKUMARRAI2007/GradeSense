@@ -742,6 +742,7 @@ frontend:
 
 test_plan:
   current_focus:
+    - "Profile Setup Redirect Fix for Existing Users"
     - "Visual Annotations for Error Highlighting"
     - "Topic Mastery Heatmap Interactivity"
     - "Student Deep-Dive Modal Logic Fix"
