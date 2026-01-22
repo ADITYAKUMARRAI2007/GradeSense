@@ -877,6 +877,7 @@ test_plan:
     - "Optional Questions Detection and Marks Calculation (Issue #2)"
     - "Review Papers UI Default Checkboxes (Issue #3)"
     - "Manual Entry Form Conditional Logic (Issue #4)"
+    - "Grading Progress UI Update Fix (P0 Critical)"
   stuck_tasks: []
   test_all: false
   test_priority: "critical_first"
