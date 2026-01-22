@@ -291,7 +291,7 @@ export default function UploadGrade({ user }) {
             if (examData.model_answer_processing) {
               console.log('Model answer is still processing');
               setStep(2);
-              setUploading(true);
+              setLoading(true);
               setPaperUploaded(false);
               toast.info('Model answer is being processed. Please wait...');
               return;
