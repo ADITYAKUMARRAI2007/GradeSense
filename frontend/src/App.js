@@ -73,6 +73,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     if (location.state?.user) {
       setUser(location.state.user);
       setIsAuthenticated(true);
+      setProfileCheck({profile_completed: true});
       return;
     }
 
