@@ -232,21 +232,24 @@ export default function UploadGrade({ user }) {
         // PRIORITY: Handle active grading job FIRST
         if (state.activeJobId) {
           console.log('Active grading job found:', state.activeJobId);
-          setExamId(state.examId);
-          setActiveJobId(state.activeJobId);
-          setProcessing(true);
           
-          // Restore form data
-          if (state.formData) {
-            setFormData(state.formData);
-          }
-          
-          // IMPORTANT: Check backend for uploaded files to set flags correctly
+          // CRITICAL: Verify job and exam still exist before restoring
           try {
+            // Check if exam exists
             const examResponse = await axios.get(`${API}/exams/${state.examId}`);
             const examData = examResponse.data;
             
-            console.log('Exam data during grading restore:', examData);
+            console.log('Exam verified:', examData.exam_id);
+            
+            // Exam exists, proceed with restoration
+            setExamId(state.examId);
+            setActiveJobId(state.activeJobId);
+            setProcessing(true);
+            
+            // Restore form data
+            if (state.formData) {
+              setFormData(state.formData);
+            }
             
             // Set file upload flags based on backend data
             if (examData.model_answer_file_id) {
@@ -258,17 +261,33 @@ export default function UploadGrade({ user }) {
               setQuestionsSkipped(false);
               console.log('Question paper confirmed uploaded');
             }
+            
+            setStep(5); // Always go to step 5 for active grading
+            toast.info('Resuming grading progress...');
+            
+            // CRITICAL FIX: Restart polling for the active job
+            startPollingJob(state.activeJobId);
+            
+            return; // Exit early - grading is top priority
+            
           } catch (error) {
-            console.error('Error fetching exam data during restore:', error);
+            // Exam or job doesn't exist (404, 403, etc.)
+            console.error('Error restoring grading job:', error);
+            console.log('Exam or job no longer exists. Clearing stale state.');
+            
+            // Clear stale localStorage
+            localStorage.removeItem('activeGradingJob');
+            localStorage.removeItem('uploadGradeState');
+            
+            // Reset state and start fresh
+            setActiveJobId(null);
+            setProcessing(false);
+            setStep(1);
+            
+            toast.error('Previous grading job no longer exists. Starting fresh.');
+            
+            // Don't return - continue with normal flow
           }
-          
-          setStep(5); // Always go to step 5 for active grading
-          toast.info('Resuming grading progress...');
-          
-          // CRITICAL FIX: Restart polling for the active job
-          startPollingJob(state.activeJobId);
-          
-          return; // Exit early - grading is top priority
         }
         
         // If we have an examId but no active job, check with backend
