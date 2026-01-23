@@ -12,7 +12,7 @@ from PIL import Image
 
 class UploadGradingFlowTester:
     def __init__(self):
-        self.base_url = "https://paper-sense.preview.emergentagent.com/api"
+        self.base_url = "https://ai-grading.preview.emergentagent.com/api"
         self.session_token = None
         self.user_id = None
         self.tests_run = 0
