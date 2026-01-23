@@ -167,15 +167,7 @@ function AppRouter() {
         path="/teacher/dashboard"
         element={
           <ProtectedRoute allowedRoles={["teacher"]}>
-            {(props) => <NewDashboard {...props} />}
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/teacher/dashboard/old"
-        element={
-          <ProtectedRoute allowedRoles={["teacher"]}>
-            {(props) => <TeacherDashboard {...props} />}
+            {(props) => <Dashboard {...props} />}
           </ProtectedRoute>
         }
       />
