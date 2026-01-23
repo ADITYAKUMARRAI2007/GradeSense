@@ -9109,6 +9109,50 @@ async def health_check():
 
 # ============== DEBUG ENDPOINT ==============
 
+@api_router.post("/debug/cleanup")
+async def debug_cleanup():
+    """
+    EMERGENCY CLEANUP: Cancel all stuck jobs and tasks
+    Use this when the system is blocked by zombie jobs
+    """
+    from datetime import timedelta
+    
+    try:
+        # Cancel jobs stuck for > 30 minutes
+        thirty_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        
+        jobs_result = await db.grading_jobs.update_many(
+            {
+                "status": {"$in": ["processing", "pending"]},
+                "created_at": {"$lt": thirty_min_ago}
+            },
+            {
+                "$set": {
+                    "status": "failed",
+                    "error": "Cancelled by system cleanup - exceeded 30 minutes",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        # Cancel all stuck tasks
+        tasks_result = await db.tasks.update_many(
+            {"status": {"$in": ["pending", "processing", "claimed"]}},
+            {"$set": {"status": "cancelled"}}
+        )
+        
+        return {
+            "success": True,
+            "jobs_cancelled": jobs_result.modified_count,
+            "tasks_cancelled": tasks_result.modified_count,
+            "message": f"Cleaned up {jobs_result.modified_count} jobs and {tasks_result.modified_count} tasks"
+        }
+        
+    except Exception as e:
+        logger.error(f"Cleanup error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/debug/status")
 async def debug_status():
     """
