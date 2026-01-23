@@ -4997,6 +4997,7 @@ async def grade_papers_background(
     """
     Start background grading job - creates a task in MongoDB for worker to process
     Returns immediately with job_id for progress polling
+    Stores large files in GridFS to avoid 16MB BSON limit
     """
     try:
         logger.info(f"=== GRADE PAPERS BG START === User: {user.user_id}, Exam: {exam_id}, Files: {len(files)}")
@@ -5019,16 +5020,29 @@ async def grade_papers_background(
         file_contents = await asyncio.gather(*read_tasks)
         logger.info(f"All files read successfully")
         
-        # Build files_data with filenames and contents
-        files_data = []
+        # Store files in GridFS to avoid 16MB BSON document limit
+        # Only store file IDs in the task document
+        logger.info(f"Storing {len(files)} files in GridFS...")
+        file_refs = []
         for file, content in zip(files, file_contents):
-            logger.info(f"  Read {file.filename}: {len(content)} bytes")
-            files_data.append({
+            file_size_mb = len(content) / (1024 * 1024)
+            logger.info(f"  Storing {file.filename}: {file_size_mb:.2f} MB")
+            
+            # Store in GridFS
+            file_id = fs.put(
+                content,
+                filename=file.filename,
+                job_id=job_id,
+                content_type="application/pdf"
+            )
+            
+            file_refs.append({
                 "filename": file.filename,
-                "content": content
+                "gridfs_id": str(file_id),  # Store GridFS ID instead of file content
+                "size_bytes": len(content)
             })
         
-        logger.info(f"Files read successfully. Creating job record and task...")
+        logger.info(f"All files stored in GridFS. Creating job record and task...")
         
         # Create job record in database
         job_record = {
@@ -5036,7 +5050,7 @@ async def grade_papers_background(
             "exam_id": exam_id,
             "teacher_id": user.user_id,
             "status": "pending",
-            "total_papers": len(files_data),
+            "total_papers": len(file_refs),
             "processed_papers": 0,
             "successful": 0,
             "failed": 0,
@@ -5050,6 +5064,7 @@ async def grade_papers_background(
         logger.info(f"Job record created in DB")
         
         # Create task for worker to process
+        # Store only file references (GridFS IDs), not the actual file data
         task_id = f"task_{uuid.uuid4().hex[:12]}"
         task_record = {
             "task_id": task_id,
@@ -5058,7 +5073,7 @@ async def grade_papers_background(
             "data": {
                 "job_id": job_id,
                 "exam_id": exam_id,
-                "files_data": files_data,
+                "file_refs": file_refs,  # Only store GridFS IDs, not file content
                 "teacher_id": user.user_id
             },
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -5069,14 +5084,14 @@ async def grade_papers_background(
         
         await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
         
-        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} queued for {len(files_data)} papers")
+        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} queued for {len(file_refs)} papers")
         
         return {
             "job_id": job_id,
             "task_id": task_id,
             "status": "pending",
-            "total_papers": len(files_data),
-            "message": f"Grading job queued for {len(files_data)} papers. Worker will process in background."
+            "total_papers": len(file_refs),
+            "message": f"Grading job queued for {len(file_refs)} papers. Worker will process in background."
         }
     except HTTPException:
         raise
