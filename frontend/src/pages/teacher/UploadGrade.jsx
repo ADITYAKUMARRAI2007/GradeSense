@@ -182,11 +182,37 @@ export default function UploadGrade({ user }) {
           setActiveJobId(null);
           localStorage.removeItem('activeGradingJob');
           localStorage.removeItem('uploadGradeState');
+        } else if (jobData.status === 'cancelled') {
+          clearInterval(interval);
+          pollIntervalRef.current = null;
+          console.log('Job was cancelled');
+          toast.warning('Grading was cancelled');
+          setProcessing(false);
+          setActiveJobId(null);
+          localStorage.removeItem('activeGradingJob');
+          localStorage.removeItem('uploadGradeState');
         }
         // If status is 'processing' or 'pending', continue polling
       } catch (pollError) {
         console.error('Error polling job status:', pollError);
-        // Don't clear interval on network errors - keep trying
+        
+        // If job not found (404) or forbidden (403), stop polling and clear state
+        if (pollError.response?.status === 404 || pollError.response?.status === 403) {
+          console.log('Job no longer accessible (404/403). Clearing state and stopping polling.');
+          clearInterval(interval);
+          pollIntervalRef.current = null;
+          
+          toast.error('Grading job no longer exists. Starting fresh.');
+          
+          setProcessing(false);
+          setActiveJobId(null);
+          localStorage.removeItem('activeGradingJob');
+          localStorage.removeItem('uploadGradeState');
+          
+          // Reset to step 1
+          setStep(1);
+        }
+        // For other network errors, keep trying
       }
     }, 2000); // Poll every 2 seconds
     
