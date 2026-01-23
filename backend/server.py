@@ -9107,6 +9107,129 @@ async def get_common_feedback_patterns():
 async def health_check():
     return {"status": "healthy", "service": "GradeSense API"}
 
+# ============== DEBUG ENDPOINT ==============
+
+@api_router.get("/debug/status")
+async def debug_status():
+    """
+    Debug endpoint to check worker status, database connectivity, and job queue
+    USE THIS TO DIAGNOSE PRODUCTION ISSUES
+    """
+    from datetime import datetime, timezone
+    
+    debug_info = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "environment": {
+            "db_name": os.environ.get('DB_NAME', 'NOT_SET'),
+            "mongo_url_configured": "MONGO_URL" in os.environ,
+            "worker_integrated": True,  # We integrated the worker
+            "worker_task_status": "Unknown"
+        },
+        "database": {
+            "connection": "Unknown",
+            "collections": []
+        },
+        "worker": {
+            "status": "Unknown",
+            "message": "Checking..."
+        },
+        "jobs": {
+            "pending": 0,
+            "processing": 0,
+            "completed_last_hour": 0,
+            "failed_last_hour": 0,
+            "recent_jobs": []
+        },
+        "tasks": {
+            "pending": 0,
+            "processing": 0,
+            "recent_tasks": []
+        }
+    }
+    
+    try:
+        # Check database connectivity
+        await db.command("ping")
+        debug_info["database"]["connection"] = "Connected ✅"
+        
+        # List collections
+        collections = await db.list_collection_names()
+        debug_info["database"]["collections"] = collections[:10]  # First 10
+        
+        # Count jobs by status
+        from datetime import timedelta
+        one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        
+        debug_info["jobs"]["pending"] = await db.grading_jobs.count_documents({"status": "pending"})
+        debug_info["jobs"]["processing"] = await db.grading_jobs.count_documents({"status": "processing"})
+        debug_info["jobs"]["completed_last_hour"] = await db.grading_jobs.count_documents({
+            "status": "completed",
+            "updated_at": {"$gte": one_hour_ago}
+        })
+        debug_info["jobs"]["failed_last_hour"] = await db.grading_jobs.count_documents({
+            "status": "failed",
+            "updated_at": {"$gte": one_hour_ago}
+        })
+        
+        # Get recent jobs (last 5)
+        recent_jobs = await db.grading_jobs.find(
+            {},
+            {"_id": 0, "job_id": 1, "exam_id": 1, "status": 1, "total_papers": 1, "processed_papers": 1, "created_at": 1}
+        ).sort([("created_at", -1)]).limit(5).to_list(5)
+        
+        debug_info["jobs"]["recent_jobs"] = [
+            {
+                "job_id": job.get("job_id"),
+                "status": job.get("status"),
+                "progress": f"{job.get('processed_papers', 0)}/{job.get('total_papers', 0)}",
+                "created": job.get("created_at", "")[:19]
+            }
+            for job in recent_jobs
+        ]
+        
+        # Count tasks by status
+        debug_info["tasks"]["pending"] = await db.tasks.count_documents({"status": "pending"})
+        debug_info["tasks"]["processing"] = await db.tasks.count_documents({"status": "processing"})
+        
+        # Get recent tasks (last 5)
+        recent_tasks = await db.tasks.find(
+            {},
+            {"_id": 0, "task_id": 1, "type": 1, "status": 1, "created_at": 1}
+        ).sort([("created_at", -1)]).limit(5).to_list(5)
+        
+        debug_info["tasks"]["recent_tasks"] = [
+            {
+                "task_id": task.get("task_id"),
+                "type": task.get("type"),
+                "status": task.get("status"),
+                "created": task.get("created_at", "")[:19]
+            }
+            for task in recent_tasks
+        ]
+        
+        # Worker status check
+        global _worker_task
+        if _worker_task is not None:
+            if _worker_task.done():
+                debug_info["worker"]["status"] = "STOPPED ⚠️"
+                try:
+                    exception = _worker_task.exception()
+                    debug_info["worker"]["message"] = f"Worker crashed: {str(exception)}"
+                except:
+                    debug_info["worker"]["message"] = "Worker completed or was cancelled"
+            else:
+                debug_info["worker"]["status"] = "RUNNING ✅"
+                debug_info["worker"]["message"] = "Integrated worker is active and polling for tasks"
+        else:
+            debug_info["worker"]["status"] = "NOT STARTED ❌"
+            debug_info["worker"]["message"] = "Worker task was never initialized. Check app startup logs."
+        
+    except Exception as e:
+        debug_info["error"] = f"Error collecting debug info: {str(e)}"
+        logger.error(f"Debug endpoint error: {e}", exc_info=True)
+    
+    return debug_info
+
 # Include router and add middleware
 app.include_router(api_router)
 
