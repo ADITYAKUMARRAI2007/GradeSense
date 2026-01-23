@@ -129,57 +129,6 @@ const DashboardStats = ({ batches = [] }) => {
           </div>
         )}
       </div>
-
-      {/* At Risk Students Modal */}
-      <Dialog open={atRiskModal} onOpenChange={setAtRiskModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-700">
-              <AlertCircle className="w-5 h-5" />
-              Students Needing Support ({stats.at_risk.count})
-            </DialogTitle>
-            <DialogDescription>
-              Students who scored below {stats.at_risk.threshold}% in recent exams. Consider intervention or additional support.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-4">
-            {stats.at_risk.students.length > 0 ? (
-              stats.at_risk.students.map((student, idx) => (
-                <div key={idx} className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">{student.student_name}</p>
-                    <p className="text-sm text-gray-600">
-                      Avg Score: <span className="font-medium text-red-600">{student.avg_score}%</span>
-                      {student.exams_failed > 1 && ` • Failed ${student.exams_failed} recent exams`}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setAtRiskModal(false);
-                      navigate(`/teacher/analytics`);
-                    }}
-                  >
-                    View Analytics
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>Great! No students currently at risk.</p>
-              </div>
-            )}
-          </div>
-
-          {stats.at_risk.count > 5 && (
-            <p className="text-xs text-gray-500 text-center mt-4">
-              Showing top 5 of {stats.at_risk.count} students. View full list in Analytics.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
