@@ -3162,7 +3162,12 @@ Return ONLY the JSON, no other text."""
         for attempt in range(max_retries):
             try:
                 logger.info(f"Question extraction attempt {attempt + 1}/{max_retries}")
-                ai_response = await chat.send_message(user_message)
+                ai_response = await ai_call_with_timeout(
+                    chat,
+                    user_message,
+                    timeout_seconds=90,
+                    operation_name=f"Question extraction attempt {attempt+1}"
+                )
                 
                 # Parse response with robust JSON extraction
                 import json
