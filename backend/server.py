@@ -9162,18 +9162,13 @@ async def debug_cleanup():
     from datetime import timedelta
     
     try:
-        # Cancel jobs stuck for > 30 minutes
-        thirty_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
-        
+        # AGGRESSIVE: Cancel ALL jobs in processing/pending state (no time limit)
         jobs_result = await db.grading_jobs.update_many(
-            {
-                "status": {"$in": ["processing", "pending"]},
-                "created_at": {"$lt": thirty_min_ago}
-            },
+            {"status": {"$in": ["processing", "pending"]}},
             {
                 "$set": {
                     "status": "failed",
-                    "error": "Cancelled by system cleanup - exceeded 30 minutes",
+                    "error": "Emergency cleanup - manually cancelled",
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
             }
