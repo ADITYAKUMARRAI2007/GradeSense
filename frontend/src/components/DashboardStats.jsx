@@ -11,81 +11,14 @@ import { toast } from 'sonner';
 
 const DashboardStats = ({ batches = [] }) => {
   const navigate = useNavigate();
-  const [selectedBatch, setSelectedBatch] = useState('all');
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [atRiskModal, setAtRiskModal] = useState(false);
-
-  useEffect(() => {
-    fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBatch]);
-
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      const params = selectedBatch !== 'all' ? `?batch_id=${selectedBatch}` : '';
-      const response = await axios.get(`${API}/dashboard/actionable-stats${params}`);
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching actionable stats:', error);
-      toast.error('Failed to load dashboard stats');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getTrendIcon = (direction) => {
-    if (direction === 'up') return <TrendingUp size={12} />;
-    if (direction === 'down') return <TrendingDown size={12} />;
-    return <Minus size={12} />;
-  };
-
-  const getTrendColor = (direction) => {
-    if (direction === 'up') return 'bg-green-50 text-green-600';
-    if (direction === 'down') return 'bg-red-50 text-red-600';
-    return 'bg-gray-50 text-gray-600';
-  };
-
-  if (loading) {
-    return (
-      <div className="mb-8">
-        <div className="h-8 w-48 bg-gray-200 rounded mb-4 animate-pulse"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (!stats) return null;
-
-  const batchName = batches.find(b => b.batch_id === selectedBatch)?.name || 'All Batches';
 
   return (
     <div className="mb-8">
-      {/* Batch Selector */}
+      {/* Batch Selector Header */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-700">📚 Viewing:</h2>
-          <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-            <SelectTrigger className="w-48 bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Batches</SelectItem>
-              {batches.map((batch) => (
-                <SelectItem key={batch.batch_id} value={batch.batch_id}>
-                  {batch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <h2 className="text-lg font-semibold text-gray-700">📚 My Classes</h2>
         <Badge variant="outline" className="text-xs">
-          {batchName}
+          {batches.length} {batches.length === 1 ? 'Batch' : 'Batches'}
         </Badge>
       </div>
 
