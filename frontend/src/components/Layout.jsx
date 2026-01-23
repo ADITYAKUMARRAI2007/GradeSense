@@ -30,6 +30,7 @@ import { API } from "../App";
 import GlobalSearch from "./GlobalSearch";
 import NotificationDropdown from "./NotificationDropdown";
 import GlobalGradingProgress from "./GlobalGradingProgress";
+import FeedbackBeacon from "./FeedbackBeacon";
 
 const teacherNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher/dashboard" },
