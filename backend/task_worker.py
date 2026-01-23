@@ -105,13 +105,39 @@ async def process_task(task):
 
 
 async def process_grading_task(task_data):
-    """Process a grading job"""
+    """Process a grading job - reads files from GridFS"""
     job_id = task_data['job_id']
     exam_id = task_data['exam_id']
-    files_data = task_data['files_data']
+    file_refs = task_data.get('file_refs', task_data.get('files_data', []))  # Support both old and new format
     teacher_id = task_data['teacher_id']
     
-    logger.info(f"Processing grading job {job_id} with {len(files_data)} papers")
+    logger.info(f"Processing grading job {job_id} with {len(file_refs)} papers")
+    
+    # Check if we're using old format (files_data) or new format (file_refs with GridFS IDs)
+    files_data = []
+    if file_refs and isinstance(file_refs[0], dict):
+        if 'gridfs_id' in file_refs[0]:
+            # New format: Read files from GridFS
+            logger.info(f"Reading {len(file_refs)} files from GridFS...")
+            for ref in file_refs:
+                try:
+                    gridfs_id = ObjectId(ref['gridfs_id'])
+                    file_content = fs.get(gridfs_id).read()
+                    files_data.append({
+                        "filename": ref['filename'],
+                        "content": file_content
+                    })
+                    logger.info(f"  Read {ref['filename']} from GridFS: {len(file_content)} bytes")
+                except Exception as e:
+                    logger.error(f"Error reading file {ref['filename']} from GridFS: {e}")
+                    raise
+        else:
+            # Old format: files already have content
+            files_data = file_refs
+    else:
+        files_data = file_refs
+    
+    logger.info(f"Successfully loaded {len(files_data)} files for processing")
     
     # Get exam data
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
