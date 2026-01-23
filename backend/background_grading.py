@@ -33,6 +33,26 @@ async def process_grading_job_in_background(
     Files are already read - content is in files_data
     """
     try:
+        # CRITICAL: Check if exam still exists before starting
+        exam_check = await db.exams.find_one({"exam_id": exam_id})
+        if not exam_check:
+            logger.warning(f"Job {job_id}: Exam {exam_id} was deleted. Cancelling job.")
+            await db.grading_jobs.update_one(
+                {"job_id": job_id},
+                {"$set": {
+                    "status": "cancelled",
+                    "cancellation_reason": "Exam deleted",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            return
+        
+        # Check if job is already cancelled
+        job_check = await db.grading_jobs.find_one({"job_id": job_id}, {"_id": 0, "status": 1})
+        if job_check and job_check.get("status") == "cancelled":
+            logger.info(f"Job {job_id} was cancelled before processing started")
+            return
+        
         # Update job status to processing
         await db.grading_jobs.update_one(
             {"job_id": job_id},
@@ -76,6 +96,12 @@ async def process_grading_job_in_background(
         
         # Process each paper - content already read
         for idx, file_data in enumerate(files_data):
+            # Check if job was cancelled during processing
+            job_status_check = await db.grading_jobs.find_one({"job_id": job_id}, {"_id": 0, "status": 1})
+            if job_status_check and job_status_check.get("status") == "cancelled":
+                logger.info(f"Job {job_id} was cancelled during processing at paper {idx+1}/{len(files_data)}")
+                return
+            
             filename = file_data["filename"]
             pdf_bytes = file_data["content"]
             
