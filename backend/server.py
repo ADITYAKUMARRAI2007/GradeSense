@@ -23,6 +23,7 @@ import asyncio
 import hashlib
 import json
 import pickle
+from contextlib import asynccontextmanager
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -39,8 +40,46 @@ sync_client = MongoClient(mongo_url)
 sync_db = sync_client[os.environ['DB_NAME']]
 fs = GridFS(sync_db)
 
-# Create the main app
-app = FastAPI(title="GradeSense API")
+# Global variable to hold worker task
+_worker_task = None
+
+async def run_background_worker():
+    """Run the task worker in the background"""
+    logger.info("=" * 60)
+    logger.info("BACKGROUND TASK WORKER STARTING (Integrated Mode)")
+    logger.info("=" * 60)
+    
+    # Import worker main loop
+    try:
+        from task_worker import main as worker_main
+        await worker_main()
+    except Exception as e:
+        logger.error(f"Background worker error: {e}", exc_info=True)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager - starts/stops background worker"""
+    global _worker_task
+    
+    # Startup: Start the background worker
+    logger.info("🚀 FastAPI app starting up...")
+    logger.info("🔄 Starting integrated background task worker...")
+    _worker_task = asyncio.create_task(run_background_worker())
+    
+    yield
+    
+    # Shutdown: Cancel the background worker
+    logger.info("🛑 FastAPI app shutting down...")
+    if _worker_task and not _worker_task.done():
+        logger.info("⏹️  Stopping background task worker...")
+        _worker_task.cancel()
+        try:
+            await _worker_task
+        except asyncio.CancelledError:
+            logger.info("✅ Background task worker stopped cleanly")
+
+# Create the main app with lifespan
+app = FastAPI(title="GradeSense API", lifespan=lifespan)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
