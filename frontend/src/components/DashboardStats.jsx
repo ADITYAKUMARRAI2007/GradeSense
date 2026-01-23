@@ -1,13 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API } from '../App';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { TrendingDown, TrendingUp, AlertCircle, HelpCircle, Minus, ChevronRight } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
-import { toast } from 'sonner';
+import { ChevronRight } from 'lucide-react';
 
 const DashboardStats = ({ batches = [] }) => {
   const navigate = useNavigate();
