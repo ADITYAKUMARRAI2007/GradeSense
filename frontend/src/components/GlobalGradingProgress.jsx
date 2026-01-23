@@ -89,12 +89,14 @@ const GlobalGradingProgress = () => {
   const getStatusColor = () => {
     if (jobData.status === 'completed') return 'bg-green-50 border-green-200';
     if (jobData.status === 'failed') return 'bg-red-50 border-red-200';
+    if (jobData.status === 'cancelled') return 'bg-yellow-50 border-yellow-200';
     return 'bg-blue-50 border-blue-200';
   };
 
   const getStatusIcon = () => {
     if (jobData.status === 'completed') return <CheckCircle className="w-5 h-5 text-green-600" />;
     if (jobData.status === 'failed') return <AlertCircle className="w-5 h-5 text-red-600" />;
+    if (jobData.status === 'cancelled') return <XCircle className="w-5 h-5 text-yellow-600" />;
     return <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />;
   };
 
@@ -104,6 +106,9 @@ const GlobalGradingProgress = () => {
     }
     if (jobData.status === 'failed') {
       return `✗ Grading failed`;
+    }
+    if (jobData.status === 'cancelled') {
+      return `⊗ Grading cancelled (exam deleted)`;
     }
     return `Grading in progress: ${jobData.processed_papers}/${jobData.total_papers} papers`;
   };
