@@ -50,8 +50,8 @@ const GlobalGradingProgress = () => {
       setJobData(response.data);
       setVisible(true);
 
-      // If completed or failed, remove from storage after delay
-      if (response.data.status === 'completed' || response.data.status === 'failed') {
+      // If completed, failed, or cancelled, remove from storage after delay
+      if (response.data.status === 'completed' || response.data.status === 'failed' || response.data.status === 'cancelled') {
         setTimeout(() => {
           localStorage.removeItem('activeGradingJob');
           setVisible(false);
