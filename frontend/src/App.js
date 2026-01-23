@@ -7,6 +7,8 @@ import { Toaster } from "./components/ui/sonner";
 import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
 import ProfileSetup from "./pages/ProfileSetup";
+import NewDashboard from './pages/teacher/NewDashboard';
+import BatchView from './pages/teacher/BatchView';
 import TeacherDashboard from "./pages/teacher/Dashboard";
 import UploadGrade from "./pages/teacher/UploadGrade";
 import ReviewPapers from "./pages/teacher/ReviewPapers";
