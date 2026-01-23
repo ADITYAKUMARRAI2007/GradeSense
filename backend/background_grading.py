@@ -106,28 +106,124 @@ async def process_grading_job_in_background(
             pdf_bytes = file_data["content"]
             
             logger.info(f"[Job {job_id}] [{idx + 1}/{len(files_data)}] Processing: {filename}")
-            logger.info(f"[Job {job_id}] File data type: {type(pdf_bytes)}, length: {len(pdf_bytes) if isinstance(pdf_bytes, bytes) else 'NOT BYTES'}")
+            logger.info(f"[Job {job_id}] File size: {len(pdf_bytes) / (1024*1024):.2f}MB")
             
             try:
-                # Ensure we have bytes
-                if not isinstance(pdf_bytes, bytes):
-                    logger.error(f"[Job {job_id}] ERROR: pdf_bytes is not bytes type, it is {type(pdf_bytes)}")
-                    errors.append({
-                        "filename": filename,
-                        "error": f"Invalid file data type: {type(pdf_bytes)}"
-                    })
-                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
-                    continue
+                # Add timeout for entire paper processing (5 minutes max per paper)
+                import asyncio
                 
-                # Check file size
-                file_size_mb = len(pdf_bytes) / (1024 * 1024)
-                if file_size_mb > 30:
+                async def process_single_paper():
+                    # Ensure we have bytes
+                    if not isinstance(pdf_bytes, bytes):
+                        logger.error(f"[Job {job_id}] ERROR: pdf_bytes is not bytes type, it is {type(pdf_bytes)}")
+                        return {
+                            "error": f"Invalid file data type: {type(pdf_bytes)}",
+                            "filename": filename
+                        }
+                    
+                    # Check file size
+                    file_size_mb = len(pdf_bytes) / (1024 * 1024)
+                    if file_size_mb > 30:
+                        return {
+                            "error": f"File too large ({file_size_mb:.1f}MB). Maximum 30MB.",
+                            "filename": filename
+                        }
+                    
+                    logger.info(f"[Job {job_id}] Converting PDF to images...")
+                    paper_images = await pdf_to_images(pdf_bytes)
+                    
+                    if not paper_images:
+                        return {
+                            "error": "Failed to extract images from PDF",
+                            "filename": filename
+                        }
+                    
+                    logger.info(f"[Job {job_id}] Extracted {len(paper_images)} pages")
+                    
+                    # Extract student info
+                    student_info = await extract_student_info_from_paper(paper_images, filename)
+                    
+                    # Get or create student
+                    student_id = None
+                    if student_info.get("name") or student_info.get("roll_number"):
+                        student = await get_or_create_student(
+                            name=student_info.get("name", ""),
+                            roll_number=student_info.get("roll_number", ""),
+                            email=student_info.get("email", "")
+                        )
+                        student_id = student["student_id"]
+                    
+                    logger.info(f"[Job {job_id}] Grading with AI...")
+                    
+                    # Grade the paper
+                    scores = await grade_with_ai(
+                        images=paper_images,
+                        model_answer_images=model_answer_imgs,
+                        questions=questions_to_grade,
+                        grading_mode=exam.get("grading_mode", "balanced"),
+                        total_marks=exam.get("total_marks", 100),
+                        model_answer_text=model_answer_text
+                    )
+                    
+                    # Calculate total
+                    obtained_marks = sum(s.obtained_marks for s in scores if s.obtained_marks >= 0)
+                    percentage = (obtained_marks / exam.get("total_marks", 100)) * 100 if exam.get("total_marks") else 0
+                    
+                    # Create submission
+                    submission_id = f"sub_{uuid.uuid4().hex[:12]}"
+                    submission = {
+                        "submission_id": submission_id,
+                        "exam_id": exam_id,
+                        "student_id": student_id,
+                        "student_name": student_info.get("name", "Unknown"),
+                        "roll_number": student_info.get("roll_number", ""),
+                        "filename": filename,
+                        "obtained_marks": obtained_marks,
+                        "total_marks": exam.get("total_marks", 100),
+                        "percentage": round(percentage, 2),
+                        "scores": [s.dict() for s in scores],
+                        "submitted_at": datetime.now(timezone.utc).isoformat(),
+                        "graded_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    
+                    await db.submissions.insert_one(submission)
+                    logger.info(f"[Job {job_id}] ✓ Paper graded: {obtained_marks}/{exam.get('total_marks')} ({percentage:.1f}%)")
+                    
+                    return {"submission": submission, "filename": filename}
+                
+                # Process with 5-minute timeout
+                try:
+                    result = await asyncio.wait_for(process_single_paper(), timeout=300.0)
+                    
+                    if "error" in result:
+                        errors.append({"filename": result["filename"], "error": result["error"]})
+                    else:
+                        submissions.append(result["submission"])
+                    
+                except asyncio.TimeoutError:
+                    logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 5 minutes")
                     errors.append({
                         "filename": filename,
-                        "error": f"File too large ({file_size_mb:.1f}MB). Maximum 30MB."
+                        "error": "Processing timeout - exceeded 5 minutes (paper too complex or API slow)"
                     })
-                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
-                    continue
+                
+                # Explicit memory cleanup
+                import gc
+                pdf_bytes = None
+                gc.collect()
+                
+                # Update progress after each paper
+                await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+                logger.info(f"[Job {job_id}] Progress: {idx + 1}/{len(files_data)} papers, {len(submissions)} successful, {len(errors)} errors")
+                
+            except Exception as e:
+                logger.error(f"[Job {job_id}] ERROR processing {filename}: {str(e)}", exc_info=True)
+                errors.append({
+                    "filename": filename,
+                    "error": f"Processing error: {str(e)[:200]}"
+                })
+                await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+                continue
                 
                 # Extract images from PDF
                 images = pdf_to_images(pdf_bytes)
