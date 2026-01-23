@@ -315,6 +315,14 @@ function AppRouter() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/feedback"
+        element={
+          <ProtectedRoute>
+            {(props) => <AdminFeedback {...props} />}
+          </ProtectedRoute>
+        }
+      />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/login" replace />} />
