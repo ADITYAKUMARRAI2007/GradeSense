@@ -40,6 +40,22 @@ sync_client = MongoClient(mongo_url)
 sync_db = sync_client[os.environ['DB_NAME']]
 fs = GridFS(sync_db)
 
+# Helper function: AI call with timeout protection
+async def ai_call_with_timeout(chat, message, timeout_seconds=60, operation_name="AI call"):
+    """
+    Wrapper for AI API calls with timeout protection
+    Prevents indefinite hanging on API timeouts
+    """
+    try:
+        result = await asyncio.wait_for(
+            chat.send_message(message),
+            timeout=timeout_seconds
+        )
+        return result
+    except asyncio.TimeoutError:
+        logger.error(f"⏱️ TIMEOUT after {timeout_seconds}s: {operation_name}")
+        raise TimeoutError(f"{operation_name} exceeded {timeout_seconds}s timeout")
+
 # Global variable to hold worker task
 _worker_task = None
 
