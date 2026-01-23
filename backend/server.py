@@ -9151,6 +9151,194 @@ async def get_common_feedback_patterns():
 async def health_check():
     return {"status": "healthy", "service": "GradeSense API"}
 
+# ============== BATCH STATS ==============
+
+@api_router.get("/batches/{batch_id}/stats")
+async def get_batch_stats(batch_id: str, user: User = Depends(get_current_user)):
+    """Get statistics for a specific batch"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view batch stats")
+    
+    # Verify batch belongs to teacher
+    batch = await db.batches.find_one({"batch_id": batch_id, "teacher_id": user.user_id})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    # Get exams for this batch
+    exams = await db.exams.find({"batch_id": batch_id, "teacher_id": user.user_id}, {"_id": 0}).to_list(100)
+    
+    # Get submissions for batch exams
+    exam_ids = [exam["exam_id"] for exam in exams]
+    submissions = await db.submissions.find({"exam_id": {"$in": exam_ids}}, {"_id": 0}).to_list(1000)
+    
+    # Calculate stats
+    total_exams = len([e for e in exams if e.get("status") == "completed"])
+    action_required = len([e for e in exams if e.get("status") == "processing"])
+    
+    # Class average
+    if submissions:
+        class_average = round(sum(s.get("percentage", 0) for s in submissions) / len(submissions), 1)
+    else:
+        class_average = 0
+    
+    # At-risk students (below 40%)
+    at_risk_count = len(set(s["student_id"] for s in submissions if s.get("percentage", 0) < 40))
+    
+    # Trend (last 8 exams)
+    trend = []
+    for exam in sorted(exams, key=lambda x: x.get("created_at", ""))[-8:]:
+        exam_submissions = [s for s in submissions if s["exam_id"] == exam["exam_id"]]
+        if exam_submissions:
+            avg = sum(s.get("percentage", 0) for s in exam_submissions) / len(exam_submissions)
+            trend.append(int(avg))
+    
+    trend_direction = "up" if len(trend) >= 2 and trend[-1] > trend[0] else "down" if len(trend) >= 2 and trend[-1] < trend[0] else "neutral"
+    
+    return {
+        "total_exams": total_exams,
+        "action_required": action_required,
+        "class_average": class_average,
+        "at_risk_count": at_risk_count,
+        "trend": trend,
+        "trend_direction": trend_direction,
+        "total_students": len(batch.get("students", []))
+    }
+
+
+@api_router.get("/batches/{batch_id}/students")
+async def get_batch_students(batch_id: str, user: User = Depends(get_current_user)):
+    """Get students in a batch with their performance data"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view batch students")
+    
+    # Verify batch belongs to teacher
+    batch = await db.batches.find_one({"batch_id": batch_id, "teacher_id": user.user_id})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    student_ids = batch.get("students", [])
+    if not student_ids:
+        return []
+    
+    # Get student details
+    students = await db.users.find({"user_id": {"$in": student_ids}}, {"_id": 0, "password": 0}).to_list(100)
+    
+    # Get submissions for each student
+    exams = await db.exams.find({"batch_id": batch_id}, {"_id": 0, "exam_id": 1}).to_list(100)
+    exam_ids = [e["exam_id"] for e in exams]
+    
+    # Enrich with performance data
+    enriched_students = []
+    for student in students:
+        student_submissions = await db.submissions.find({
+            "student_id": student["user_id"],
+            "exam_id": {"$in": exam_ids}
+        }, {"_id": 0}).to_list(100)
+        
+        if student_submissions:
+            average = round(sum(s.get("percentage", 0) for s in student_submissions) / len(student_submissions), 1)
+            
+            # Calculate trend
+            recent = sorted(student_submissions, key=lambda x: x.get("graded_at", ""))[-2:]
+            trend = "up" if len(recent) == 2 and recent[1].get("percentage", 0) > recent[0].get("percentage", 0) else \
+                   "down" if len(recent) == 2 and recent[1].get("percentage", 0) < recent[0].get("percentage", 0) else "neutral"
+        else:
+            average = 0
+            trend = "neutral"
+        
+        enriched_students.append({
+            "student_id": student["user_id"],
+            "name": student.get("name", "Unknown"),
+            "email": student.get("email", ""),
+            "roll_number": student.get("roll_number", ""),
+            "average": average,
+            "trend": trend
+        })
+    
+    return enriched_students
+
+
+@api_router.get("/students/{student_id}/analytics")
+async def get_student_analytics(
+    student_id: str,
+    batch_id: str,
+    user: User = Depends(get_current_user)
+):
+    """Get detailed analytics for a student"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view student analytics")
+    
+    # Get exams for this batch
+    exams = await db.exams.find({"batch_id": batch_id, "teacher_id": user.user_id}, {"_id": 0}).to_list(100)
+    exam_ids = [e["exam_id"] for e in exams]
+    
+    # Get student submissions
+    submissions = await db.submissions.find({
+        "student_id": student_id,
+        "exam_id": {"$in": exam_ids}
+    }, {"_id": 0}).to_list(100)
+    
+    if not submissions:
+        return {
+            "overall_average": 0,
+            "total_exams": 0,
+            "exam_history": [],
+            "strengths": ["No data yet"],
+            "weaknesses": ["No data yet"]
+        }
+    
+    # Calculate overall average
+    overall_average = round(sum(s.get("percentage", 0) for s in submissions) / len(submissions), 1)
+    
+    # Build exam history
+    exam_history = []
+    for sub in sorted(submissions, key=lambda x: x.get("graded_at", ""), reverse=True):
+        exam = next((e for e in exams if e["exam_id"] == sub["exam_id"]), None)
+        if exam:
+            # Get class average for comparison
+            all_submissions = await db.submissions.find({"exam_id": sub["exam_id"]}, {"_id": 0, "percentage": 1}).to_list(100)
+            class_avg = round(sum(s.get("percentage", 0) for s in all_submissions) / len(all_submissions), 1) if all_submissions else 0
+            
+            exam_history.append({
+                "exam_name": exam.get("exam_name", "Untitled"),
+                "percentage": sub.get("percentage", 0),
+                "obtained_marks": sub.get("obtained_marks", 0),
+                "total_marks": sub.get("total_marks", 100),
+                "graded_at": sub.get("graded_at", ""),
+                "class_average": class_avg
+            })
+    
+    # Analyze strengths and weaknesses (based on scores)
+    strengths = []
+    weaknesses = []
+    
+    for sub in submissions:
+        scores = sub.get("scores", [])
+        for score in scores:
+            if isinstance(score, dict):
+                q_num = score.get("question_number", "")
+                obtained = score.get("obtained_marks", 0)
+                total = score.get("max_marks", 1)
+                percentage = (obtained / total * 100) if total > 0 else 0
+                
+                if percentage >= 80:
+                    strengths.append(f"Question {q_num} ({percentage:.0f}%)")
+                elif percentage < 40:
+                    weaknesses.append(f"Question {q_num} ({percentage:.0f}%)")
+    
+    # Deduplicate and limit
+    strengths = list(set(strengths))[:5] or ["Consistent performance across topics"]
+    weaknesses = list(set(weaknesses))[:5] or ["No major weaknesses identified"]
+    
+    return {
+        "overall_average": overall_average,
+        "total_exams": len(submissions),
+        "exam_history": exam_history,
+        "strengths": strengths,
+        "weaknesses": weaknesses
+    }
+
+
 # ============== DEBUG ENDPOINT ==============
 
 @api_router.post("/debug/cleanup")
