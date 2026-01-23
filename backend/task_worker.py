@@ -10,6 +10,9 @@ import logging
 from datetime import datetime, timezone
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+from pymongo import MongoClient
+from gridfs import GridFS
+from bson.objectid import ObjectId
 
 # Add parent directory to path to import from server.py
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +45,11 @@ DB_NAME = os.environ.get('DB_NAME', 'test_database')
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
+
+# GridFS for reading uploaded files
+sync_client = MongoClient(MONGO_URL)
+sync_db = sync_client[DB_NAME]
+fs = GridFS(sync_db)
 
 # Import background grading function
 from background_grading import process_grading_job_in_background
