@@ -3036,7 +3036,12 @@ Extract complete answers for ALL questions visible on these pages."""
             for attempt in range(max_retries):
                 try:
                     logger.info(f"Extracting model answer content: pages {chunk_start + 1}-{chunk_end} (attempt {attempt + 1})")
-                    response = await chat.send_message(user_message)
+                    response = await ai_call_with_timeout(
+                        chat, 
+                        user_message, 
+                        timeout_seconds=90,
+                        operation_name=f"Model answer extraction attempt {attempt+1}"
+                    )
                     if response:
                         all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response}")
                         break
