@@ -9501,6 +9501,87 @@ async def debug_status():
     
     return debug_info
 
+
+# ============== USER FEEDBACK SYSTEM ==============
+
+class UserFeedback(BaseModel):
+    type: str  # 'bug', 'suggestion', 'question'
+    data: Dict[str, Any]
+    metadata: Optional[Dict[str, Any]] = None
+
+@api_router.post("/feedback")
+async def submit_user_feedback(feedback: UserFeedback, user: User = Depends(get_current_user)):
+    """Submit user feedback (bug report, suggestion, or question)"""
+    feedback_id = f"ufb_{uuid.uuid4().hex[:12]}"
+    
+    feedback_doc = {
+        "feedback_id": feedback_id,
+        "type": feedback.type,
+        "data": feedback.data,
+        "metadata": feedback.metadata or {},
+        "user": {
+            "user_id": user.user_id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        },
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "resolved_at": None
+    }
+    
+    await db.user_feedback.insert_one(feedback_doc)
+    
+    logger.info(f"Feedback submitted: {feedback_id} ({feedback.type}) by {user.name}")
+    
+    return {
+        "success": True,
+        "feedback_id": feedback_id,
+        "message": "Feedback submitted successfully"
+    }
+
+
+@api_router.get("/admin/feedback")
+async def get_all_feedback(user: User = Depends(get_current_user)):
+    """Get all user feedback (admin only)"""
+    # For now, allow all teachers to access admin feedback
+    # In Phase 2, we'll add proper admin role checking
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    feedbacks = await db.user_feedback.find({}, {"_id": 0}).sort([("created_at", -1)]).to_list(1000)
+    
+    return feedbacks
+
+
+@api_router.put("/admin/feedback/{feedback_id}/resolve")
+async def resolve_feedback(feedback_id: str, user: User = Depends(get_current_user)):
+    """Mark feedback as resolved (admin only)"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.user_feedback.update_one(
+        {"feedback_id": feedback_id},
+        {
+            "$set": {
+                "status": "resolved",
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
+                "resolved_by": {
+                    "user_id": user.user_id,
+                    "name": user.name
+                }
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    
+    logger.info(f"Feedback resolved: {feedback_id} by {user.name}")
+    
+    return {"success": True, "message": "Feedback marked as resolved"}
+
+
 # Include router and add middleware
 app.include_router(api_router)
 
