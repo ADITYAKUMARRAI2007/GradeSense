@@ -338,6 +338,9 @@ export default function Layout({ children, user }) {
       
       {/* Global Grading Progress Indicator */}
       <GlobalGradingProgress />
+      
+      {/* Feedback Beacon */}
+      <FeedbackBeacon user={user} />
     </div>
   );
 }
