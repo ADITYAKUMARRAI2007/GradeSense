@@ -2470,7 +2470,7 @@ async def get_exam(exam_id: str, user: User = Depends(get_current_user)):
 
 @api_router.delete("/exams/{exam_id}")
 async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
-    """Delete an exam and all its submissions"""
+    """Delete an exam and all its submissions, and cancel any active grading jobs"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can delete exams")
     
@@ -2478,6 +2478,26 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
     exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id})
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # IMPORTANT: Cancel any active grading jobs for this exam
+    logger.info(f"Cancelling active grading jobs for exam {exam_id}")
+    cancelled_jobs = await db.grading_jobs.update_many(
+        {"exam_id": exam_id, "status": {"$in": ["pending", "processing"]}},
+        {"$set": {
+            "status": "cancelled",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "cancellation_reason": "Exam deleted by teacher"
+        }}
+    )
+    
+    # Cancel associated tasks in the task queue
+    cancelled_tasks = await db.tasks.update_many(
+        {"data.exam_id": exam_id, "status": {"$in": ["pending", "processing"]}},
+        {"$set": {"status": "cancelled"}}
+    )
+    
+    if cancelled_jobs.modified_count > 0 or cancelled_tasks.modified_count > 0:
+        logger.info(f"Cancelled {cancelled_jobs.modified_count} jobs and {cancelled_tasks.modified_count} tasks for exam {exam_id}")
     
     # Delete all submissions associated with this exam
     await db.submissions.delete_many({"exam_id": exam_id})
@@ -2488,13 +2508,25 @@ async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
     # Delete exam files from separate collection
     await db.exam_files.delete_many({"exam_id": exam_id})
     
+    # Delete GridFS files for this exam (model answers, question papers, student papers)
+    try:
+        for grid_file in fs.find({"exam_id": exam_id}):
+            fs.delete(grid_file._id)
+            logger.info(f"Deleted GridFS file: {grid_file.filename}")
+    except Exception as e:
+        logger.warning(f"Error cleaning up GridFS files for exam {exam_id}: {e}")
+    
     # Delete the exam
     result = await db.exams.delete_one({"exam_id": exam_id, "teacher_id": user.user_id})
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    return {"message": "Exam deleted successfully"}
+    return {
+        "message": "Exam deleted successfully",
+        "cancelled_jobs": cancelled_jobs.modified_count,
+        "cancelled_tasks": cancelled_tasks.modified_count
+    }
 
 @api_router.post("/exams/{exam_id}/extract-questions")
 async def extract_and_update_questions(exam_id: str, user: User = Depends(get_current_user)):
