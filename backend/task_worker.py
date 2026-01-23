@@ -163,12 +163,61 @@ async def process_grading_task(task_data):
     )
 
 
+async def cleanup_stuck_jobs():
+    """Cleanup jobs that have been processing for too long"""
+    try:
+        from datetime import timedelta
+        
+        # Cancel jobs stuck for more than 1 hour
+        one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        
+        result = await db.grading_jobs.update_many(
+            {
+                "status": "processing",
+                "updated_at": {"$lt": one_hour_ago}
+            },
+            {
+                "$set": {
+                    "status": "failed",
+                    "error": "Job timeout - exceeded 1 hour processing time",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        if result.modified_count > 0:
+            logger.warning(f"⚠️  Cleaned up {result.modified_count} stuck jobs (>1 hour)")
+        
+        # Cancel stuck tasks
+        task_result = await db.tasks.update_many(
+            {
+                "status": "processing",
+                "created_at": {"$lt": one_hour_ago}
+            },
+            {"$set": {"status": "failed"}}
+        )
+        
+        if task_result.modified_count > 0:
+            logger.warning(f"⚠️  Cleaned up {task_result.modified_count} stuck tasks (>1 hour)")
+            
+    except Exception as e:
+        logger.error(f"Error in cleanup: {e}")
+
+
 async def worker_loop():
     """Main worker loop - polls for pending tasks"""
     logger.info("Task worker started. Polling for tasks...")
     
+    # Track when we last ran cleanup
+    last_cleanup = datetime.now(timezone.utc)
+    
     while True:
         try:
+            # Run cleanup every 10 minutes
+            if (datetime.now(timezone.utc) - last_cleanup).total_seconds() > 600:
+                await cleanup_stuck_jobs()
+                last_cleanup = datetime.now(timezone.utc)
+            
             # Find next pending task
             task = await db.tasks.find_one_and_update(
                 {"status": "pending"},
