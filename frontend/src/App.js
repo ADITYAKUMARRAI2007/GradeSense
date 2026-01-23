@@ -182,6 +182,30 @@ function AppRouter() {
         }
       />
       <Route
+        path="/teacher/batches/create"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <AddBatch {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teacher/batch/:batchId/settings"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <BatchSettings {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teacher/batch/:batchId/students/add"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <ManageStudentsInBatch {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/teacher/upload"
         element={
           <ProtectedRoute allowedRoles={["teacher"]}>
