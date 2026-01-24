@@ -27,6 +27,19 @@ from contextlib import asynccontextmanager
 import time
 import traceback
 
+# Import all models from the models package
+from models import (
+    User, UserCreate, ProfileUpdate,
+    Batch, BatchCreate,
+    Subject, SubjectCreate,
+    SubQuestion, ExamQuestion, Exam, ExamCreate, StudentExamCreate, StudentSubmission,
+    SubQuestionScore, QuestionScore, Submission,
+    ReEvaluationRequest, ReEvaluationCreate,
+    GradingFeedback, FeedbackSubmit,
+    NaturalLanguageQuery, GradingAnalytics, FrontendEvent,
+    UserFeatureFlags, UserQuotas, UserStatusUpdate, UserFeedback
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
