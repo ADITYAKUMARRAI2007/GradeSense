@@ -123,7 +123,8 @@ const CreateStudentExam = () => {
       if (response.data.questions && response.data.questions.length > 0) {
         setQuestions(response.data.questions.map(q => ({
           question_number: q.question_number,
-          max_marks: q.max_marks || 10
+          max_marks: q.max_marks || 10,
+          sub_questions: q.sub_questions || []
         })));
         toast.success(`Extracted ${response.data.questions.length} questions from model answer`);
       } else {
