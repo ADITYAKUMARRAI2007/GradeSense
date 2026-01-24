@@ -61,6 +61,7 @@ const teacherNavItems = [
 
 const studentNavItems = [
   { icon: LayoutDashboard, label: "My Dashboard", path: "/student/dashboard" },
+  { icon: BookOpen, label: "My Exams", path: "/student/exams" },
   { icon: FileText, label: "My Results", path: "/student/results" },
   { icon: MessageSquare, label: "Request Re-evaluation", path: "/student/re-evaluation" },
 ];
