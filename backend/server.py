@@ -1963,8 +1963,8 @@ async def download_question_paper(exam_id: str, user: User = Depends(get_current
         from fastapi.responses import StreamingResponse
         import io
         
-        qp_stream = await fs.open_download_stream_by_name(qp_file_ref)
-        qp_bytes = await qp_stream.read()
+        qp_file = fs.get_last_version(filename=qp_file_ref)
+        qp_bytes = qp_file.read()
         
         return StreamingResponse(
             io.BytesIO(qp_bytes),
