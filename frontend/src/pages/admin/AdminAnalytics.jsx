@@ -5,6 +5,7 @@ import { ArrowLeft, Users, FileText, TrendingUp, DollarSign, Zap, Target, Activi
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
+import FeedbackBeacon from '../../components/FeedbackBeacon';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
