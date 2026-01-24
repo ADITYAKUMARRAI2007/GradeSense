@@ -110,6 +110,152 @@ async def process_task(task):
         )
 
 
+async def process_single_paper_grading(task_data):
+    """Process grading for a single student paper (student-upload mode)"""
+    exam_id = task_data['exam_id']
+    student_id = task_data['student_id']
+    student_name = task_data['student_name']
+    answer_file_ref = task_data['answer_file_ref']
+    model_answer_ref = task_data.get('model_answer_ref')
+    questions = task_data['questions']
+    grading_mode = task_data.get('grading_mode', 'balanced')
+    
+    logger.info(f"Grading single paper for student {student_name} in exam {exam_id}")
+    
+    try:
+        # Import required functions from server
+        from server import (
+            pdf_to_images, grade_with_ai, 
+            get_exam_model_answer_images, get_exam_model_answer_text
+        )
+        
+        # Get answer paper from GridFS
+        ans_file = fs.get_last_version(filename=answer_file_ref)
+        ans_bytes = ans_file.read()
+        ans_images = pdf_to_images(ans_bytes)
+        
+        # Get model answer from GridFS if available
+        ma_images = []
+        ma_text = ""
+        if model_answer_ref:
+            ma_file = fs.get_last_version(filename=model_answer_ref)
+            ma_bytes = ma_file.read()
+            ma_images = pdf_to_images(ma_bytes)
+            # Extract text from model answer
+            ma_text = await get_exam_model_answer_text(exam_id)
+        
+        # Grade each question
+        question_scores = []
+        total_obtained = 0
+        
+        for q in questions:
+            question_number = q['question_number']
+            max_marks = q['max_marks']
+            sub_questions = q.get('sub_questions', [])
+            
+            if sub_questions:
+                # Grade sub-questions
+                sub_scores = []
+                for sub_q in sub_questions:
+                    result = await grade_with_ai(
+                        student_answer_images=ans_images,
+                        model_answer_images=ma_images,
+                        question_number=f"{question_number}{sub_q['sub_id']}",
+                        max_marks=sub_q['max_marks'],
+                        grading_mode=grading_mode,
+                        exam_id=exam_id,
+                        student_id=student_id
+                    )
+                    sub_scores.append({
+                        "sub_id": sub_q['sub_id'],
+                        "max_marks": sub_q['max_marks'],
+                        "obtained_marks": result['score'],
+                        "ai_feedback": result['feedback']
+                    })
+                    total_obtained += result['score']
+                
+                question_scores.append({
+                    "question_number": question_number,
+                    "max_marks": max_marks,
+                    "obtained_marks": sum(s['obtained_marks'] for s in sub_scores),
+                    "ai_feedback": f"Graded {len(sub_scores)} sub-questions",
+                    "sub_scores": sub_scores,
+                    "status": "graded"
+                })
+            else:
+                # Grade main question
+                result = await grade_with_ai(
+                    student_answer_images=ans_images,
+                    model_answer_images=ma_images,
+                    question_number=question_number,
+                    max_marks=max_marks,
+                    grading_mode=grading_mode,
+                    exam_id=exam_id,
+                    student_id=student_id
+                )
+                question_scores.append({
+                    "question_number": question_number,
+                    "max_marks": max_marks,
+                    "obtained_marks": result['score'],
+                    "ai_feedback": result['feedback'],
+                    "sub_scores": [],
+                    "status": "graded"
+                })
+                total_obtained += result['score']
+        
+        # Get exam to get total marks
+        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+        total_marks = exam['total_marks']
+        percentage = (total_obtained / total_marks) * 100 if total_marks > 0 else 0
+        
+        # Create paper document
+        paper_id = f"paper_{uuid.uuid4().hex[:12]}"
+        paper_doc = {
+            "paper_id": paper_id,
+            "exam_id": exam_id,
+            "student_id": student_id,
+            "student_name": student_name,
+            "question_scores": question_scores,
+            "total_marks": total_marks,
+            "obtained_marks": total_obtained,
+            "percentage": round(percentage, 2),
+            "status": "graded",
+            "graded_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.papers.insert_one(paper_doc)
+        
+        # Update submission status
+        await db.student_submissions.update_one(
+            {"exam_id": exam_id, "student_id": student_id},
+            {"$set": {"status": "graded", "graded_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        # Update exam progress
+        total_students = exam.get('total_students', 0)
+        graded_count = await db.papers.count_documents({"exam_id": exam_id})
+        
+        update_data = {
+            "graded_count": graded_count,
+            "progress": (graded_count / total_students) * 100 if total_students > 0 else 0
+        }
+        
+        # If all graded, mark exam as completed
+        if graded_count >= total_students:
+            update_data["status"] = "completed"
+        
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": update_data}
+        )
+        
+        logger.info(f"✓ Successfully graded paper for {student_name}: {total_obtained}/{total_marks} ({percentage:.1f}%)")
+        
+    except Exception as e:
+        logger.error(f"✗ Error grading paper for {student_name}: {e}", exc_info=True)
+        raise
+
+
 async def process_grading_task(task_data):
     """Process a grading job - reads files from GridFS"""
     job_id = task_data['job_id']
