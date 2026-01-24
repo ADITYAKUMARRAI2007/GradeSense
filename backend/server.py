@@ -10162,34 +10162,26 @@ async def get_metrics_overview(user: User = Depends(get_admin_user)):
         new_signups = await db.users.count_documents({"created_at": {"$gte": month_ago}})
         
         # ⭐ NEW: Retention Rate - Users who graded 2nd exam within 30 days of first
-        retention_data = await db.exams.aggregate([
-            {"$sort": {"created_at": 1}},
+        # Simplified approach: count teachers with 2+ exams
+        teachers_with_multiple_exams = await db.exams.aggregate([
             {"$group": {
                 "_id": "$teacher_id",
-                "first_exam": {"$first": "$created_at"},
-                "second_exam": {"$first": {"$cond": [{"$gt": [{"$size": {"$filter": {
-                    "input": "$$ROOT",
-                    "cond": True
-                }}}, 1]}, "$created_at", None]}},
-                "exam_count": {"$sum": 1}
+                "exam_count": {"$sum": 1},
+                "exams": {"$push": {"exam_id": "$exam_id", "created_at": "$created_at"}}
             }},
             {"$match": {"exam_count": {"$gte": 2}}}
         ]).to_list(None)
         
-        # Calculate retention: teachers with 2+ exams where 2nd exam is within 30 days of 1st
+        # Calculate retention: teachers whose 2nd exam is within 30 days of 1st
         retained_users = 0
         eligible_users = await db.users.count_documents({"role": "teacher"})
         
-        for teacher_data in retention_data:
-            first_exam_date = datetime.fromisoformat(teacher_data["first_exam"].replace('Z', '+00:00'))
-            # Find their second exam
-            second_exam = await db.exams.find_one(
-                {"teacher_id": teacher_data["_id"], "created_at": {"$gt": teacher_data["first_exam"]}},
-                sort=[("created_at", 1)]
-            )
-            if second_exam:
-                second_exam_date = datetime.fromisoformat(second_exam["created_at"].replace('Z', '+00:00'))
-                days_diff = (second_exam_date - first_exam_date).days
+        for teacher in teachers_with_multiple_exams:
+            exams = sorted(teacher["exams"], key=lambda x: x["created_at"])
+            if len(exams) >= 2:
+                first = datetime.fromisoformat(exams[0]["created_at"].replace('Z', '+00:00'))
+                second = datetime.fromisoformat(exams[1]["created_at"].replace('Z', '+00:00'))
+                days_diff = (second - first).days
                 if days_diff <= 30:
                     retained_users += 1
         
