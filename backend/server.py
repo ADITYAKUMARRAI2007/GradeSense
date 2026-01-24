@@ -1782,19 +1782,33 @@ async def extract_questions_temporary(
         if not extracted_questions:
             return {"questions": [], "message": "No questions found"}
         
-        # Convert to simple format for frontend
+        # Convert to format for frontend with sub-questions
         questions = []
         for i, q in enumerate(extracted_questions, 1):
             if isinstance(q, dict):
-                questions.append({
+                question_obj = {
                     "question_number": q.get("question_number", i),
-                    "max_marks": q.get("max_marks", 10)
-                })
+                    "max_marks": q.get("max_marks", 10),
+                    "sub_questions": []
+                }
+                
+                # Include sub-questions if they exist
+                if "sub_questions" in q and isinstance(q["sub_questions"], list):
+                    for sub_q in q["sub_questions"]:
+                        if isinstance(sub_q, dict):
+                            question_obj["sub_questions"].append({
+                                "sub_id": sub_q.get("sub_id", "a"),
+                                "max_marks": sub_q.get("max_marks", 5),
+                                "rubric": sub_q.get("rubric", "")
+                            })
+                
+                questions.append(question_obj)
             else:
                 # Fallback for simple format
                 questions.append({
                     "question_number": i,
-                    "max_marks": 10
+                    "max_marks": 10,
+                    "sub_questions": []
                 })
         
         return {"questions": questions, "message": f"Extracted {len(questions)} questions"}
