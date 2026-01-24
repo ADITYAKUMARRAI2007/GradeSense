@@ -330,6 +330,29 @@ class ExamCreate(BaseModel):
     exam_date: str
     grading_mode: str
     questions: List[dict] = []  # Now optional, will be populated by auto-extraction
+    exam_mode: str = "teacher_upload"  # ⭐ NEW: "teacher_upload" or "student_upload"
+    show_question_paper: bool = False  # ⭐ NEW: For student mode, whether to show question paper
+
+class StudentExamCreate(BaseModel):
+    """Model for creating exam in student-upload mode"""
+    batch_id: str
+    exam_name: str
+    total_marks: float
+    grading_mode: str = "balanced"
+    student_ids: List[str]  # Selected students
+    show_question_paper: bool = False
+    questions: List[ExamQuestion]
+
+class StudentSubmission(BaseModel):
+    """Model for student answer submission"""
+    submission_id: str
+    exam_id: str
+    student_id: str
+    student_name: str
+    student_email: str
+    answer_file_ref: str  # GridFS reference
+    submitted_at: str
+    status: str  # "submitted", "graded"
 
 class SubQuestionScore(BaseModel):
     sub_id: str
