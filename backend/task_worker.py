@@ -58,7 +58,11 @@ from background_grading import process_grading_job_in_background
 async def process_task(task):
     """Process a single grading task"""
     task_id = task['task_id']
-    task_data = task['data']
+    # Support both 'data' (old format) and 'payload' (new format)
+    task_data = task.get('data') or task.get('payload')
+    
+    if not task_data:
+        raise ValueError(f"Task {task_id} has no data or payload field")
     
     try:
         logger.info(f"Starting task {task_id}: {task['type']}")
