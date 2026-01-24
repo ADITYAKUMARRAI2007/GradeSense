@@ -9835,6 +9835,15 @@ async def track_frontend_event(event: FrontendEvent, user: User = Depends(get_cu
         logger.error(f"Failed to track event: {e}")
         return {"success": False}
 
+@api_router.get("/admin/users")
+async def get_all_users(user: User = Depends(get_current_user)):
+    """Get all users for admin management"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    users = await db.users.find({}, {"_id": 0, "password": 0}).sort([("created_at", -1)]).to_list(1000)
+    return users
+
 @api_router.get("/admin/metrics/overview")
 async def get_metrics_overview(user: User = Depends(get_current_user)):
     """Get comprehensive metrics overview for admin dashboard"""
