@@ -750,6 +750,11 @@ submissions.forEach(function(sub) {{
             print("❌ Failed to create test batch and students")
             return False
         
+        # Create student session for one of the enrolled students
+        if not self.create_student_session_for_enrolled_student():
+            print("❌ Failed to create student session")
+            return False
+        
         # Step 2: Phase B - Teacher creates exam
         if not self.test_phase_b_teacher_creation_flow():
             print("❌ Phase B failed")
