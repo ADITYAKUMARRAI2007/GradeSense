@@ -10252,6 +10252,52 @@ async def get_metrics_overview(user: User = Depends(get_admin_user)):
             }}
         ]).to_list(None)
         
+        # ⭐ NEW: End-to-End Grading Time - Average duration from grading_analytics
+        grading_time_stats = await db.grading_analytics.aggregate([
+            {"$group": {
+                "_id": None,
+                "avg_grading_time": {"$avg": "$grading_duration_seconds"}
+            }}
+        ]).to_list(1)
+        
+        avg_grading_time = grading_time_stats[0]["avg_grading_time"] if grading_time_stats else 0
+        
+        # ⭐ NEW: Error Categorization - Breakdown of API errors from last 24 hours
+        day_ago_errors = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        error_breakdown = await db.api_metrics.aggregate([
+            {"$match": {
+                "timestamp": {"$gte": day_ago_errors},
+                "status_code": {"$ne": 200},
+                "error_type": {"$ne": None}
+            }},
+            {"$group": {
+                "_id": "$error_type",
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]).to_list(10)
+        
+        # ⭐ NEW: Geographic Distribution - Simple IP-based tracking (placeholder for now)
+        # In production, you'd use a geo IP service like MaxMind
+        geo_distribution = await db.metrics_logs.aggregate([
+            {"$group": {
+                "_id": "$country",
+                "users": {"$addToSet": "$user_id"}
+            }},
+            {"$project": {
+                "country": "$_id",
+                "user_count": {"$size": "$users"},
+                "_id": 0
+            }},
+            {"$sort": {"user_count": -1}},
+            {"$limit": 10}
+        ]).to_list(10)
+        
+        # If no geo data yet, create placeholder
+        if not geo_distribution:
+            geo_distribution = [{"country": "Unknown", "user_count": total_users}]
+        
         # AI Trust Metrics (from grading_analytics if exists)
         ai_metrics = await db.grading_analytics.aggregate([
             {"$group": {
