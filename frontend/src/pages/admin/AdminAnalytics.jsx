@@ -46,7 +46,7 @@ const AdminAnalytics = () => {
     );
   }
 
-  const { business_metrics, engagement_metrics, ai_trust_metrics, system_performance, unit_economics } = metrics;
+  const { business_metrics, engagement_metrics, ai_trust_metrics, system_performance, unit_economics, geographic_distribution } = metrics;
 
   // Prepare chart data
   const userDistribution = [
@@ -63,6 +63,18 @@ const AdminAnalytics = () => {
   const gradingModes = engagement_metrics.grading_mode_distribution.map(m => ({
     mode: (m._id || 'Unknown').toUpperCase(),
     count: m.count
+  }));
+  
+  // ⭐ NEW: Geographic distribution chart data
+  const geoData = (geographic_distribution || []).map(g => ({
+    country: g.country || 'Unknown',
+    users: g.user_count
+  }));
+  
+  // ⭐ NEW: Error breakdown chart data
+  const errorData = (system_performance.error_breakdown || []).map(e => ({
+    type: e._id || 'Unknown',
+    count: e.count
   }));
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
