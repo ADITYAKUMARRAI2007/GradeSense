@@ -1880,6 +1880,103 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
         "total_papers": len(submissions)
     }
 
+@api_router.get("/students/my-exams")
+async def get_student_exams(user: User = Depends(get_current_user)):
+    """Get all exams for current student (student-upload mode only)"""
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can access this")
+    
+    # Find all exams where this student is in selected_students list
+    exams = await db.exams.find(
+        {
+            "exam_mode": "student_upload",
+            "selected_students": user.user_id
+        },
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Check submission status for each exam
+    result = []
+    for exam in exams:
+        # Get batch name
+        batch = await db.batches.find_one({"batch_id": exam["batch_id"]}, {"_id": 0})
+        
+        # Check if student has submitted
+        submission = await db.student_submissions.find_one({
+            "exam_id": exam["exam_id"],
+            "student_id": user.user_id
+        }, {"_id": 0})
+        
+        # Check if graded
+        graded_paper = await db.papers.find_one({
+            "exam_id": exam["exam_id"],
+            "student_id": user.user_id
+        }, {"_id": 0})
+        
+        result.append({
+            "exam_id": exam["exam_id"],
+            "exam_name": exam["exam_name"],
+            "batch_id": exam["batch_id"],
+            "batch_name": batch["name"] if batch else "Unknown",
+            "total_marks": exam["total_marks"],
+            "grading_mode": exam["grading_mode"],
+            "show_question_paper": exam.get("show_question_paper", False),
+            "status": exam.get("status", "awaiting_submissions"),
+            "submitted": submission is not None,
+            "submitted_at": submission["submitted_at"] if submission else None,
+            "graded": graded_paper is not None,
+            "obtained_marks": graded_paper.get("obtained_marks") if graded_paper else None,
+            "percentage": graded_paper.get("percentage") if graded_paper else None
+        })
+    
+    return result
+
+@api_router.get("/exams/{exam_id}/question-paper")
+async def download_question_paper(exam_id: str, user: User = Depends(get_current_user)):
+    """Download question paper for an exam (if allowed)"""
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Check if user is allowed to download
+    if user.role == "student":
+        # Check if student is in the exam
+        if user.user_id not in exam.get("selected_students", []):
+            raise HTTPException(status_code=403, detail="You are not enrolled in this exam")
+        
+        # Check if question paper is visible to students
+        if not exam.get("show_question_paper", False):
+            raise HTTPException(status_code=403, detail="Question paper is not available for students")
+    elif user.role == "teacher":
+        # Teachers can always download their own exam's question paper
+        if exam.get("teacher_id") != user.user_id:
+            raise HTTPException(status_code=403, detail="Not your exam")
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    # Get question paper from GridFS
+    qp_file_ref = exam.get("question_paper_ref")
+    if not qp_file_ref:
+        raise HTTPException(status_code=404, detail="Question paper not found")
+    
+    try:
+        from fastapi.responses import StreamingResponse
+        import io
+        
+        qp_stream = await fs.open_download_stream_by_name(qp_file_ref)
+        qp_bytes = await qp_stream.read()
+        
+        return StreamingResponse(
+            io.BytesIO(qp_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={exam['exam_name']}_Question_Paper.pdf"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error downloading question paper: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download question paper")
+
 # ============== BATCH ROUTES ==============
 
 @api_router.get("/batches")
