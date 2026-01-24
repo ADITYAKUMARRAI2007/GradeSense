@@ -114,7 +114,10 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Active Now</p>
-                  <p className="text-2xl font-bold text-gray-900">12</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {loading ? '...' : stats.active_now}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Last 30 minutes</p>
                 </div>
                 <Activity className="w-8 h-8 text-blue-500" />
               </div>
@@ -126,7 +129,10 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Pending Feedback</p>
-                  <p className="text-2xl font-bold text-gray-900">5</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {loading ? '...' : stats.pending_feedback}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Unresolved</p>
                 </div>
                 <MessageSquare className="w-8 h-8 text-green-500" />
               </div>
@@ -138,7 +144,14 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">API Health</p>
-                  <p className="text-2xl font-bold text-green-600">99.8%</p>
+                  <p className={`text-2xl font-bold ${
+                    stats.api_health >= 95 ? 'text-green-600' :
+                    stats.api_health >= 80 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {loading ? '...' : `${stats.api_health}%`}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Last hour</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-500" />
               </div>
@@ -150,7 +163,20 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">System Status</p>
-                  <p className="text-2xl font-bold text-green-600">Healthy</p>
+                  <p className={`text-2xl font-bold ${
+                    stats.system_status === 'Healthy' ? 'text-green-600' :
+                    stats.system_status === 'Degraded' ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {loading ? '...' : stats.system_status}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {loading ? 'Checking...' : (
+                      stats.system_status === 'Healthy' ? 'All systems operational' :
+                      stats.system_status === 'Degraded' ? 'Minor issues detected' :
+                      'Issues detected'
+                    )}
+                  </p>
                 </div>
                 <Shield className="w-8 h-8 text-orange-500" />
               </div>
