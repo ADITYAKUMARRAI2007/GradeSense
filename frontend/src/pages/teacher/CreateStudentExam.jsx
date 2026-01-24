@@ -427,37 +427,95 @@ const CreateStudentExam = () => {
 
                 {/* Manual Entry Mode */}
                 {questionMode === 'manual' && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600">Define questions with their marks</p>
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">Define questions with their marks and optional sub-questions</p>
                     {questions.map((q, idx) => (
-                      <div key={idx} className="flex gap-3">
-                        <Input
-                          type="number"
-                          value={q.question_number}
-                          onChange={(e) => updateQuestion(idx, 'question_number', e.target.value)}
-                          placeholder="Q No."
-                          className="w-24"
-                        />
-                        <Input
-                          type="number"
-                          value={q.max_marks}
-                          onChange={(e) => updateQuestion(idx, 'max_marks', e.target.value)}
-                          placeholder="Max marks"
-                          className="flex-1"
-                        />
-                        {questions.length > 1 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeQuestion(idx)}
-                          >
-                            Remove
-                          </Button>
-                        )}
+                      <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex gap-3 items-start">
+                          <div className="flex-1 space-y-3">
+                            <div className="flex gap-3">
+                              <div className="w-32">
+                                <Label className="text-xs">Question No.</Label>
+                                <Input
+                                  type="number"
+                                  value={q.question_number}
+                                  onChange={(e) => updateQuestion(idx, 'question_number', e.target.value)}
+                                  placeholder="Q No."
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <Label className="text-xs">Max Marks</Label>
+                                <Input
+                                  type="number"
+                                  value={q.max_marks}
+                                  onChange={(e) => updateQuestion(idx, 'max_marks', e.target.value)}
+                                  placeholder="Max marks"
+                                  className="mt-1"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Sub-questions section */}
+                            {q.sub_questions && q.sub_questions.length > 0 && (
+                              <div className="ml-4 space-y-2 border-l-2 border-blue-200 pl-4">
+                                <Label className="text-xs text-blue-700">Sub-questions</Label>
+                                {q.sub_questions.map((sub, subIdx) => (
+                                  <div key={subIdx} className="flex gap-2 items-center bg-blue-50 p-2 rounded">
+                                    <span className="text-sm font-medium text-blue-900 w-8">{sub.sub_id})</span>
+                                    <Input
+                                      type="number"
+                                      value={sub.max_marks}
+                                      onChange={(e) => updateSubQuestion(idx, subIdx, 'max_marks', e.target.value)}
+                                      placeholder="Marks"
+                                      className="w-24"
+                                    />
+                                    <Input
+                                      value={sub.rubric || ''}
+                                      onChange={(e) => updateSubQuestion(idx, subIdx, 'rubric', e.target.value)}
+                                      placeholder="Description (optional)"
+                                      className="flex-1"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeSubQuestion(idx, subIdx)}
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addSubQuestion(idx)}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add Sub-question
+                            </Button>
+                          </div>
+
+                          {questions.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeQuestion(idx)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    <Button variant="outline" size="sm" onClick={addQuestion} className="mt-2">
-                      + Add Question
+                    <Button variant="outline" size="sm" onClick={addQuestion} className="w-full">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Question
                     </Button>
                   </div>
                 )}
