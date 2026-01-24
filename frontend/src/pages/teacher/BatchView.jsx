@@ -213,7 +213,7 @@ const BatchView = () => {
                 <div className="space-y-3">
                   {exams.filter(e => e.status === 'completed').map(exam => (
                     <Card key={exam.exam_id} className="border-l-4 border-l-green-500 hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => navigate(`/teacher/exam/${exam.exam_id}/analytics`)}>
+                      onClick={() => navigate(`/teacher/analytics?exam_id=${exam.exam_id}`)}>
                       <CardContent className="p-4 flex items-center justify-between">
                         <div className="flex-1">
                           <h4 className="font-semibold text-gray-900">{exam.exam_name}</h4>
