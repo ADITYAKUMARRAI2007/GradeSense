@@ -1817,8 +1817,8 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
         task_id = f"task_{uuid.uuid4().hex[:12]}"
         
         # Get answer paper from GridFS
-        ans_stream = await fs.open_download_stream_by_name(submission["answer_file_ref"])
-        ans_bytes = await ans_stream.read()
+        ans_file = fs.get_last_version(filename=submission["answer_file_ref"])
+        ans_bytes = ans_file.read()
         
         # Convert to images
         ans_images = pdf_to_base64_images(ans_bytes)
