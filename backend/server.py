@@ -9718,6 +9718,44 @@ def calculate_edit_distance(original: str, final: str) -> int:
         return 0
     return len(set(original) ^ set(final))
 
+async def log_grading_analytics(
+    submission_id: str,
+    exam_id: str, 
+    teacher_id: str,
+    question_scores: List[QuestionScore],
+    grading_duration: float,
+    ai_confidence: float = 0.0,
+    tokens_input: int = 0,
+    tokens_output: int = 0
+):
+    """Log detailed grading analytics to database"""
+    try:
+        for qs in question_scores:
+            analytics_doc = {
+                "analytics_id": f"ga_{uuid.uuid4().hex[:12]}",
+                "submission_id": submission_id,
+                "exam_id": exam_id,
+                "teacher_id": teacher_id,
+                "question_number": qs.question_number,
+                "original_ai_grade": qs.obtained_marks,
+                "final_grade": qs.obtained_marks,  # Initially same, updated when teacher edits
+                "grade_delta": 0.0,
+                "original_ai_feedback": qs.ai_feedback,
+                "final_feedback": qs.ai_feedback,  # Initially same
+                "edit_distance": 0,
+                "ai_confidence_score": ai_confidence,
+                "tokens_input": tokens_input,
+                "tokens_output": tokens_output,
+                "estimated_cost": calculate_grading_cost(tokens_input, tokens_output),
+                "edited_by_teacher": False,
+                "edited_at": None,
+                "grading_duration_seconds": grading_duration,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await db.grading_analytics.insert_one(analytics_doc)
+    except Exception as e:
+        logger.error(f"Failed to log grading analytics: {e}")
+
 @api_router.post("/metrics/track-event")
 async def track_frontend_event(event: FrontendEvent, user: User = Depends(get_current_user)):
     """Track frontend user interactions for analytics"""
