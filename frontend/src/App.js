@@ -325,6 +325,22 @@ function AppRouter() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/analytics"
+        element={
+          <ProtectedRoute>
+            {(props) => <AdminAnalytics {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            {(props) => <AdminUsers {...props} />}
+          </ProtectedRoute>
+        }
+      />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/login" replace />} />
