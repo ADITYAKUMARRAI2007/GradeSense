@@ -116,7 +116,7 @@ const BatchView = () => {
               </div>
               <p className="text-sm text-gray-600">Papers to review</p>
               <button
-                onClick={() => navigate(`/teacher/review-papers?batch=${batchId}`)}
+                onClick={() => navigate(`/teacher/review?batch_id=${batchId}`)}
                 className="text-sm text-orange-600 hover:underline mt-4"
               >
                 Review Now →
