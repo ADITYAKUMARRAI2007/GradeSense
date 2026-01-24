@@ -242,6 +242,20 @@ const BatchView = () => {
 
           {/* Students Tab */}
           <TabsContent value="students" className="mt-6">
+            {showAtRiskOnly && (
+              <div className="mb-4 flex items-center justify-between bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-red-700">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="font-semibold">Showing students below 40% only</span>
+                </div>
+                <button
+                  onClick={() => setShowAtRiskOnly(false)}
+                  className="text-sm text-red-600 hover:underline"
+                >
+                  Show All Students
+                </button>
+              </div>
+            )}
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -256,7 +270,9 @@ const BatchView = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {students.map(student => (
+                      {students
+                        .filter(student => !showAtRiskOnly || (student.average < 40))
+                        .map(student => (
                         <tr
                           key={student.student_id}
                           onClick={() => setSelectedStudent(student)}
