@@ -1797,7 +1797,7 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     ma_bytes = ma_file.read()
     
     # Convert model answer to images
-    ma_images = pdf_to_base64_images(ma_bytes)
+    ma_images = pdf_to_images(ma_bytes)
     
     # Store model answer in GridFS with images
     await db.exam_files.update_one(
