@@ -1636,6 +1636,10 @@ async def get_submission_status(exam_id: str, user: User = Depends(get_current_u
     if exam.get("exam_mode") != "student_upload":
         raise HTTPException(status_code=400, detail="This is not a student-upload exam")
     
+    # Only the teacher who created the exam can access submission status
+    if user.role != "teacher" or exam.get("teacher_id") != user.user_id:
+        raise HTTPException(status_code=403, detail="Only the exam creator can access submission status")
+    
     # Get all submissions
     submissions = await db.student_submissions.find(
         {"exam_id": exam_id}, 
