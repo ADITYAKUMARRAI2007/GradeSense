@@ -61,16 +61,57 @@ async def ai_call_with_timeout(chat, message, timeout_seconds=60, operation_name
 # Global variable to hold worker task
 _worker_task = None
 
+# ============== DATA RETENTION & CLEANUP ==============
+
+async def cleanup_old_metrics():
+    """Delete metrics data older than 1 year, keep aggregated summaries"""
+    try:
+        one_year_ago = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+        
+        # Delete old metrics logs
+        result1 = await db.metrics_logs.delete_many({"timestamp": {"$lt": one_year_ago}})
+        logger.info(f"Deleted {result1.deleted_count} old metrics_logs records")
+        
+        # Delete old API metrics
+        result2 = await db.api_metrics.delete_many({"timestamp": {"$lt": one_year_ago}})
+        logger.info(f"Deleted {result2.deleted_count} old api_metrics records")
+        
+        # Keep grading_analytics forever as it's valuable for long-term insights
+        # but delete associated metadata that's less critical
+        
+        logger.info("✅ Data cleanup completed successfully")
+    except Exception as e:
+        logger.error(f"Error during data cleanup: {e}", exc_info=True)
+
 async def run_background_worker():
-    """Run the task worker in the background"""
+    """Integrated background worker - processes tasks and runs cleanup"""
+    logger.info("🔄 Background worker started")
     logger.info("=" * 60)
-    logger.info("BACKGROUND TASK WORKER STARTING (Integrated Mode)")
-    logger.info("=" * 60)
+    
+    # Run cleanup on startup (once)
+    await cleanup_old_metrics()
+    
+    # Schedule cleanup to run daily
+    last_cleanup = datetime.now(timezone.utc)
     
     # Import worker main loop
     try:
         from task_worker import main as worker_main
-        await worker_main()
+        
+        # Run worker in a loop with periodic cleanup
+        while True:
+            # Check if it's time for daily cleanup (every 24 hours)
+            if (datetime.now(timezone.utc) - last_cleanup).total_seconds() > 86400:  # 24 hours
+                logger.info("🗑️  Running scheduled data cleanup...")
+                await cleanup_old_metrics()
+                last_cleanup = datetime.now(timezone.utc)
+            
+            # Run the worker main loop
+            await worker_main()
+            
+            # Small delay to prevent tight loop
+            await asyncio.sleep(1)
+            
     except Exception as e:
         logger.error(f"Background worker error: {e}", exc_info=True)
 
