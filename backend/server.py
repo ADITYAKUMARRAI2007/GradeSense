@@ -1571,6 +1571,311 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
         "exam_category": user.exam_category if hasattr(user, 'exam_category') else None
     }
 
+# ============== STUDENT-UPLOAD EXAM WORKFLOW ==============
+
+@api_router.post("/exams/student-mode")
+async def create_student_upload_exam(
+    exam_data: StudentExamCreate,
+    question_paper: UploadFile = File(...),
+    model_answer: UploadFile = File(...),
+    user: User = Depends(get_current_user)
+):
+    """Create exam where students upload their answer papers"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can create exams")
+    
+    exam_id = f"exam_{uuid.uuid4().hex[:12]}"
+    
+    # Store question paper in GridFS
+    qp_bytes = await question_paper.read()
+    qp_file_ref = f"qp_{exam_id}"
+    await fs.upload_from_stream(qp_file_ref, qp_bytes)
+    
+    # Store model answer in GridFS
+    ma_bytes = await model_answer.read()
+    ma_file_ref = f"ma_{exam_id}"
+    await fs.upload_from_stream(ma_file_ref, ma_bytes)
+    
+    # Create exam document
+    exam_doc = {
+        "exam_id": exam_id,
+        "batch_id": exam_data.batch_id,
+        "exam_name": exam_data.exam_name,
+        "total_marks": exam_data.total_marks,
+        "grading_mode": exam_data.grading_mode,
+        "exam_mode": "student_upload",  # Mark as student-upload mode
+        "show_question_paper": exam_data.show_question_paper,
+        "question_paper_ref": qp_file_ref,
+        "model_answer_ref": ma_file_ref,
+        "questions": [q.dict() for q in exam_data.questions],
+        "teacher_id": user.user_id,
+        "selected_students": exam_data.student_ids,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "awaiting_submissions",
+        "total_students": len(exam_data.student_ids),
+        "submitted_count": 0
+    }
+    
+    await db.exams.insert_one(exam_doc)
+    
+    logger.info(f"Created student-upload exam {exam_id} with {len(exam_data.student_ids)} students")
+    
+    return {"exam_id": exam_id, "message": "Exam created. Students can now submit their answers."}
+
+@api_router.get("/exams/{exam_id}/submissions-status")
+async def get_submission_status(exam_id: str, user: User = Depends(get_current_user)):
+    """Get submission status for a student-upload exam"""
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam.get("exam_mode") != "student_upload":
+        raise HTTPException(status_code=400, detail="This is not a student-upload exam")
+    
+    # Get all submissions
+    submissions = await db.student_submissions.find(
+        {"exam_id": exam_id}, 
+        {"_id": 0}
+    ).to_list(1000)
+    
+    selected_students = exam.get("selected_students", [])
+    submitted_ids = {sub["student_id"] for sub in submissions}
+    
+    # Get student details
+    students_info = []
+    for student_id in selected_students:
+        student = await db.users.find_one({"user_id": student_id}, {"_id": 0})
+        if student:
+            has_submitted = student_id in submitted_ids
+            submission = next((s for s in submissions if s["student_id"] == student_id), None)
+            students_info.append({
+                "student_id": student_id,
+                "name": student["name"],
+                "email": student["email"],
+                "submitted": has_submitted,
+                "submitted_at": submission["submitted_at"] if submission else None
+            })
+    
+    return {
+        "exam_id": exam_id,
+        "exam_name": exam["exam_name"],
+        "total_students": len(selected_students),
+        "submitted_count": len(submitted_ids),
+        "students": students_info,
+        "all_submitted": len(submitted_ids) == len(selected_students)
+    }
+
+@api_router.post("/exams/{exam_id}/submit")
+async def submit_student_answer(
+    exam_id: str,
+    answer_paper: UploadFile = File(...),
+    user: User = Depends(get_current_user)
+):
+    """Student submits their answer paper"""
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can submit answers")
+    
+    # Check exam exists and is in student-upload mode
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam.get("exam_mode") != "student_upload":
+        raise HTTPException(status_code=400, detail="This exam does not accept student submissions")
+    
+    # Check if student is in the selected list
+    if user.user_id not in exam.get("selected_students", []):
+        raise HTTPException(status_code=403, detail="You are not enrolled in this exam")
+    
+    # Check if already submitted
+    existing = await db.student_submissions.find_one({
+        "exam_id": exam_id,
+        "student_id": user.user_id
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already submitted. Re-submission is not allowed.")
+    
+    # Store answer paper in GridFS
+    file_bytes = await answer_paper.read()
+    file_ref = f"ans_{exam_id}_{user.user_id}"
+    await fs.upload_from_stream(file_ref, file_bytes)
+    
+    # Create submission record
+    submission_id = f"sub_{uuid.uuid4().hex[:12]}"
+    submission_doc = {
+        "submission_id": submission_id,
+        "exam_id": exam_id,
+        "student_id": user.user_id,
+        "student_name": user.name,
+        "student_email": user.email,
+        "answer_file_ref": file_ref,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "status": "submitted"
+    }
+    
+    await db.student_submissions.insert_one(submission_doc)
+    
+    # Update exam submitted count
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$inc": {"submitted_count": 1}}
+    )
+    
+    logger.info(f"Student {user.user_id} submitted answer for exam {exam_id}")
+    
+    return {"message": "Answer submitted successfully", "submission_id": submission_id}
+
+@api_router.delete("/exams/{exam_id}/remove-student/{student_id}")
+async def remove_student_from_exam(
+    exam_id: str,
+    student_id: str,
+    user: User = Depends(get_current_user)
+):
+    """Teacher removes a student from exam (for non-submitters)"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can remove students")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam["teacher_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="Not your exam")
+    
+    # Remove student from selected list
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {
+            "$pull": {"selected_students": student_id},
+            "$inc": {"total_students": -1}
+        }
+    )
+    
+    logger.info(f"Teacher {user.user_id} removed student {student_id} from exam {exam_id}")
+    
+    return {"message": "Student removed from exam"}
+
+@api_router.post("/exams/{exam_id}/grade-student-submissions")
+async def grade_student_submissions(exam_id: str, user: User = Depends(get_current_user)):
+    """Trigger grading for all submitted student answers"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can grade")
+    
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam["teacher_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="Not your exam")
+    
+    if exam.get("exam_mode") != "student_upload":
+        raise HTTPException(status_code=400, detail="Not a student-upload exam")
+    
+    # Get all submissions
+    submissions = await db.student_submissions.find(
+        {"exam_id": exam_id, "status": "submitted"},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    if not submissions:
+        raise HTTPException(status_code=400, detail="No submissions to grade")
+    
+    # Create grading job
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    
+    # Get model answer from GridFS
+    ma_file_ref = exam.get("model_answer_ref")
+    ma_stream = await fs.open_download_stream_by_name(ma_file_ref)
+    ma_bytes = await ma_stream.read()
+    
+    # Convert model answer to images
+    ma_images = pdf_to_base64_images(ma_bytes)
+    
+    # Store model answer in GridFS with images
+    await db.exam_files.update_one(
+        {"exam_id": exam_id, "file_type": "model_answer"},
+        {"$set": {
+            "exam_id": exam_id,
+            "file_type": "model_answer",
+            "file_refs": [ma_file_ref],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Create task for each submission
+    tasks_created = []
+    for submission in submissions:
+        task_id = f"task_{uuid.uuid4().hex[:12]}"
+        
+        # Get answer paper from GridFS
+        ans_stream = await fs.open_download_stream_by_name(submission["answer_file_ref"])
+        ans_bytes = await ans_stream.read()
+        
+        # Convert to images
+        ans_images = pdf_to_base64_images(ans_bytes)
+        
+        # Store answer paper with GridFS reference
+        await db.exam_files.update_one(
+            {"exam_id": exam_id, "student_id": submission["student_id"], "file_type": "answer_paper"},
+            {"$set": {
+                "exam_id": exam_id,
+                "student_id": submission["student_id"],
+                "file_type": "answer_paper",
+                "file_refs": [submission["answer_file_ref"]],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        
+        # Create task
+        task_doc = {
+            "task_id": task_id,
+            "type": "grade_paper",
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "payload": {
+                "exam_id": exam_id,
+                "student_id": submission["student_id"],
+                "student_name": submission["student_name"],
+                "grading_mode": exam["grading_mode"],
+                "questions": exam["questions"],
+                "answer_file_ref": submission["answer_file_ref"],
+                "model_answer_ref": ma_file_ref
+            },
+            "result": None
+        }
+        
+        await db.tasks.insert_one(task_doc)
+        tasks_created.append(task_id)
+    
+    # Create grading job
+    job_doc = {
+        "job_id": job_id,
+        "exam_id": exam_id,
+        "status": "processing",
+        "progress": 0,
+        "total_papers": len(submissions),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "task_ids": tasks_created
+    }
+    
+    await db.grading_jobs.insert_one(job_doc)
+    
+    # Update exam status
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {"status": "grading", "grading_job_id": job_id}}
+    )
+    
+    logger.info(f"Created grading job {job_id} for {len(submissions)} student submissions")
+    
+    return {
+        "job_id": job_id,
+        "message": f"Grading started for {len(submissions)} submissions",
+        "total_papers": len(submissions)
+    }
+
 # ============== BATCH ROUTES ==============
 
 @api_router.get("/batches")
