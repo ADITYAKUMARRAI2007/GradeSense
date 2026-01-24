@@ -346,7 +346,7 @@ function AppRouter() {
         path="/admin/users"
         element={
           <ProtectedRoute>
-            {(props) => <AdminUsers {...props} />}
+            {(props) => <AdminUsersAdvanced {...props} />}
           </ProtectedRoute>
         }
       />
