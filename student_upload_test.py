@@ -385,6 +385,8 @@ startxref
             'model_answer': ('test.pdf', io.BytesIO(b'test'), 'application/pdf')
         }
         
+        form_data = {'exam_data': json.dumps(exam_data)}
+        
         # Temporarily remove session token
         original_token = self.teacher_session_token
         self.teacher_session_token = None
@@ -394,7 +396,7 @@ startxref
             "POST",
             "exams/student-mode",
             401,
-            data={'exam_data': json.dumps(exam_data)},
+            data=form_data,
             files=files,
             session_type="teacher"
         )
@@ -408,7 +410,7 @@ startxref
             "POST", 
             "exams/student-mode",
             403,
-            data={'exam_data': json.dumps(exam_data)},
+            data=form_data,
             files=files,
             session_type="student"
         )
