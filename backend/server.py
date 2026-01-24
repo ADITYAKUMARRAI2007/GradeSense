@@ -1575,7 +1575,7 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
 
 @api_router.post("/exams/student-mode")
 async def create_student_upload_exam(
-    exam_data: StudentExamCreate,
+    exam_data: str = Form(...),
     question_paper: UploadFile = File(...),
     model_answer: UploadFile = File(...),
     user: User = Depends(get_current_user)
@@ -1583,6 +1583,10 @@ async def create_student_upload_exam(
     """Create exam where students upload their answer papers"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create exams")
+    
+    # Parse the JSON exam data from form
+    import json
+    exam_data_dict = json.loads(exam_data)
     
     exam_id = f"exam_{uuid.uuid4().hex[:12]}"
     
@@ -1599,26 +1603,26 @@ async def create_student_upload_exam(
     # Create exam document
     exam_doc = {
         "exam_id": exam_id,
-        "batch_id": exam_data.batch_id,
-        "exam_name": exam_data.exam_name,
-        "total_marks": exam_data.total_marks,
-        "grading_mode": exam_data.grading_mode,
+        "batch_id": exam_data_dict["batch_id"],
+        "exam_name": exam_data_dict["exam_name"],
+        "total_marks": exam_data_dict["total_marks"],
+        "grading_mode": exam_data_dict["grading_mode"],
         "exam_mode": "student_upload",  # Mark as student-upload mode
-        "show_question_paper": exam_data.show_question_paper,
+        "show_question_paper": exam_data_dict.get("show_question_paper", False),
         "question_paper_ref": qp_file_ref,
         "model_answer_ref": ma_file_ref,
-        "questions": [q.dict() for q in exam_data.questions],
+        "questions": exam_data_dict.get("questions", []),
         "teacher_id": user.user_id,
-        "selected_students": exam_data.student_ids,
+        "selected_students": exam_data_dict["student_ids"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "awaiting_submissions",
-        "total_students": len(exam_data.student_ids),
+        "total_students": len(exam_data_dict["student_ids"]),
         "submitted_count": 0
     }
     
     await db.exams.insert_one(exam_doc)
     
-    logger.info(f"Created student-upload exam {exam_id} with {len(exam_data.student_ids)} students")
+    logger.info(f"Created student-upload exam {exam_id} with {len(exam_data_dict['student_ids'])} students")
     
     return {"exam_id": exam_id, "message": "Exam created. Students can now submit their answers."}
 
