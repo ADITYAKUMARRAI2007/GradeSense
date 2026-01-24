@@ -193,6 +193,31 @@ const BatchView = () => {
           {/* Exams Tab */}
           <TabsContent value="exams" className="mt-6">
             <div className="space-y-6">
+              {/* Student-Upload Exams (Awaiting Submissions) */}
+              {exams.filter(e => e.exam_mode === 'student_upload' && e.status === 'awaiting_submissions').length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Student Upload - Awaiting Submissions</h3>
+                  <div className="space-y-3">
+                    {exams.filter(e => e.exam_mode === 'student_upload' && e.status === 'awaiting_submissions').map(exam => (
+                      <Card key={exam.exam_id} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => navigate(`/teacher/exam/${exam.exam_id}/submissions`)}>
+                        <CardContent className="p-4 flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">{exam.exam_name}</h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {exam.submitted_count || 0}/{exam.total_students || 0} Students Submitted
+                            </p>
+                          </div>
+                          <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            View Submissions
+                          </button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Active/Grading */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Active / Grading</h3>
