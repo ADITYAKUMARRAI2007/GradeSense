@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Upload, Users, FileText, CheckCircle, AlertCircle, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Upload, Users, FileText, CheckCircle, AlertCircle, Lightbulb, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -31,9 +31,10 @@ const CreateStudentExam = () => {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [questionPaper, setQuestionPaper] = useState(null);
   const [modelAnswer, setModelAnswer] = useState(null);
-  const [questions, setQuestions] = useState([{ question_number: 1, max_marks: 10 }]);
+  const [questions, setQuestions] = useState([{ question_number: 1, max_marks: 10, sub_questions: [] }]);
   const [questionMode, setQuestionMode] = useState('manual'); // 'manual' or 'ai-extract'
   const [extracting, setExtracting] = useState(false);
+  const [expandedQuestion, setExpandedQuestion] = useState(null);
 
   useEffect(() => {
     fetchBatchAndStudents();
@@ -66,7 +67,7 @@ const CreateStudentExam = () => {
   };
 
   const addQuestion = () => {
-    setQuestions([...questions, { question_number: questions.length + 1, max_marks: 10 }]);
+    setQuestions([...questions, { question_number: questions.length + 1, max_marks: 10, sub_questions: [] }]);
   };
 
   const updateQuestion = (index, field, value) => {
@@ -77,6 +78,30 @@ const CreateStudentExam = () => {
 
   const removeQuestion = (index) => {
     setQuestions(questions.filter((_, i) => i !== index));
+  };
+
+  const addSubQuestion = (questionIndex) => {
+    const updated = [...questions];
+    const existingSubs = updated[questionIndex].sub_questions || [];
+    const nextSubId = String.fromCharCode(97 + existingSubs.length); // a, b, c...
+    updated[questionIndex].sub_questions = [
+      ...existingSubs,
+      { sub_id: nextSubId, max_marks: 5, rubric: '' }
+    ];
+    setQuestions(updated);
+  };
+
+  const updateSubQuestion = (questionIndex, subIndex, field, value) => {
+    const updated = [...questions];
+    updated[questionIndex].sub_questions[subIndex][field] = 
+      field === 'max_marks' ? parseFloat(value) : value;
+    setQuestions(updated);
+  };
+
+  const removeSubQuestion = (questionIndex, subIndex) => {
+    const updated = [...questions];
+    updated[questionIndex].sub_questions = updated[questionIndex].sub_questions.filter((_, i) => i !== subIndex);
+    setQuestions(updated);
   };
 
   const handleExtractQuestions = async () => {
@@ -118,6 +143,12 @@ const CreateStudentExam = () => {
       return;
     }
 
+    // Validate questions exist
+    if (questions.length === 0) {
+      toast.error('Please add at least one question');
+      return;
+    }
+
     // Check if files are provided when using AI extraction
     if (questionMode === 'ai-extract' && (!questionPaper || !modelAnswer)) {
       toast.error('Please upload both question paper and model answer for AI extraction');
@@ -142,11 +173,11 @@ const CreateStudentExam = () => {
         total_marks: parseFloat(totalMarks),
         grading_mode: gradingMode,
         student_ids: selectedStudents,
-        show_question_paper: showQuestionPaper,
+        show_question_paper: showQuestionPaper && questionPaper !== null, // Only show if uploaded
         questions: questions.map(q => ({
           question_number: q.question_number,
           max_marks: q.max_marks,
-          sub_questions: []
+          sub_questions: q.sub_questions || []
         }))
       };
       
