@@ -1935,6 +1935,53 @@ async def get_student_exams(user: User = Depends(get_current_user)):
     
     return result
 
+@api_router.post("/extract-questions-temp")
+async def extract_questions_temporary(
+    model_answer: UploadFile = File(...),
+    user: User = Depends(get_current_user)
+):
+    """Temporary endpoint to extract questions from model answer during exam creation"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can extract questions")
+    
+    try:
+        # Read the model answer PDF
+        ma_bytes = await model_answer.read()
+        
+        # Convert to images
+        ma_images = pdf_to_images(ma_bytes)
+        
+        if not ma_images:
+            raise HTTPException(status_code=400, detail="Could not process model answer PDF")
+        
+        # Extract questions using AI
+        # We'll try to extract up to 20 questions (reasonable default)
+        extracted_questions = await extract_questions_from_model_answer(ma_images, num_questions=20)
+        
+        if not extracted_questions:
+            return {"questions": [], "message": "No questions found"}
+        
+        # Convert to simple format for frontend
+        questions = []
+        for i, q in enumerate(extracted_questions, 1):
+            if isinstance(q, dict):
+                questions.append({
+                    "question_number": q.get("question_number", i),
+                    "max_marks": q.get("max_marks", 10)
+                })
+            else:
+                # Fallback for simple format
+                questions.append({
+                    "question_number": i,
+                    "max_marks": 10
+                })
+        
+        return {"questions": questions, "message": f"Extracted {len(questions)} questions"}
+        
+    except Exception as e:
+        logger.error(f"Error extracting questions: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to extract questions: {str(e)}")
+
 @api_router.get("/exams/{exam_id}/question-paper")
 async def download_question_paper(exam_id: str, user: User = Depends(get_current_user)):
     """Download question paper for an exam (if allowed)"""
