@@ -352,7 +352,8 @@ startxref
             'model_answer': ('model_answer.pdf', io.BytesIO(model_answer_content), 'application/pdf')
         }
         
-        data = {
+        # Send exam_data as form field, not JSON
+        form_data = {
             'exam_data': json.dumps(exam_data)
         }
         
@@ -361,7 +362,7 @@ startxref
             "POST",
             "exams/student-mode",
             200,
-            data=data,
+            data=form_data,
             files=files,
             session_type="teacher"
         )
