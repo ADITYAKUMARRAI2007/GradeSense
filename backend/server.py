@@ -9698,6 +9698,227 @@ async def resolve_feedback(feedback_id: str, user: User = Depends(get_current_us
     return {"success": True, "message": "Feedback marked as resolved"}
 
 
+# ============== METRICS & ANALYTICS TRACKING ==============
+
+# Gemini Flash pricing (per 1M tokens)
+GEMINI_INPUT_PRICE = 0.075  # $0.075 per 1M input tokens
+GEMINI_OUTPUT_PRICE = 0.30  # $0.30 per 1M output tokens
+
+def calculate_grading_cost(tokens_input: int, tokens_output: int) -> float:
+    """Calculate cost in USD for Gemini Flash API usage"""
+    input_cost = (tokens_input / 1_000_000) * GEMINI_INPUT_PRICE
+    output_cost = (tokens_output / 1_000_000) * GEMINI_OUTPUT_PRICE
+    return round(input_cost + output_cost, 6)
+
+def calculate_edit_distance(original: str, final: str) -> int:
+    """Calculate simple edit distance (character difference)"""
+    # Simple implementation - counts character differences
+    # For production, consider using Levenshtein distance
+    if original == final:
+        return 0
+    return len(set(original) ^ set(final))
+
+@api_router.post("/metrics/track-event")
+async def track_frontend_event(event: FrontendEvent, user: User = Depends(get_current_user)):
+    """Track frontend user interactions for analytics"""
+    try:
+        await db.metrics_logs.insert_one({
+            "event_id": f"evt_{uuid.uuid4().hex[:12]}",
+            "event_type": event.event_type,
+            "element_id": event.element_id,
+            "page": event.page,
+            "user_id": user.user_id,
+            "role": user.role,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "metadata": event.metadata or {}
+        })
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Failed to track event: {e}")
+        return {"success": False}
+
+@api_router.get("/admin/metrics/overview")
+async def get_metrics_overview(user: User = Depends(get_current_user)):
+    """Get comprehensive metrics overview for admin dashboard"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # Business & Growth Metrics
+        total_users = await db.users.count_documents({})
+        total_teachers = await db.users.count_documents({"role": "teacher"})
+        total_students = await db.users.count_documents({"role": "student"})
+        
+        # Calculate DAU/WAU/MAU (users with activity in last 1/7/30 days)
+        now = datetime.now(timezone.utc)
+        day_ago = (now - timedelta(days=1)).isoformat()
+        week_ago = (now - timedelta(days=7)).isoformat()
+        month_ago = (now - timedelta(days=30)).isoformat()
+        
+        dau = await db.metrics_logs.distinct("user_id", {"timestamp": {"$gte": day_ago}})
+        wau = await db.metrics_logs.distinct("user_id", {"timestamp": {"$gte": week_ago}})
+        mau = await db.metrics_logs.distinct("user_id", {"timestamp": {"$gte": month_ago}})
+        
+        # New signups (last 30 days)
+        new_signups = await db.users.count_documents({"created_at": {"$gte": month_ago}})
+        
+        # Engagement Metrics
+        total_exams = await db.exams.count_documents({})
+        total_papers = await db.submissions.count_documents({})
+        
+        # Calculate average batch size
+        exams_with_counts = await db.exams.aggregate([
+            {"$lookup": {
+                "from": "submissions",
+                "localField": "exam_id",
+                "foreignField": "exam_id",
+                "as": "submissions"
+            }},
+            {"$project": {
+                "submission_count": {"$size": "$submissions"}
+            }}
+        ]).to_list(None)
+        
+        avg_batch_size = sum(e["submission_count"] for e in exams_with_counts) / len(exams_with_counts) if exams_with_counts else 0
+        
+        # Power users (Top 10 teachers by papers graded)
+        power_users = await db.submissions.aggregate([
+            {"$lookup": {
+                "from": "exams",
+                "localField": "exam_id",
+                "foreignField": "exam_id",
+                "as": "exam"
+            }},
+            {"$unwind": "$exam"},
+            {"$group": {
+                "_id": "$exam.teacher_id",
+                "papers_graded": {"$sum": 1}
+            }},
+            {"$sort": {"papers_graded": -1}},
+            {"$limit": 10},
+            {"$lookup": {
+                "from": "users",
+                "localField": "_id",
+                "foreignField": "user_id",
+                "as": "teacher"
+            }},
+            {"$unwind": "$teacher"},
+            {"$project": {
+                "teacher_id": "$_id",
+                "teacher_name": "$teacher.name",
+                "papers_graded": 1,
+                "_id": 0
+            }}
+        ]).to_list(10)
+        
+        # Grading mode preference
+        grading_modes = await db.exams.aggregate([
+            {"$group": {
+                "_id": "$grading_mode",
+                "count": {"$sum": 1}
+            }}
+        ]).to_list(None)
+        
+        # AI Trust Metrics (from grading_analytics if exists)
+        ai_metrics = await db.grading_analytics.aggregate([
+            {"$group": {
+                "_id": None,
+                "avg_confidence": {"$avg": "$ai_confidence_score"},
+                "avg_grade_delta": {"$avg": "$grade_delta"},
+                "total_graded": {"$sum": 1},
+                "edited_count": {"$sum": {"$cond": ["$edited_by_teacher", 1, 0]}},
+                "zero_touch_count": {"$sum": {"$cond": [{"$eq": ["$edited_by_teacher", False]}, 1, 0]}}
+            }}
+        ]).to_list(1)
+        
+        ai_stats = ai_metrics[0] if ai_metrics else {
+            "avg_confidence": 0,
+            "avg_grade_delta": 0,
+            "total_graded": 0,
+            "edited_count": 0,
+            "zero_touch_count": 0
+        }
+        
+        # Calculate rates
+        human_intervention_rate = (ai_stats["edited_count"] / ai_stats["total_graded"] * 100) if ai_stats["total_graded"] > 0 else 0
+        zero_touch_rate = (ai_stats["zero_touch_count"] / ai_stats["total_graded"] * 100) if ai_stats["total_graded"] > 0 else 0
+        
+        # System Performance Metrics
+        avg_response_time = await db.api_metrics.aggregate([
+            {"$group": {
+                "_id": None,
+                "avg_time": {"$avg": "$response_time_ms"}
+            }}
+        ]).to_list(1)
+        
+        success_rate_data = await db.api_metrics.aggregate([
+            {"$group": {
+                "_id": None,
+                "total": {"$sum": 1},
+                "successful": {"$sum": {"$cond": [{"$eq": ["$status_code", 200]}, 1, 0]}}
+            }}
+        ]).to_list(1)
+        
+        success_rate = (success_rate_data[0]["successful"] / success_rate_data[0]["total"] * 100) if success_rate_data and success_rate_data[0]["total"] > 0 else 0
+        
+        # Unit Economics
+        cost_metrics = await db.grading_analytics.aggregate([
+            {"$group": {
+                "_id": None,
+                "total_cost": {"$sum": "$estimated_cost"},
+                "avg_cost_per_paper": {"$avg": "$estimated_cost"},
+                "total_tokens_input": {"$sum": "$tokens_input"},
+                "total_tokens_output": {"$sum": "$tokens_output"}
+            }}
+        ]).to_list(1)
+        
+        cost_stats = cost_metrics[0] if cost_metrics else {
+            "total_cost": 0,
+            "avg_cost_per_paper": 0,
+            "total_tokens_input": 0,
+            "total_tokens_output": 0
+        }
+        
+        return {
+            "business_metrics": {
+                "total_users": total_users,
+                "total_teachers": total_teachers,
+                "total_students": total_students,
+                "dau": len(dau),
+                "wau": len(wau),
+                "mau": len(mau),
+                "new_signups_30d": new_signups
+            },
+            "engagement_metrics": {
+                "total_exams": total_exams,
+                "total_papers": total_papers,
+                "avg_batch_size": round(avg_batch_size, 1),
+                "power_users": power_users,
+                "grading_mode_distribution": grading_modes
+            },
+            "ai_trust_metrics": {
+                "avg_confidence": round(ai_stats["avg_confidence"], 1),
+                "avg_grade_delta": round(ai_stats["avg_grade_delta"], 2),
+                "human_intervention_rate": round(human_intervention_rate, 1),
+                "zero_touch_rate": round(zero_touch_rate, 1),
+                "total_graded": ai_stats["total_graded"]
+            },
+            "system_performance": {
+                "avg_response_time_ms": round(avg_response_time[0]["avg_time"], 0) if avg_response_time else 0,
+                "api_success_rate": round(success_rate, 1)
+            },
+            "unit_economics": {
+                "total_cost_usd": round(cost_stats["total_cost"], 2),
+                "avg_cost_per_paper_usd": round(cost_stats["avg_cost_per_paper"], 4),
+                "total_tokens_input": cost_stats["total_tokens_input"],
+                "total_tokens_output": cost_stats["total_tokens_output"]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include router and add middleware
 app.include_router(api_router)
 
