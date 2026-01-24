@@ -614,6 +614,19 @@ async def get_current_user(request: Request) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     
+    # Check account status - ENFORCE DISABLED/BANNED STATUS
+    account_status = user.get("account_status", "active")
+    if account_status == "banned":
+        raise HTTPException(
+            status_code=403, 
+            detail="Your account has been banned. Contact support for assistance."
+        )
+    elif account_status == "disabled":
+        raise HTTPException(
+            status_code=403, 
+            detail="Your account has been temporarily disabled. Contact support for assistance."
+        )
+    
     # Update last_login timestamp (throttled - only update if more than 5 minutes since last update)
     last_login = user.get("last_login")
     should_update = False
