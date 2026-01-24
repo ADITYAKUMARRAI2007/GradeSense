@@ -17,7 +17,7 @@ const AdminDashboard = () => {
     },
     {
       title: 'User Management',
-      description: 'Manage users, roles, permissions, and access control',
+      description: 'Manage users, feature flags, quotas, and access control',
       icon: Users,
       path: '/admin/users',
       color: 'bg-green-500',
