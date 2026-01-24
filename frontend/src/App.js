@@ -28,7 +28,7 @@ import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminFeedback from "./pages/admin/AdminFeedback";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
-import AdminUsers from "./pages/admin/AdminUsers";
+import AdminUsersAdvanced from "./pages/admin/AdminUsersAdvanced";
 import FeedbackBeacon from "./components/FeedbackBeacon";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
