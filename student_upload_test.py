@@ -457,7 +457,7 @@ startxref
         )
         
         if my_exams_result:
-            exams = my_exams_result.get('exams', [])
+            exams = my_exams_result if isinstance(my_exams_result, list) else my_exams_result.get('exams', [])
             print(f"✅ Student can see {len(exams)} exam(s)")
             
             # Check if our test exam is in the list
