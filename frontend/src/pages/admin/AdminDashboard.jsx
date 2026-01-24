@@ -17,11 +17,12 @@ const AdminDashboard = () => {
     },
     {
       title: 'User Management',
-      description: 'Manage users, feature flags, quotas, and access control',
+      description: 'Manage users, feature flags, quotas, and account status',
       icon: Users,
       path: '/admin/users',
       color: 'bg-green-500',
-      stats: 'Full control'
+      stats: 'Full control',
+      badge: '✨ All Features'
     },
     {
       title: 'Feedback Management',
@@ -46,24 +47,6 @@ const AdminDashboard = () => {
       icon: Mail,
       path: '/admin/emails',
       color: 'bg-pink-500',
-      stats: 'Coming soon',
-      disabled: true
-    },
-    {
-      title: 'Feature Flags',
-      description: 'Control feature availability per user or globally',
-      icon: Zap,
-      path: '/admin/features',
-      color: 'bg-yellow-500',
-      stats: 'Coming soon',
-      disabled: true
-    },
-    {
-      title: 'Usage Quotas',
-      description: 'Set limits on exams, papers, and API usage per user',
-      icon: Database,
-      path: '/admin/quotas',
-      color: 'bg-indigo-500',
       stats: 'Coming soon',
       disabled: true
     },
