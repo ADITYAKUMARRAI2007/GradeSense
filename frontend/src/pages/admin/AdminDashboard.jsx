@@ -186,11 +186,15 @@ const AdminDashboard = () => {
                     <div className={`w-12 h-12 ${section.color} rounded-lg flex items-center justify-center`}>
                       <section.icon className="w-6 h-6 text-white" />
                     </div>
-                    {section.disabled && (
+                    {section.disabled ? (
                       <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
                         Coming Soon
                       </span>
-                    )}
+                    ) : section.badge ? (
+                      <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-semibold animate-pulse">
+                        {section.badge}
+                      </span>
+                    ) : null}
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">{section.title}</h3>
                   <p className="text-sm text-gray-600 mb-4">{section.description}</p>
