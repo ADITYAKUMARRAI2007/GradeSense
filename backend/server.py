@@ -9788,23 +9788,16 @@ async def submit_user_feedback(feedback: UserFeedback, user: User = Depends(get_
 
 
 @api_router.get("/admin/feedback")
-async def get_all_feedback(user: User = Depends(get_current_user)):
+async def get_all_feedback(user: User = Depends(get_admin_user)):
     """Get all user feedback (admin only)"""
-    # For now, allow all teachers to access admin feedback
-    # In Phase 2, we'll add proper admin role checking
-    if user.role != "teacher":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     feedbacks = await db.user_feedback.find({}, {"_id": 0}).sort([("created_at", -1)]).to_list(1000)
     
     return feedbacks
 
 
 @api_router.put("/admin/feedback/{feedback_id}/resolve")
-async def resolve_feedback(feedback_id: str, user: User = Depends(get_current_user)):
+async def resolve_feedback(feedback_id: str, user: User = Depends(get_admin_user)):
     """Mark feedback as resolved (admin only)"""
-    if user.role != "teacher":
-        raise HTTPException(status_code=403, detail="Admin access required")
     
     result = await db.user_feedback.update_one(
         {"feedback_id": feedback_id},
