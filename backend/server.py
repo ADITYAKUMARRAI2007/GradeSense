@@ -9693,6 +9693,35 @@ async def debug_status():
     return debug_info
 
 
+# ============== ADMIN ROLE SYSTEM ==============
+
+ADMIN_WHITELIST = [
+    "gradingtoolaibased@gmail.com",
+    # Add more admin emails here
+]
+
+def is_admin(user: User) -> bool:
+    """Check if user has admin privileges"""
+    return user.email in ADMIN_WHITELIST or user.role == "admin"
+
+async def get_admin_user(user: User = Depends(get_current_user)) -> User:
+    """Dependency to ensure user has admin privileges"""
+    if not is_admin(user):
+        raise HTTPException(
+            status_code=403, 
+            detail="Admin access required. Contact support if you need admin privileges."
+        )
+    return user
+
+@api_router.get("/auth/check-admin")
+async def check_admin_status(user: User = Depends(get_current_user)):
+    """Check if current user has admin privileges"""
+    return {
+        "is_admin": is_admin(user),
+        "email": user.email,
+        "role": user.role
+    }
+
 # ============== USER FEEDBACK SYSTEM ==============
 
 class UserFeedback(BaseModel):
