@@ -1793,8 +1793,8 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     
     # Get model answer from GridFS
     ma_file_ref = exam.get("model_answer_ref")
-    ma_stream = await fs.open_download_stream_by_name(ma_file_ref)
-    ma_bytes = await ma_stream.read()
+    ma_file = fs.get_last_version(filename=ma_file_ref)
+    ma_bytes = ma_file.read()
     
     # Convert model answer to images
     ma_images = pdf_to_base64_images(ma_bytes)
