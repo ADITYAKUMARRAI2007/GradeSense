@@ -110,16 +110,13 @@ class StudentUploadWorkflowTester:
         self.teacher_user_id = f"test-teacher-{timestamp}"
         self.teacher_session_token = f"teacher_session_{timestamp}"
         
-        self.student_user_id = f"test-student-{timestamp}"
-        self.student_session_token = f"student_session_{timestamp}"
+        # We'll create the student session later using one of the created students
         
-        # Create MongoDB commands for both users
+        # Create MongoDB commands for teacher user
         mongo_commands = f"""
 use('test_database');
 var teacherId = '{self.teacher_user_id}';
 var teacherToken = '{self.teacher_session_token}';
-var studentId = '{self.student_user_id}';
-var studentToken = '{self.student_session_token}';
 var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
 
 // Insert test teacher
@@ -133,17 +130,6 @@ db.users.insertOne({{
   created_at: new Date().toISOString()
 }});
 
-// Insert test student
-db.users.insertOne({{
-  user_id: studentId,
-  email: 'test.student.{timestamp}@example.com',
-  name: 'Test Student Upload',
-  picture: 'https://via.placeholder.com/150',
-  role: 'student',
-  batches: [],
-  created_at: new Date().toISOString()
-}});
-
 // Insert teacher session
 db.user_sessions.insertOne({{
   user_id: teacherId,
@@ -152,17 +138,8 @@ db.user_sessions.insertOne({{
   created_at: new Date().toISOString()
 }});
 
-// Insert student session
-db.user_sessions.insertOne({{
-  user_id: studentId,
-  session_token: studentToken,
-  expires_at: expiresAt.toISOString(),
-  created_at: new Date().toISOString()
-}});
-
-print('Test teacher and student users created successfully');
+print('Test teacher user created successfully');
 print('Teacher ID: ' + teacherId);
-print('Student ID: ' + studentId);
 """
         
         try:
@@ -177,7 +154,6 @@ print('Student ID: ' + studentId);
             
             if result.returncode == 0:
                 print(f"✅ Test teacher created: {self.teacher_user_id}")
-                print(f"✅ Test student created: {self.student_user_id}")
                 return True
             else:
                 print(f"❌ MongoDB setup failed: {result.stderr}")
@@ -185,6 +161,52 @@ print('Student ID: ' + studentId);
                 
         except Exception as e:
             print(f"❌ Error creating test users: {str(e)}")
+            return False
+
+    def create_student_session_for_enrolled_student(self):
+        """Create session for one of the enrolled students"""
+        if not self.test_student_ids:
+            return False
+            
+        # Use the first created student
+        self.student_user_id = self.test_student_ids[0]
+        timestamp = int(datetime.now().timestamp())
+        self.student_session_token = f"student_session_{timestamp}"
+        
+        mongo_commands = f"""
+use('test_database');
+var studentId = '{self.student_user_id}';
+var studentToken = '{self.student_session_token}';
+var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
+
+// Insert student session
+db.user_sessions.insertOne({{
+  user_id: studentId,
+  session_token: studentToken,
+  expires_at: expiresAt.toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Student session created for enrolled student');
+"""
+        
+        try:
+            with open('/tmp/mongo_student_session.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/mongo_student_session.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"✅ Student session created for: {self.student_user_id}")
+                return True
+            else:
+                print(f"❌ Student session creation failed: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error creating student session: {str(e)}")
             return False
 
     def create_test_batch_and_students(self):
