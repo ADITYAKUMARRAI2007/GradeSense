@@ -73,7 +73,7 @@ async def process_task(task):
         )
         
         # Process based on task type
-        if task['type'] == 'grade_papers':
+        if task['type'] == 'grade_papers' or task['type'] == 'grade_paper':
             await process_grading_task(task_data)
         else:
             logger.error(f"Unknown task type: {task['type']}")
@@ -188,13 +188,14 @@ async def cleanup_stuck_jobs():
         if result.modified_count > 0:
             logger.warning(f"⚠️  Cleaned up {result.modified_count} stuck jobs (>1 hour)")
         
-        # Cancel stuck tasks
+        # Cancel stuck tasks (both claimed and processing)
         task_result = await db.tasks.update_many(
             {
-                "status": "processing",
+                "status": {"$in": ["claimed", "processing"]},
                 "created_at": {"$lt": one_hour_ago}
             },
-            {"$set": {"status": "failed"}}
+            {"$set": {"status": "failed", "error": "Task timeout - exceeded 1 hour"}}
+        )
         )
         
         if task_result.modified_count > 0:
