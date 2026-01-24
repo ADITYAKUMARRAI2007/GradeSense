@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Upload, Users, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Users, FileText, CheckCircle, AlertCircle, Lightbulb } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -32,6 +32,8 @@ const CreateStudentExam = () => {
   const [questionPaper, setQuestionPaper] = useState(null);
   const [modelAnswer, setModelAnswer] = useState(null);
   const [questions, setQuestions] = useState([{ question_number: 1, max_marks: 10 }]);
+  const [questionMode, setQuestionMode] = useState('manual'); // 'manual' or 'ai-extract'
+  const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
     fetchBatchAndStudents();
@@ -77,17 +79,62 @@ const CreateStudentExam = () => {
     setQuestions(questions.filter((_, i) => i !== index));
   };
 
+  const handleExtractQuestions = async () => {
+    if (!modelAnswer) {
+      toast.error('Please upload a model answer first');
+      return;
+    }
+
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append('model_answer', modelAnswer);
+      
+      const response = await axios.post(`${API}/extract-questions-temp`, formData, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (response.data.questions && response.data.questions.length > 0) {
+        setQuestions(response.data.questions.map(q => ({
+          question_number: q.question_number,
+          max_marks: q.max_marks || 10
+        })));
+        toast.success(`Extracted ${response.data.questions.length} questions from model answer`);
+      } else {
+        toast.error('No questions found in the model answer');
+      }
+    } catch (error) {
+      console.error('Error extracting questions:', error);
+      toast.error(error.response?.data?.detail || 'Failed to extract questions');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const handleCreate = async () => {
-    if (!examName || !totalMarks || selectedStudents.length === 0 || !questionPaper || !modelAnswer) {
+    if (!examName || !totalMarks || selectedStudents.length === 0) {
       toast.error('Please fill all required fields');
+      return;
+    }
+
+    // Check if files are provided when using AI extraction
+    if (questionMode === 'ai-extract' && (!questionPaper || !modelAnswer)) {
+      toast.error('Please upload both question paper and model answer for AI extraction');
       return;
     }
 
     setCreating(true);
     try {
       const formData = new FormData();
-      formData.append('question_paper', questionPaper);
-      formData.append('model_answer', modelAnswer);
+      
+      // Only append files if they exist
+      if (questionPaper) {
+        formData.append('question_paper', questionPaper);
+      }
+      if (modelAnswer) {
+        formData.append('model_answer', modelAnswer);
+      }
       
       const examData = {
         batch_id: batchId,
@@ -211,42 +258,6 @@ const CreateStudentExam = () => {
                 />
               </div>
               
-              {/* Question Configuration */}
-              <div className="border-t pt-4">
-                <Label className="text-base font-semibold">Question Structure</Label>
-                <p className="text-sm text-gray-600 mb-3">Define the questions for grading</p>
-                {questions.map((q, idx) => (
-                  <div key={idx} className="flex gap-3 mb-2">
-                    <Input
-                      type="number"
-                      value={q.question_number}
-                      onChange={(e) => updateQuestion(idx, 'question_number', e.target.value)}
-                      placeholder="Q No."
-                      className="w-24"
-                    />
-                    <Input
-                      type="number"
-                      value={q.max_marks}
-                      onChange={(e) => updateQuestion(idx, 'max_marks', e.target.value)}
-                      placeholder="Max marks"
-                      className="flex-1"
-                    />
-                    {questions.length > 1 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeQuestion(idx)}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" onClick={addQuestion} className="mt-2">
-                  + Add Question
-                </Button>
-              </div>
-              
               <Button onClick={() => setStep(2)} className="w-full" disabled={!examName || !totalMarks}>
                 Next: Select Students
               </Button>
@@ -303,48 +314,178 @@ const CreateStudentExam = () => {
           </Card>
         )}
 
-        {/* Step 3: Upload Files */}
+        {/* Step 3: Upload Files & Configure Questions */}
         {step === 3 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Upload className="w-5 h-5" />
-                Step 3: Upload Question Paper & Model Answer
+                Step 3: Upload Files & Configure Questions
               </CardTitle>
+              <p className="text-sm text-gray-600 mt-2">
+                📋 Optional but recommended: Upload files and configure questions for better grading
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Question Paper (PDF) *</Label>
-                <Input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setQuestionPaper(e.target.files[0])}
-                  className="mt-1"
-                />
-                {questionPaper && (
-                  <p className="text-sm text-green-600 mt-1">✓ {questionPaper.name}</p>
+            <CardContent className="space-y-6">
+              {/* File Uploads Section */}
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold text-gray-900">Upload Files (Optional)</h3>
+                <div>
+                  <Label>Question Paper (PDF)</Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setQuestionPaper(e.target.files[0])}
+                    className="mt-1"
+                  />
+                  {questionPaper && (
+                    <p className="text-sm text-green-600 mt-1">✓ {questionPaper.name}</p>
+                  )}
+                </div>
+                <div>
+                  <Label>Model Answer (PDF)</Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setModelAnswer(e.target.files[0])}
+                    className="mt-1"
+                  />
+                  {modelAnswer && (
+                    <p className="text-sm text-green-600 mt-1">✓ {modelAnswer.name}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Question Configuration Section */}
+              <div className="border-t pt-6 space-y-4">
+                <h3 className="text-base font-semibold text-gray-900">Question Structure</h3>
+                
+                {/* Mode Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setQuestionMode('manual')}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      questionMode === 'manual'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <span className="font-semibold">Manual Entry</span>
+                    </div>
+                    <p className="text-sm text-gray-600">Add questions manually with marks</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => setQuestionMode('ai-extract')}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      questionMode === 'ai-extract'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lightbulb className="w-5 h-5 text-primary" />
+                      <span className="font-semibold">AI Extraction</span>
+                    </div>
+                    <p className="text-sm text-gray-600">Extract from model answer PDF</p>
+                  </button>
+                </div>
+
+                {/* Manual Entry Mode */}
+                {questionMode === 'manual' && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600">Define questions with their marks</p>
+                    {questions.map((q, idx) => (
+                      <div key={idx} className="flex gap-3">
+                        <Input
+                          type="number"
+                          value={q.question_number}
+                          onChange={(e) => updateQuestion(idx, 'question_number', e.target.value)}
+                          placeholder="Q No."
+                          className="w-24"
+                        />
+                        <Input
+                          type="number"
+                          value={q.max_marks}
+                          onChange={(e) => updateQuestion(idx, 'max_marks', e.target.value)}
+                          placeholder="Max marks"
+                          className="flex-1"
+                        />
+                        {questions.length > 1 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeQuestion(idx)}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addQuestion} className="mt-2">
+                      + Add Question
+                    </Button>
+                  </div>
+                )}
+
+                {/* AI Extraction Mode */}
+                {questionMode === 'ai-extract' && (
+                  <div className="space-y-3">
+                    {!modelAnswer ? (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p className="text-sm text-yellow-800">
+                          ⚠️ Please upload a Model Answer PDF above to use AI extraction
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={handleExtractQuestions}
+                          disabled={extracting}
+                          className="w-full"
+                        >
+                          {extracting ? (
+                            <>
+                              <Upload className="w-4 h-4 mr-2 animate-spin" />
+                              Extracting Questions...
+                            </>
+                          ) : (
+                            <>
+                              <Lightbulb className="w-4 h-4 mr-2" />
+                              Extract Questions from Model Answer
+                            </>
+                          )}
+                        </Button>
+                        
+                        {questions.length > 0 && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <p className="text-sm text-green-800 font-medium mb-2">
+                              ✓ {questions.length} questions extracted
+                            </p>
+                            <div className="space-y-1">
+                              {questions.map((q, idx) => (
+                                <p key={idx} className="text-sm text-green-700">
+                                  Q{q.question_number}: {q.max_marks} marks
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-              <div>
-                <Label>Model Answer (PDF) *</Label>
-                <Input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setModelAnswer(e.target.files[0])}
-                  className="mt-1"
-                />
-                {modelAnswer && (
-                  <p className="text-sm text-green-600 mt-1">✓ {modelAnswer.name}</p>
-                )}
-              </div>
-              <div className="flex gap-3">
+
+              <div className="flex gap-3 pt-4">
                 <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
                   Back
                 </Button>
                 <Button
                   onClick={() => setStep(4)}
                   className="flex-1"
-                  disabled={!questionPaper || !modelAnswer}
                 >
                   Next: Review & Create
                 </Button>
@@ -368,8 +509,9 @@ const CreateStudentExam = () => {
                 <p><strong>Total Marks:</strong> {totalMarks}</p>
                 <p><strong>Grading Mode:</strong> {gradingMode}</p>
                 <p><strong>Students:</strong> {selectedStudents.length} selected</p>
-                <p><strong>Question Paper:</strong> {showQuestionPaper ? 'Visible to students' : 'Hidden from students'}</p>
-                <p><strong>Questions:</strong> {questions.length} questions configured</p>
+                <p><strong>Question Paper:</strong> {questionPaper ? `Uploaded (${showQuestionPaper ? 'Visible to students' : 'Hidden from students'})` : 'Not uploaded'}</p>
+                <p><strong>Model Answer:</strong> {modelAnswer ? 'Uploaded' : 'Not uploaded'}</p>
+                <p><strong>Questions:</strong> {questions.length} questions configured ({questionMode === 'ai-extract' ? 'AI Extracted' : 'Manual Entry'})</p>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
