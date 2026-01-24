@@ -329,6 +329,19 @@ const BatchView = () => {
                 </button>
               </div>
             )}
+            {students.length > 0 && showAtRiskOnly && students.filter(s => s.average < 40).length === 0 && (
+              <div className="text-center py-12">
+                <Users className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-green-600 mb-2">Great News!</h3>
+                <p className="text-gray-600 mb-6">No students are below 40%. Everyone is doing well!</p>
+                <button
+                  onClick={() => setShowAtRiskOnly(false)}
+                  className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  View All Students
+                </button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
