@@ -213,6 +213,31 @@ export default function Layout({ children, user }) {
 
       {/* Bottom section */}
       <div className="p-3 border-t mt-auto">
+        {/* Admin Panel Link - Only for admins/teachers */}
+        {user?.role === "teacher" && (
+          <Link
+            to="/admin"
+            onClick={() => isMobile && setMobileOpen(false)}
+            data-testid="nav-admin-panel"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all mb-1",
+              location.pathname.startsWith("/admin")
+                ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground border border-orange-200 hover:border-orange-300"
+            )}
+          >
+            <Shield className="w-5 h-5 flex-shrink-0" />
+            {(isMobile || !collapsed) && (
+              <div className="flex items-center gap-2 flex-1">
+                <span className="font-medium">Admin Panel</span>
+                {location.pathname.startsWith("/admin") && (
+                  <span className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                )}
+              </div>
+            )}
+          </Link>
+        )}
+        
         <Link
           to="/settings"
           onClick={() => isMobile && setMobileOpen(false)}
