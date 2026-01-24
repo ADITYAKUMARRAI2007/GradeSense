@@ -138,7 +138,7 @@ const BatchView = () => {
               </div>
               <p className="text-sm text-gray-600">vs. previous exams</p>
               <button
-                onClick={() => navigate(`/teacher/batch/${batchId}/analytics`)}
+                onClick={() => navigate(`/teacher/analytics?batch_id=${batchId}`)}
                 className="text-sm text-blue-600 hover:underline mt-4"
               >
                 View Trend →
