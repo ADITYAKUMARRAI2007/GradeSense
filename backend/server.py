@@ -10161,6 +10161,40 @@ async def get_metrics_overview(user: User = Depends(get_admin_user)):
         # New signups (last 30 days)
         new_signups = await db.users.count_documents({"created_at": {"$gte": month_ago}})
         
+        # ⭐ NEW: Retention Rate - Users who graded 2nd exam within 30 days of first
+        retention_data = await db.exams.aggregate([
+            {"$sort": {"created_at": 1}},
+            {"$group": {
+                "_id": "$teacher_id",
+                "first_exam": {"$first": "$created_at"},
+                "second_exam": {"$first": {"$cond": [{"$gt": [{"$size": {"$filter": {
+                    "input": "$$ROOT",
+                    "cond": True
+                }}}, 1]}, "$created_at", None]}},
+                "exam_count": {"$sum": 1}
+            }},
+            {"$match": {"exam_count": {"$gte": 2}}}
+        ]).to_list(None)
+        
+        # Calculate retention: teachers with 2+ exams where 2nd exam is within 30 days of 1st
+        retained_users = 0
+        eligible_users = await db.users.count_documents({"role": "teacher"})
+        
+        for teacher_data in retention_data:
+            first_exam_date = datetime.fromisoformat(teacher_data["first_exam"].replace('Z', '+00:00'))
+            # Find their second exam
+            second_exam = await db.exams.find_one(
+                {"teacher_id": teacher_data["_id"], "created_at": {"$gt": teacher_data["first_exam"]}},
+                sort=[("created_at", 1)]
+            )
+            if second_exam:
+                second_exam_date = datetime.fromisoformat(second_exam["created_at"].replace('Z', '+00:00'))
+                days_diff = (second_exam_date - first_exam_date).days
+                if days_diff <= 30:
+                    retained_users += 1
+        
+        retention_rate = (retained_users / eligible_users * 100) if eligible_users > 0 else 0
+        
         # Engagement Metrics
         total_exams = await db.exams.count_documents({})
         total_papers = await db.submissions.count_documents({})
