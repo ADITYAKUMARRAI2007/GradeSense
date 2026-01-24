@@ -9767,6 +9767,58 @@ async def check_admin_status(user: User = Depends(get_current_user)):
         "role": user.role
     }
 
+@api_router.get("/admin/dashboard-stats")
+async def get_dashboard_stats(user: User = Depends(get_admin_user)):
+    """Get real-time dashboard statistics for admin"""
+    try:
+        # Active Now - users with sessions active in last 30 minutes
+        thirty_mins_ago = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        active_sessions = await db.user_sessions.distinct(
+            "user_id",
+            {"created_at": {"$gte": thirty_mins_ago}}
+        )
+        active_now = len(active_sessions)
+        
+        # Pending Feedback - unresolved feedback count
+        pending_feedback = await db.user_feedback.count_documents({
+            "status": {"$ne": "resolved"}
+        })
+        
+        # API Health - calculate from recent API metrics
+        recent_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        api_metrics = await db.api_metrics.aggregate([
+            {"$match": {"timestamp": {"$gte": recent_time}}},
+            {"$group": {
+                "_id": None,
+                "total": {"$sum": 1},
+                "successful": {"$sum": {"$cond": [{"$eq": ["$status_code", 200]}, 1, 0]}}
+            }}
+        ]).to_list(1)
+        
+        if api_metrics and api_metrics[0]["total"] > 0:
+            api_health = round((api_metrics[0]["successful"] / api_metrics[0]["total"]) * 100, 1)
+        else:
+            api_health = 100.0  # Default if no recent metrics
+        
+        # System Status
+        system_status = "Healthy" if api_health >= 95 else "Degraded" if api_health >= 80 else "Issues"
+        
+        return {
+            "active_now": active_now,
+            "pending_feedback": pending_feedback,
+            "api_health": api_health,
+            "system_status": system_status
+        }
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {e}")
+        # Return defaults on error
+        return {
+            "active_now": 0,
+            "pending_feedback": 0,
+            "api_health": 0.0,
+            "system_status": "Unknown"
+        }
+
 # ============== ADVANCED USER CONTROLS ==============
 
 class UserFeatureFlags(BaseModel):
