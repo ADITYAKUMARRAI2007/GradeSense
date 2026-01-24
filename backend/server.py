@@ -102,6 +102,94 @@ app = FastAPI(title="GradeSense API", lifespan=lifespan)
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# ============== METRICS TRACKING MIDDLEWARE ==============
+
+@app.middleware("http")
+async def metrics_tracking_middleware(request: Request, call_next):
+    """Track API metrics for all requests"""
+    start_time = time.time()
+    
+    # Get user info if available
+    user_id = None
+    try:
+        if request.url.path != "/api/auth/me":  # Avoid recursion
+            auth_header = request.headers.get("cookie", "")
+            if "session" in auth_header:
+                # User is authenticated, we'll track this
+                pass
+    except:
+        pass
+    
+    # Process request
+    response = None
+    error_type = None
+    status_code = 500
+    
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception as e:
+        error_type = type(e).__name__
+        status_code = 500
+        logger.error(f"Request failed: {str(e)}")
+        raise
+    finally:
+        # Calculate response time
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log API metrics asynchronously (don't block response)
+        asyncio.create_task(log_api_metric(
+            endpoint=request.url.path,
+            method=request.method,
+            response_time_ms=response_time_ms,
+            status_code=status_code,
+            error_type=error_type,
+            user_id=user_id,
+            ip_address=request.client.host if request.client else None
+        ))
+    
+    return response
+
+async def log_api_metric(endpoint: str, method: str, response_time_ms: int, 
+                         status_code: int, error_type: Optional[str], 
+                         user_id: Optional[str], ip_address: Optional[str]):
+    """Log API metrics to database"""
+    try:
+        await db.api_metrics.insert_one({
+            "endpoint": endpoint,
+            "method": method,
+            "response_time_ms": response_time_ms,
+            "status_code": status_code,
+            "error_type": error_type,
+            "user_id": user_id,
+            "ip_address": ip_address,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Failed to log API metric: {e}")
+
+async def log_user_event(event_type: str, user_id: str, role: str, 
+                         ip_address: str, metadata: Dict = None):
+    """Log user events for analytics"""
+    try:
+        # Get geo location from IP (simplified - you can use a proper geo IP service)
+        country = "Unknown"
+        region = "Unknown"
+        
+        await db.metrics_logs.insert_one({
+            "event_id": f"evt_{uuid.uuid4().hex[:12]}",
+            "event_type": event_type,
+            "user_id": user_id,
+            "role": role,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "metadata": metadata or {},
+            "ip_address": ip_address,
+            "country": country,
+            "region": region
+        })
+    except Exception as e:
+        logger.error(f"Failed to log user event: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
