@@ -9700,6 +9700,23 @@ ADMIN_WHITELIST = [
     # Add more admin emails here
 ]
 
+# Default feature flags and quotas
+DEFAULT_FEATURES = {
+    "ai_suggestions": True,
+    "sub_questions": True,
+    "bulk_upload": True,
+    "analytics": True,
+    "peer_comparison": True,
+    "export_data": True
+}
+
+DEFAULT_QUOTAS = {
+    "max_exams_per_month": 100,
+    "max_papers_per_month": 1000,
+    "max_students": 500,
+    "max_batches": 50
+}
+
 def is_admin(user: User) -> bool:
     """Check if user has admin privileges"""
     return user.email in ADMIN_WHITELIST or user.role == "admin"
@@ -9721,6 +9738,143 @@ async def check_admin_status(user: User = Depends(get_current_user)):
         "email": user.email,
         "role": user.role
     }
+
+# ============== ADVANCED USER CONTROLS ==============
+
+class UserFeatureFlags(BaseModel):
+    ai_suggestions: bool = True
+    sub_questions: bool = True
+    bulk_upload: bool = True
+    analytics: bool = True
+    peer_comparison: bool = True
+    export_data: bool = True
+
+class UserQuotas(BaseModel):
+    max_exams_per_month: int = 100
+    max_papers_per_month: int = 1000
+    max_students: int = 500
+    max_batches: int = 50
+
+class UserStatusUpdate(BaseModel):
+    status: str  # 'active', 'disabled', 'banned'
+    reason: Optional[str] = None
+
+@api_router.get("/admin/users/{user_id}/details")
+async def get_user_details(user_id: str, admin: User = Depends(get_admin_user)):
+    """Get detailed user information including features and quotas"""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Add default features/quotas if not present
+    if "feature_flags" not in user:
+        user["feature_flags"] = DEFAULT_FEATURES
+    if "quotas" not in user:
+        user["quotas"] = DEFAULT_QUOTAS
+    if "account_status" not in user:
+        user["account_status"] = "active"
+    
+    # Get usage statistics
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    exams_this_month = await db.exams.count_documents({
+        "teacher_id": user_id,
+        "created_at": {"$gte": month_start.isoformat()}
+    })
+    
+    papers_this_month = await db.submissions.aggregate([
+        {"$lookup": {
+            "from": "exams",
+            "localField": "exam_id",
+            "foreignField": "exam_id",
+            "as": "exam"
+        }},
+        {"$unwind": "$exam"},
+        {"$match": {
+            "exam.teacher_id": user_id,
+            "created_at": {"$gte": month_start.isoformat()}
+        }},
+        {"$count": "total"}
+    ]).to_list(1)
+    
+    total_students = await db.students.count_documents({"teacher_id": user_id})
+    total_batches = await db.batches.count_documents({"teacher_id": user_id})
+    
+    user["current_usage"] = {
+        "exams_this_month": exams_this_month,
+        "papers_this_month": papers_this_month[0]["total"] if papers_this_month else 0,
+        "total_students": total_students,
+        "total_batches": total_batches
+    }
+    
+    return user
+
+@api_router.put("/admin/users/{user_id}/features")
+async def update_user_features(
+    user_id: str,
+    features: UserFeatureFlags,
+    admin: User = Depends(get_admin_user)
+):
+    """Update user's feature flags"""
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"feature_flags": features.model_dump()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    logger.info(f"Admin {admin.email} updated features for user {user_id}")
+    return {"success": True, "message": "Feature flags updated"}
+
+@api_router.put("/admin/users/{user_id}/quotas")
+async def update_user_quotas(
+    user_id: str,
+    quotas: UserQuotas,
+    admin: User = Depends(get_admin_user)
+):
+    """Update user's usage quotas"""
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"quotas": quotas.model_dump()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    logger.info(f"Admin {admin.email} updated quotas for user {user_id}")
+    return {"success": True, "message": "Quotas updated"}
+
+@api_router.put("/admin/users/{user_id}/status")
+async def update_user_status(
+    user_id: str,
+    status_update: UserStatusUpdate,
+    admin: User = Depends(get_admin_user)
+):
+    """Update user account status (active/disabled/banned)"""
+    if status_update.status not in ["active", "disabled", "banned"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    update_data = {
+        "account_status": status_update.status,
+        "status_updated_at": datetime.now(timezone.utc).isoformat(),
+        "status_updated_by": admin.email
+    }
+    
+    if status_update.reason:
+        update_data["status_reason"] = status_update.reason
+    
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    logger.info(f"Admin {admin.email} changed user {user_id} status to {status_update.status}")
+    return {"success": True, "message": f"User status updated to {status_update.status}"}
 
 # ============== USER FEEDBACK SYSTEM ==============
 
