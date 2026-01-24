@@ -26,6 +26,8 @@ import StudentResults from "./pages/student/Results";
 import StudentReEvaluation from "./pages/student/RequestReEvaluation";
 import Settings from "./pages/Settings";
 import AdminFeedback from "./pages/admin/AdminFeedback";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import AdminUsers from "./pages/admin/AdminUsers";
 import FeedbackBeacon from "./components/FeedbackBeacon";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
