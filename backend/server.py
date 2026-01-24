@@ -1392,8 +1392,8 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
 @api_router.post("/exams/student-mode")
 async def create_student_upload_exam(
     exam_data: str = Form(...),
-    question_paper: UploadFile = File(...),
-    model_answer: UploadFile = File(...),
+    question_paper: Optional[UploadFile] = File(None),
+    model_answer: Optional[UploadFile] = File(None),
     user: User = Depends(get_current_user)
 ):
     """Create exam where students upload their answer papers"""
@@ -1406,15 +1406,20 @@ async def create_student_upload_exam(
     
     exam_id = f"exam_{uuid.uuid4().hex[:12]}"
     
-    # Store question paper in GridFS
-    qp_bytes = await question_paper.read()
-    qp_file_ref = f"qp_{exam_id}"
-    qp_gridfs_id = fs.put(qp_bytes, filename=qp_file_ref)
+    qp_file_ref = None
+    ma_file_ref = None
     
-    # Store model answer in GridFS
-    ma_bytes = await model_answer.read()
-    ma_file_ref = f"ma_{exam_id}"
-    ma_gridfs_id = fs.put(ma_bytes, filename=ma_file_ref)
+    # Store question paper in GridFS if provided
+    if question_paper:
+        qp_bytes = await question_paper.read()
+        qp_file_ref = f"qp_{exam_id}"
+        qp_gridfs_id = fs.put(qp_bytes, filename=qp_file_ref)
+    
+    # Store model answer in GridFS if provided
+    if model_answer:
+        ma_bytes = await model_answer.read()
+        ma_file_ref = f"ma_{exam_id}"
+        ma_gridfs_id = fs.put(ma_bytes, filename=ma_file_ref)
     
     # Create exam document
     exam_doc = {
@@ -1424,7 +1429,7 @@ async def create_student_upload_exam(
         "total_marks": exam_data_dict["total_marks"],
         "grading_mode": exam_data_dict["grading_mode"],
         "exam_mode": "student_upload",  # Mark as student-upload mode
-        "show_question_paper": exam_data_dict.get("show_question_paper", False),
+        "show_question_paper": exam_data_dict.get("show_question_paper", False) and qp_file_ref is not None,
         "question_paper_ref": qp_file_ref,
         "model_answer_ref": ma_file_ref,
         "questions": exam_data_dict.get("questions", []),
