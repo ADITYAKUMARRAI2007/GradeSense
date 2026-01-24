@@ -755,6 +755,21 @@ async def create_session(request: Request, response: Response):
             }
             await db.users.insert_one(new_user)
     
+    # Check account status before creating session
+    final_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    account_status = final_user.get("account_status", "active")
+    
+    if account_status == "banned":
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been banned. Contact support at gradingtoolaibased@gmail.com for assistance."
+        )
+    elif account_status == "disabled":
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been temporarily disabled. Contact support at gradingtoolaibased@gmail.com for assistance."
+        )
+    
     # Create session token
     session_token = f"session_{uuid.uuid4().hex}"
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
