@@ -8249,12 +8249,6 @@ async def send_peer_group_email(
 
 # ============== NATURAL LANGUAGE QUERY (Ask Your Data) ==============
 
-class NaturalLanguageQuery(BaseModel):
-    query: str
-    batch_id: Optional[str] = None
-    exam_id: Optional[str] = None
-    subject_id: Optional[str] = None
-
 @api_router.post("/analytics/ask")
 async def ask_your_data(
     request: NaturalLanguageQuery,
@@ -10117,24 +10111,6 @@ async def get_dashboard_stats(user: User = Depends(get_admin_user)):
 
 # ============== ADVANCED USER CONTROLS ==============
 
-class UserFeatureFlags(BaseModel):
-    ai_suggestions: bool = True
-    sub_questions: bool = True
-    bulk_upload: bool = True
-    analytics: bool = True
-    peer_comparison: bool = True
-    export_data: bool = True
-
-class UserQuotas(BaseModel):
-    max_exams_per_month: int = 100
-    max_papers_per_month: int = 1000
-    max_students: int = 500
-    max_batches: int = 50
-
-class UserStatusUpdate(BaseModel):
-    status: str  # 'active', 'disabled', 'banned'
-    reason: Optional[str] = None
-
 @api_router.get("/admin/users/{user_id}/details")
 async def get_user_details(user_id: str, admin: User = Depends(get_admin_user)):
     """Get detailed user information including features and quotas"""
@@ -10253,37 +10229,6 @@ async def update_user_status(
     return {"success": True, "message": f"User status updated to {status_update.status}"}
 
 # ============== USER FEEDBACK SYSTEM ==============
-
-class UserFeedback(BaseModel):
-    type: str  # 'bug', 'suggestion', 'question'
-    data: Dict[str, Any]
-    metadata: Optional[Dict[str, Any]] = None
-
-class FrontendEvent(BaseModel):
-    event_type: str  # 'button_click', 'tab_switch', 'feature_use'
-    element_id: Optional[str] = None
-    page: str
-    metadata: Optional[Dict[str, Any]] = None
-
-class GradingAnalytics(BaseModel):
-    """Model for tracking detailed grading analytics"""
-    submission_id: str
-    exam_id: str
-    teacher_id: str
-    original_ai_grade: float
-    final_grade: float
-    grade_delta: float
-    original_ai_feedback: str
-    final_feedback: str
-    edit_distance: int  # Levenshtein distance or simple char diff
-    ai_confidence_score: float  # 0-100
-    tokens_input: int
-    tokens_output: int
-    estimated_cost: float  # in USD
-    edited_by_teacher: bool
-    edited_at: Optional[str] = None
-    grading_duration_seconds: float
-    timestamp: str
 
 @api_router.post("/feedback")
 async def submit_user_feedback(feedback: UserFeedback, user: User = Depends(get_current_user)):
