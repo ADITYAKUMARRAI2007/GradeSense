@@ -10366,14 +10366,16 @@ async def get_metrics_overview(user: User = Depends(get_admin_user)):
                 "dau": len(dau),
                 "wau": len(wau),
                 "mau": len(mau),
-                "new_signups_30d": new_signups
+                "new_signups_30d": new_signups,
+                "retention_rate": round(retention_rate, 1)  # ⭐ NEW
             },
             "engagement_metrics": {
                 "total_exams": total_exams,
                 "total_papers": total_papers,
                 "avg_batch_size": round(avg_batch_size, 1),
                 "power_users": power_users,
-                "grading_mode_distribution": grading_modes
+                "grading_mode_distribution": grading_modes,
+                "avg_grading_time_seconds": round(avg_grading_time, 1)  # ⭐ NEW
             },
             "ai_trust_metrics": {
                 "avg_confidence": round(ai_stats["avg_confidence"], 1),
@@ -10384,14 +10386,16 @@ async def get_metrics_overview(user: User = Depends(get_admin_user)):
             },
             "system_performance": {
                 "avg_response_time_ms": round(avg_response_time[0]["avg_time"], 0) if avg_response_time else 0,
-                "api_success_rate": round(success_rate, 1)
+                "api_success_rate": round(success_rate, 1),
+                "error_breakdown": error_breakdown  # ⭐ NEW
             },
             "unit_economics": {
                 "total_cost_usd": round(cost_stats["total_cost"], 2),
                 "avg_cost_per_paper_usd": round(cost_stats["avg_cost_per_paper"], 4),
                 "total_tokens_input": cost_stats["total_tokens_input"],
                 "total_tokens_output": cost_stats["total_tokens_output"]
-            }
+            },
+            "geographic_distribution": geo_distribution  # ⭐ NEW
         }
     except Exception as e:
         logger.error(f"Error fetching metrics: {e}", exc_info=True)
