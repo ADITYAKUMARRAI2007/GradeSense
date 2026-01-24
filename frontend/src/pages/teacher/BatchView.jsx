@@ -18,6 +18,8 @@ const BatchView = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [activeTab, setActiveTab] = useState('exams');
+  const [showAtRiskOnly, setShowAtRiskOnly] = useState(false);
 
   useEffect(() => {
     fetchBatchData();
