@@ -21,7 +21,10 @@ import ReEvaluations from "./pages/teacher/ReEvaluations";
 import AddBatch from "./pages/teacher/AddBatch";
 import BatchSettings from "./pages/teacher/BatchSettings";
 import ManageStudentsInBatch from "./pages/teacher/ManageStudentsInBatch";
+import CreateStudentExam from "./pages/teacher/CreateStudentExam";
+import ExamSubmissionsView from "./pages/teacher/ExamSubmissionsView";
 import StudentDashboard from "./pages/student/Dashboard";
+import StudentExamsView from "./pages/student/StudentExamsView";
 import StudentResults from "./pages/student/Results";
 import StudentReEvaluation from "./pages/student/RequestReEvaluation";
 import Settings from "./pages/Settings";
@@ -211,6 +214,22 @@ function AppRouter() {
         }
       />
       <Route
+        path="/teacher/batch/:batchId/create-student-exam"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <CreateStudentExam {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teacher/exam/:examId/submissions"
+        element={
+          <ProtectedRoute allowedRoles={["teacher"]}>
+            {(props) => <ExamSubmissionsView {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/teacher/upload"
         element={
           <ProtectedRoute allowedRoles={["teacher"]}>
@@ -289,6 +308,14 @@ function AppRouter() {
         element={
           <ProtectedRoute allowedRoles={["student"]}>
             {(props) => <StudentDashboard {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/exams"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            {(props) => <StudentExamsView {...props} />}
           </ProtectedRoute>
         }
       />

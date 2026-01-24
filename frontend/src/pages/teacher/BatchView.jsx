@@ -84,6 +84,13 @@ const BatchView = () => {
           
           <div className="flex gap-3">
             <button
+              onClick={() => navigate(`/teacher/batch/${batchId}/create-student-exam`)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Create Exam for Students
+            </button>
+            <button
               onClick={() => navigate(`/teacher/batch/${batchId}/students/add`)}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
