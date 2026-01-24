@@ -250,6 +250,9 @@ const AdminUsers = () => {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Feedback Beacon */}
+      <FeedbackBeacon user={{}} />
     </div>
   );
 };
