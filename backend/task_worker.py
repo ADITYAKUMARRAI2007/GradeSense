@@ -77,8 +77,10 @@ async def process_task(task):
         )
         
         # Process based on task type
-        if task['type'] == 'grade_papers' or task['type'] == 'grade_paper':
+        if task['type'] == 'grade_papers':
             await process_grading_task(task_data)
+        elif task['type'] == 'grade_paper':
+            await process_single_paper_grading(task_data)
         else:
             logger.error(f"Unknown task type: {task['type']}")
             raise ValueError(f"Unknown task type: {task['type']}")
