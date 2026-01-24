@@ -131,6 +131,47 @@ const AdminDashboard = () => {
         {/* Admin Sections Grid */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Admin Tools</h2>
+          
+          {/* Info Card for Feature Flags & Quotas */}
+          <Card className="mb-6 bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    ✨ Feature Flags & Usage Quotas are LIVE!
+                  </h3>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Control user features and set usage limits directly from <strong>User Management</strong>. 
+                    Click on any user and use the tabs to:
+                  </p>
+                  <div className="grid md:grid-cols-3 gap-3 text-sm">
+                    <div className="flex items-center gap-2 bg-white/50 p-2 rounded">
+                      <Zap className="w-4 h-4 text-yellow-600" />
+                      <span><strong>Tab 1:</strong> Toggle 6 feature flags</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/50 p-2 rounded">
+                      <Database className="w-4 h-4 text-indigo-600" />
+                      <span><strong>Tab 2:</strong> Set usage quotas</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/50 p-2 rounded">
+                      <Shield className="w-4 h-4 text-red-600" />
+                      <span><strong>Tab 3:</strong> Manage account status</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate('/admin/users')}
+                    className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Go to User Management →
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {adminSections.map((section) => (
               <Card
