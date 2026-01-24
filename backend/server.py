@@ -1593,12 +1593,12 @@ async def create_student_upload_exam(
     # Store question paper in GridFS
     qp_bytes = await question_paper.read()
     qp_file_ref = f"qp_{exam_id}"
-    await fs.upload_from_stream(qp_file_ref, qp_bytes)
+    qp_gridfs_id = fs.put(qp_bytes, filename=qp_file_ref)
     
     # Store model answer in GridFS
     ma_bytes = await model_answer.read()
     ma_file_ref = f"ma_{exam_id}"
-    await fs.upload_from_stream(ma_file_ref, ma_bytes)
+    ma_gridfs_id = fs.put(ma_bytes, filename=ma_file_ref)
     
     # Create exam document
     exam_doc = {
