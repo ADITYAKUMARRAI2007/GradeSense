@@ -164,6 +164,94 @@ const AdminAnalytics = () => {
           </CardContent>
         </Card>
 
+        {/* NEW: High Priority Metrics Section */}
+        <Card className="mb-8 border-l-4 border-l-green-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-green-500" />
+              High-Impact Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Retention Rate */}
+              <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-4xl font-bold text-green-700">{business_metrics.retention_rate}%</p>
+                <p className="text-sm text-green-600 mt-2">30-Day Retention</p>
+                <p className="text-xs text-gray-500 mt-1">Users who create 2nd exam</p>
+              </div>
+              
+              {/* Average Batch Size */}
+              <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-4xl font-bold text-blue-700">{engagement_metrics.avg_batch_size}</p>
+                <p className="text-sm text-blue-600 mt-2">Avg Batch Size</p>
+                <p className="text-xs text-gray-500 mt-1">Papers per exam</p>
+              </div>
+              
+              {/* End-to-End Grading Time */}
+              <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-4xl font-bold text-purple-700">
+                  {engagement_metrics.avg_grading_time_seconds ? 
+                    `${Math.round(engagement_metrics.avg_grading_time_seconds)}s` : 
+                    'N/A'}
+                </p>
+                <p className="text-sm text-purple-600 mt-2">Avg Grading Time</p>
+                <p className="text-xs text-gray-500 mt-1">Per paper (end-to-end)</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Geographic Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Geographic Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {geoData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={geoData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="country" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="users" fill="#10b981" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-center text-gray-500 py-8">No geographic data available yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Error Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Error Breakdown (Last 24h)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {errorData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={errorData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="type" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-2" />
+                  <p className="text-green-600 font-semibold">No Errors Detected!</p>
+                  <p className="text-sm text-gray-500">All systems running smoothly</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* User Distribution */}
           <Card>
