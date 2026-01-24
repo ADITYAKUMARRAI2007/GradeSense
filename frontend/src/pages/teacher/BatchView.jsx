@@ -177,7 +177,7 @@ const BatchView = () => {
 
       {/* Tabs: Exams & Students */}
       <div className="max-w-7xl mx-auto">
-        <Tabs defaultValue="exams" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="exams">Exams</TabsTrigger>
             <TabsTrigger value="students">Students</TabsTrigger>
