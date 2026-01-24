@@ -5451,16 +5451,30 @@ async def update_submission(
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can update submissions")
     
+    # Get original submission for comparison
+    original_submission = await db.submissions.find_one({"submission_id": submission_id}, {"_id": 0})
+    if not original_submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
     # Calculate new total
     question_scores = updates.get("question_scores", [])
     total_score = sum(qs.get("obtained_marks", 0) for qs in question_scores)
     
     exam = await db.exams.find_one(
-        {"exam_id": (await db.submissions.find_one({"submission_id": submission_id}))["exam_id"]},
-        {"_id": 0, "total_marks": 1}
+        {"exam_id": original_submission["exam_id"]},
+        {"_id": 0, "total_marks": 1, "teacher_id": 1}
     )
     total_marks = exam.get("total_marks", 100) if exam else 100
     percentage = (total_score / total_marks) * 100 if total_marks > 0 else 0
+    
+    # Track edits in grading_analytics
+    asyncio.create_task(track_teacher_edits(
+        submission_id=submission_id,
+        exam_id=original_submission["exam_id"],
+        teacher_id=exam.get("teacher_id", user.user_id) if exam else user.user_id,
+        original_scores=original_submission.get("question_scores", []),
+        new_scores=question_scores
+    ))
     
     await db.submissions.update_one(
         {"submission_id": submission_id},
@@ -5473,6 +5487,52 @@ async def update_submission(
     )
     
     return {"message": "Submission updated", "total_score": total_score, "percentage": percentage}
+
+async def track_teacher_edits(
+    submission_id: str,
+    exam_id: str,
+    teacher_id: str,
+    original_scores: List[dict],
+    new_scores: List[dict]
+):
+    """Track when teachers edit AI-generated grades"""
+    try:
+        for new_qs in new_scores:
+            q_num = new_qs.get("question_number")
+            orig_qs = next((q for q in original_scores if q.get("question_number") == q_num), None)
+            
+            if orig_qs:
+                # Check if edited
+                grade_changed = orig_qs.get("obtained_marks") != new_qs.get("obtained_marks")
+                feedback_changed = orig_qs.get("ai_feedback") != new_qs.get("ai_feedback")
+                
+                if grade_changed or feedback_changed:
+                    grade_delta = new_qs.get("obtained_marks", 0) - orig_qs.get("obtained_marks", 0)
+                    edit_dist = calculate_edit_distance(
+                        orig_qs.get("ai_feedback", ""),
+                        new_qs.get("ai_feedback", "")
+                    )
+                    
+                    # Update or create analytics record
+                    await db.grading_analytics.update_one(
+                        {
+                            "submission_id": submission_id,
+                            "question_number": q_num
+                        },
+                        {
+                            "$set": {
+                                "final_grade": new_qs.get("obtained_marks", 0),
+                                "grade_delta": grade_delta,
+                                "final_feedback": new_qs.get("ai_feedback", ""),
+                                "edit_distance": edit_dist,
+                                "edited_by_teacher": True,
+                                "edited_at": datetime.now(timezone.utc).isoformat()
+                            }
+                        },
+                        upsert=True
+                    )
+    except Exception as e:
+        logger.error(f"Failed to track teacher edits: {e}")
 
 # ============== RE-EVALUATION ROUTES ==============
 
