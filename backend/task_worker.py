@@ -196,7 +196,6 @@ async def cleanup_stuck_jobs():
             },
             {"$set": {"status": "failed", "error": "Task timeout - exceeded 1 hour"}}
         )
-        )
         
         if task_result.modified_count > 0:
             logger.warning(f"⚠️  Cleaned up {task_result.modified_count} stuck tasks (>1 hour)")
