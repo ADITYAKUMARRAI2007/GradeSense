@@ -319,6 +319,14 @@ function AppRouter() {
         }
       />
       <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            {(props) => <AdminDashboard {...props} />}
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/feedback"
         element={
           <ProtectedRoute>
