@@ -1702,7 +1702,7 @@ async def submit_student_answer(
     # Store answer paper in GridFS
     file_bytes = await answer_paper.read()
     file_ref = f"ans_{exam_id}_{user.user_id}"
-    await fs.upload_from_stream(file_ref, file_bytes)
+    answer_gridfs_id = fs.put(file_bytes, filename=file_ref)
     
     # Create submission record
     submission_id = f"sub_{uuid.uuid4().hex[:12]}"
