@@ -4517,6 +4517,364 @@ startxref
                 self.log_test("Database Submissions Verification", False, 
                     "No submissions found in database")
 
+    def test_grading_system_comprehensive(self):
+        """COMPREHENSIVE GRADING SYSTEM E2E TEST - ALL WORKFLOWS"""
+        print("\n" + "="*80)
+        print("🎯 COMPREHENSIVE GRADING SYSTEM E2E TEST - ALL WORKFLOWS")
+        print("="*80)
+        
+        # Test both workflows as specified in the review request
+        self.test_teacher_upload_workflow()
+        self.test_student_upload_workflow()
+        self.test_error_scenarios()
+        self.check_database_collections()
+        self.check_backend_logs()
+
+    def test_teacher_upload_workflow(self):
+        """PART 1: Teacher-Upload Workflow (Bulk Grading)"""
+        print("\n📚 PART 1: Teacher-Upload Workflow (Bulk Grading)")
+        print("-" * 60)
+        
+        # 1. Setup: Create test exam with batch, subject
+        if not hasattr(self, 'test_batch_id') or not hasattr(self, 'test_subject_id'):
+            print("⚠️  Skipping teacher upload workflow - missing batch or subject")
+            return None
+        
+        # Create exam with 2-3 questions with marks
+        exam_data = {
+            "batch_id": self.test_batch_id,
+            "subject_id": self.test_subject_id,
+            "exam_type": "Unit Test",
+            "exam_name": f"Teacher Upload Test {datetime.now().strftime('%H%M%S')}",
+            "total_marks": 100.0,
+            "exam_date": "2024-01-15",
+            "grading_mode": "balanced",
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 40.0,
+                    "rubric": "Solve the algebraic equation: 2x + 5 = 15"
+                },
+                {
+                    "question_number": 2,
+                    "max_marks": 35.0,
+                    "rubric": "Find the derivative of f(x) = x² + 3x - 2"
+                },
+                {
+                    "question_number": 3,
+                    "max_marks": 25.0,
+                    "rubric": "Explain the concept of limits in calculus"
+                }
+            ]
+        }
+        
+        exam_result = self.run_api_test(
+            "Create Exam for Teacher Upload Workflow",
+            "POST",
+            "exams",
+            200,
+            data=exam_data
+        )
+        
+        if not exam_result:
+            print("❌ Failed to create exam for teacher upload workflow")
+            return None
+        
+        self.teacher_upload_exam_id = exam_result.get('exam_id')
+        print(f"✅ Created exam: {self.teacher_upload_exam_id}")
+        
+        # Note: We cannot test actual PDF upload without real files
+        # But we can verify the exam structure and check for any existing grading jobs
+        
+        # Check grading jobs collection
+        self.check_grading_jobs_collection()
+        
+        return exam_result
+
+    def test_student_upload_workflow(self):
+        """PART 2: Student-Upload Workflow"""
+        print("\n👨‍🎓 PART 2: Student-Upload Workflow")
+        print("-" * 60)
+        
+        if not hasattr(self, 'test_batch_id'):
+            print("⚠️  Skipping student upload workflow - missing batch")
+            return None
+        
+        # 1. Setup: Create exam with "student_upload" mode
+        exam_data = {
+            "batch_id": self.test_batch_id,
+            "exam_name": f"Student Upload Test {datetime.now().strftime('%H%M%S')}",
+            "total_marks": 25.0,
+            "grading_mode": "balanced",
+            "show_question_paper": True,
+            "student_ids": [self.valid_student_id] if hasattr(self, 'valid_student_id') else [],
+            "questions": [
+                {
+                    "question_number": 1,
+                    "max_marks": 10.0,
+                    "rubric": "Basic algebra question"
+                },
+                {
+                    "question_number": 2,
+                    "max_marks": 15.0,
+                    "rubric": "Calculus differentiation"
+                }
+            ]
+        }
+        
+        # Test student-mode exam creation endpoint
+        student_exam_result = self.run_api_test(
+            "Create Student-Upload Mode Exam",
+            "POST",
+            "exams/student-mode",
+            200,
+            data={"exam_data": json.dumps(exam_data)}
+        )
+        
+        if student_exam_result:
+            self.student_upload_exam_id = student_exam_result.get('exam_id')
+            print(f"✅ Created student-upload exam: {self.student_upload_exam_id}")
+            
+            # Test submission status endpoint
+            status_result = self.run_api_test(
+                "Get Student Submission Status",
+                "GET",
+                f"exams/{self.student_upload_exam_id}/submissions-status",
+                200
+            )
+            
+            if status_result:
+                print(f"✅ Submission status: {status_result.get('submitted_count', 0)}/{status_result.get('total_students', 0)}")
+            
+            # Test student exams endpoint
+            if hasattr(self, 'valid_student_id'):
+                # Create student session for testing
+                student_session = self.create_student_session_for_testing()
+                if student_session:
+                    original_token = self.session_token
+                    self.session_token = student_session
+                    
+                    # Test get student exams
+                    student_exams_result = self.run_api_test(
+                        "Get Student Exams (My Exams)",
+                        "GET",
+                        "students/my-exams",
+                        200
+                    )
+                    
+                    # Restore teacher session
+                    self.session_token = original_token
+                    
+                    if student_exams_result:
+                        print(f"✅ Student can see {len(student_exams_result)} available exams")
+        
+        return student_exam_result
+
+    def test_error_scenarios(self):
+        """PART 3: Error Scenarios"""
+        print("\n⚠️  PART 3: Error Scenarios")
+        print("-" * 60)
+        
+        # Test with non-existent exam
+        error_result = self.run_api_test(
+            "Test Non-existent Exam Submission Status",
+            "GET",
+            "exams/nonexistent_exam/submissions-status",
+            404
+        )
+        
+        if error_result is None:  # 404 expected
+            print("✅ Correctly handles non-existent exam")
+        
+        # Test unauthorized access
+        if hasattr(self, 'student_upload_exam_id'):
+            # Create student session and try to access teacher-only endpoint
+            student_session = self.create_student_session_for_testing()
+            if student_session:
+                original_token = self.session_token
+                self.session_token = student_session
+                
+                unauthorized_result = self.run_api_test(
+                    "Test Unauthorized Access to Submission Status",
+                    "GET",
+                    f"exams/{self.student_upload_exam_id}/submissions-status",
+                    403
+                )
+                
+                # Restore teacher session
+                self.session_token = original_token
+                
+                if unauthorized_result is None:  # 403 expected
+                    print("✅ Correctly blocks unauthorized access")
+
+    def check_database_collections(self):
+        """Check Database Collections"""
+        print("\n🗄️  Checking Database Collections")
+        print("-" * 60)
+        
+        # Check collections using MongoDB commands
+        collections_to_check = [
+            "grading_jobs",
+            "tasks", 
+            "papers",
+            "student_submissions",
+            "exams"
+        ]
+        
+        for collection in collections_to_check:
+            try:
+                mongo_command = f"""
+use('test_database');
+var count = db.{collection}.countDocuments({{}});
+print('{collection}: ' + count + ' documents');
+"""
+                
+                with open(f'/tmp/check_{collection}.js', 'w') as f:
+                    f.write(mongo_command)
+                
+                result = subprocess.run([
+                    'mongosh', '--quiet', '--file', f'/tmp/check_{collection}.js'
+                ], capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0:
+                    print(f"✅ {result.stdout.strip()}")
+                else:
+                    print(f"❌ Error checking {collection}: {result.stderr}")
+                    
+            except Exception as e:
+                print(f"❌ Error checking {collection}: {str(e)}")
+
+    def check_grading_jobs_collection(self):
+        """Check grading jobs collection specifically"""
+        print("\n📋 Checking Grading Jobs Collection")
+        print("-" * 40)
+        
+        try:
+            mongo_command = """
+use('test_database');
+var jobs = db.grading_jobs.find({}).toArray();
+print('Total grading jobs: ' + jobs.length);
+jobs.forEach(function(job) {
+    print('Job ' + job.job_id + ': status=' + job.status + ', papers=' + (job.total_papers || 0));
+});
+"""
+            
+            with open('/tmp/check_grading_jobs.js', 'w') as f:
+                f.write(mongo_command)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/check_grading_jobs.js'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                print(f"✅ Grading Jobs Status:\n{result.stdout}")
+            else:
+                print(f"❌ Error checking grading jobs: {result.stderr}")
+                
+        except Exception as e:
+            print(f"❌ Error checking grading jobs: {str(e)}")
+
+    def check_backend_logs(self):
+        """Check Backend Logs for Errors"""
+        print("\n📝 Checking Backend Logs for Critical Errors")
+        print("-" * 60)
+        
+        # Check for the specific errors mentioned in the review request
+        error_patterns = [
+            "object list can't be used in 'await' expression",
+            "tuple object has no attribute",
+            "got an unexpected keyword argument",
+            "TypeError:",
+            "AttributeError:"
+        ]
+        
+        try:
+            # Check backend logs
+            result = subprocess.run([
+                'tail', '-n', '200', '/var/log/supervisor/backend.err.log'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                log_content = result.stdout
+                found_errors = []
+                
+                for pattern in error_patterns:
+                    if pattern in log_content:
+                        found_errors.append(pattern)
+                
+                if found_errors:
+                    print(f"❌ Found critical errors in backend logs:")
+                    for error in found_errors:
+                        print(f"   - {error}")
+                else:
+                    print("✅ No critical errors found in recent backend logs")
+            
+            # Check task worker logs
+            task_result = subprocess.run([
+                'tail', '-n', '200', '/var/log/supervisor/task_worker.err.log'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if task_result.returncode == 0:
+                task_log_content = task_result.stdout
+                task_found_errors = []
+                
+                for pattern in error_patterns:
+                    if pattern in task_log_content:
+                        task_found_errors.append(pattern)
+                
+                if task_found_errors:
+                    print(f"❌ Found critical errors in task worker logs:")
+                    for error in task_found_errors:
+                        print(f"   - {error}")
+                else:
+                    print("✅ No critical errors found in recent task worker logs")
+                    
+        except Exception as e:
+            print(f"❌ Error checking logs: {str(e)}")
+
+    def create_student_session_for_testing(self):
+        """Create a student session for testing student endpoints"""
+        if not hasattr(self, 'valid_student_id'):
+            return None
+            
+        try:
+            timestamp = int(datetime.now().timestamp())
+            student_session_token = f"student_test_session_{timestamp}"
+            
+            mongo_commands = f"""
+use('test_database');
+var studentId = '{self.valid_student_id}';
+var sessionToken = '{student_session_token}';
+var expiresAt = new Date(Date.now() + 7*24*60*60*1000);
+
+// Insert student session
+db.user_sessions.insertOne({{
+  user_id: studentId,
+  session_token: sessionToken,
+  expires_at: expiresAt.toISOString(),
+  created_at: new Date().toISOString()
+}});
+
+print('Student session created: ' + sessionToken);
+"""
+            
+            with open('/tmp/create_student_session.js', 'w') as f:
+                f.write(mongo_commands)
+            
+            result = subprocess.run([
+                'mongosh', '--quiet', '--file', '/tmp/create_student_session.js'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                return student_session_token
+            else:
+                print(f"❌ Failed to create student session: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error creating student session: {str(e)}")
+            return None
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting GradeSense API Testing")
