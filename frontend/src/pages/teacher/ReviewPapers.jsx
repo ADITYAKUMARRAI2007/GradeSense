@@ -452,7 +452,7 @@ export default function ReviewPapers({ user }) {
           <div className="min-w-0 flex-1">
             <h3 className="text-lg md:text-xl font-semibold truncate">{selectedSubmission.student_name}</h3>
             <p className="text-xs md:text-sm text-muted-foreground">
-              Score: {selectedSubmission.total_score?.toFixed(1)} / {exams.find(e => e.exam_id === selectedSubmission.exam_id)?.total_marks || selectedSubmission.question_scores?.reduce((sum, q) => sum + q.max_marks, 0)} ({selectedSubmission.percentage?.toFixed(1)}%)
+              Score: {(selectedSubmission.obtained_marks || selectedSubmission.total_score || 0).toFixed(1)} / {selectedSubmission.total_marks || exams.find(e => e.exam_id === selectedSubmission.exam_id)?.total_marks || "?"} ({(selectedSubmission.percentage || 0).toFixed(1)}%)
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
