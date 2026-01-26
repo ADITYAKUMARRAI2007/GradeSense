@@ -88,6 +88,9 @@ export default function UploadGrade({ user }) {
   const [formatModalOpen, setFormatModalOpen] = useState(false);
   const [pendingAddSubQuestion, setPendingAddSubQuestion] = useState(null);
   
+  // Reset confirmation dialog
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  
   // New state for optional question entry
   const [questionsSkipped, setQuestionsSkipped] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
