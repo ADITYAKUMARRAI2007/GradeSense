@@ -163,7 +163,9 @@ export default function ReviewPapers({ user }) {
       return {
         ...prev,
         question_scores: newScores,
-        total_score: totalScore,
+        obtained_marks: totalScore,
+        total_score: totalScore,  // Keep for backward compatibility
+        total_marks: totalMarks,
         percentage: Math.round((totalScore / totalMarks) * 100 * 100) / 100
       };
     });
