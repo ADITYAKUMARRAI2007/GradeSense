@@ -226,17 +226,6 @@ export default function StudentResults({ user }) {
                         <div className="sticky top-0 bg-muted/30 py-2 z-10 space-y-2">
                           <div className="flex items-center justify-between">
                             <h3 className="font-semibold">Your Answer Sheet</h3>
-                            <div className="flex items-center gap-2">
-                              <Checkbox 
-                                id="show-annotations-student"
-                                checked={showAnnotations}
-                                onCheckedChange={setShowAnnotations}
-                              />
-                              <Label htmlFor="show-annotations-student" className="text-xs cursor-pointer flex items-center gap-1">
-                                {showAnnotations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                Show Mistakes
-                              </Label>
-                            </div>
                           </div>
                         </div>
                         
