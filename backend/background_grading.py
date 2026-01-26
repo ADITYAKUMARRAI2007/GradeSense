@@ -155,13 +155,20 @@ async def process_grading_job_in_background(
                         }
                     
                     # Get or create student
-                    student = await get_or_create_student(
+                    result = await get_or_create_student(
                         student_id=student_id_from_paper,
-                        name=student_name,
-                        email=student_email,
-                        batch_id=exam["batch_id"]
+                        student_name=student_name,
+                        batch_id=exam["batch_id"],
+                        teacher_id=exam["teacher_id"]
                     )
-                    student_id = student["student_id"]
+                    student_id, error = result
+                    
+                    if error:
+                        logger.error(f"[Job {job_id}] Error creating student: {error}")
+                        return {
+                            "error": f"Failed to create student: {error}",
+                            "filename": filename
+                        }
                     
                     logger.info(f"[Job {job_id}] Grading with AI...")
                     
