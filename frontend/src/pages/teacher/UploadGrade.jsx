@@ -656,6 +656,15 @@ export default function UploadGrade({ user }) {
     }
   }, []);
 
+  const removeModelAnswerFile = (e) => {
+    e.stopPropagation();
+    setModelAnswerFile(null);
+    // Only reset paperUploaded if question paper is also not uploaded
+    if (!questionPaperFile) {
+      setPaperUploaded(false);
+    }
+  };
+
   const { getRootProps: getModelRootProps, getInputProps: getModelInputProps, isDragActive: isModelDragActive } = useDropzone({
     onDrop: onModelAnswerDrop,
     accept: { 'application/pdf': ['.pdf'] },
@@ -669,6 +678,15 @@ export default function UploadGrade({ user }) {
       setPaperUploaded(true);
     }
   }, []);
+
+  const removeQuestionPaperFile = (e) => {
+    e.stopPropagation();
+    setQuestionPaperFile(null);
+    // Only reset paperUploaded if model answer is also not uploaded
+    if (!modelAnswerFile) {
+      setPaperUploaded(false);
+    }
+  };
 
   const { getRootProps: getQuestionRootProps, getInputProps: getQuestionInputProps, isDragActive: isQuestionDragActive } = useDropzone({
     onDrop: onQuestionPaperDrop,
