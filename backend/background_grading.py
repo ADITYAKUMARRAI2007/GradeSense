@@ -215,9 +215,12 @@ async def process_grading_job_in_background(
                     if "error" in result:
                         errors.append({"filename": result["filename"], "error": result["error"]})
                     else:
-                        # Don't store the full submission in the job - it's already in db.submissions
-                        # Just track the submission_id
-                        submissions.append({"submission_id": result["submission"]["submission_id"], "filename": filename})
+                        # Store the full submission but without MongoDB _id
+                        submission_data = result["submission"]
+                        # Remove _id if it exists
+                        if "_id" in submission_data:
+                            del submission_data["_id"]
+                        submissions.append(submission_data)
                     
                 except asyncio.TimeoutError:
                     logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 5 minutes")
@@ -288,14 +291,14 @@ async def process_grading_job_in_background(
 
 
 async def _update_job_progress(db, job_id: str, processed: int, successful: int, failed: int, submissions: List, errors: List):
-    """Helper to update job progress"""
+    """Helper to update job progress - submissions already have _id removed"""
     await db.grading_jobs.update_one(
         {"job_id": job_id},
         {"$set": {
             "processed_papers": processed,
             "successful": successful,
             "failed": failed,
-            "submissions": submissions,
+            "submissions": submissions,  # Already cleaned of _id
             "errors": errors,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
