@@ -10516,7 +10516,7 @@ async def track_frontend_event(event: FrontendEvent, user: User = Depends(get_cu
 async def get_all_users(user: User = Depends(get_admin_user)):
     """Get all users for admin management"""
     users = await db.users.find({}, {"_id": 0, "password": 0}).sort([("created_at", -1)]).to_list(1000)
-    return users
+    return serialize_doc(users)
 
 @api_router.get("/admin/metrics/overview")
 async def get_metrics_overview(user: User = Depends(get_admin_user)):
