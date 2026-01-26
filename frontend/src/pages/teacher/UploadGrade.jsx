@@ -963,6 +963,20 @@ export default function UploadGrade({ user }) {
   return (
     <Layout user={user}>
       <div className="max-w-4xl mx-auto px-0 lg:px-4" data-testid="upload-grade-page">
+        {/* Header with Reset Button */}
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl lg:text-3xl font-bold">Upload & Grade</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetDialogOpen(true)}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
+        </div>
+
         {renderStepIndicator()}
 
         {/* Step 1: Exam Configuration */}
