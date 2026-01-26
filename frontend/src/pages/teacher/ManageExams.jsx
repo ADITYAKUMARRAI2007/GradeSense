@@ -75,6 +75,14 @@ export default function ManageExams({ user }) {
   const [savingQuestions, setSavingQuestions] = useState(false);
   const [reExtracting, setReExtracting] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
+  
+  // Publish settings dialog
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [publishSettings, setPublishSettings] = useState({
+    show_model_answer: false,
+    show_answer_sheet: true,
+    show_question_paper: true
+  });
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'application/pdf': ['.pdf'] },
