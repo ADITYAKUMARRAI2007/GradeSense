@@ -129,6 +129,13 @@ async def process_single_paper_grading(task_data):
             get_exam_model_answer_images, get_exam_model_answer_text
         )
         
+        # Get exam first
+        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+        if not exam:
+            raise ValueError(f"Exam {exam_id} not found")
+        
+        total_marks = exam['total_marks']
+        
         # Get answer paper from GridFS
         ans_file = fs.get_last_version(filename=answer_file_ref)
         ans_bytes = ans_file.read()
@@ -141,71 +148,24 @@ async def process_single_paper_grading(task_data):
             ma_file = fs.get_last_version(filename=model_answer_ref)
             ma_bytes = ma_file.read()
             ma_images = pdf_to_images(ma_bytes)
-            # Extract text from model answer
-            ma_text = await get_exam_model_answer_text(exam_id)
+            # Try to extract text from model answer
+            try:
+                ma_text = await get_exam_model_answer_text(exam_id)
+            except:
+                ma_text = ""
         
-        # Grade each question
-        question_scores = []
-        total_obtained = 0
+        # Use the grade_with_ai function with correct parameters
+        question_scores = await grade_with_ai(
+            images=ans_images,
+            model_answer_images=ma_images,
+            questions=questions,
+            grading_mode=grading_mode,
+            total_marks=total_marks,
+            model_answer_text=ma_text
+        )
         
-        for q in questions:
-            question_number = q['question_number']
-            max_marks = q['max_marks']
-            sub_questions = q.get('sub_questions', [])
-            
-            if sub_questions:
-                # Grade sub-questions
-                sub_scores = []
-                for sub_q in sub_questions:
-                    result = await grade_with_ai(
-                        student_answer_images=ans_images,
-                        model_answer_images=ma_images,
-                        question_number=f"{question_number}{sub_q['sub_id']}",
-                        max_marks=sub_q['max_marks'],
-                        grading_mode=grading_mode,
-                        exam_id=exam_id,
-                        student_id=student_id
-                    )
-                    sub_scores.append({
-                        "sub_id": sub_q['sub_id'],
-                        "max_marks": sub_q['max_marks'],
-                        "obtained_marks": result['score'],
-                        "ai_feedback": result['feedback']
-                    })
-                    total_obtained += result['score']
-                
-                question_scores.append({
-                    "question_number": question_number,
-                    "max_marks": max_marks,
-                    "obtained_marks": sum(s['obtained_marks'] for s in sub_scores),
-                    "ai_feedback": f"Graded {len(sub_scores)} sub-questions",
-                    "sub_scores": sub_scores,
-                    "status": "graded"
-                })
-            else:
-                # Grade main question
-                result = await grade_with_ai(
-                    student_answer_images=ans_images,
-                    model_answer_images=ma_images,
-                    question_number=question_number,
-                    max_marks=max_marks,
-                    grading_mode=grading_mode,
-                    exam_id=exam_id,
-                    student_id=student_id
-                )
-                question_scores.append({
-                    "question_number": question_number,
-                    "max_marks": max_marks,
-                    "obtained_marks": result['score'],
-                    "ai_feedback": result['feedback'],
-                    "sub_scores": [],
-                    "status": "graded"
-                })
-                total_obtained += result['score']
-        
-        # Get exam to get total marks
-        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
-        total_marks = exam['total_marks']
+        # Calculate total obtained marks
+        total_obtained = sum(q.obtained_marks for q in question_scores)
         percentage = (total_obtained / total_marks) * 100 if total_marks > 0 else 0
         
         # Create paper document
@@ -215,7 +175,7 @@ async def process_single_paper_grading(task_data):
             "exam_id": exam_id,
             "student_id": student_id,
             "student_name": student_name,
-            "question_scores": question_scores,
+            "question_scores": [q.dict() for q in question_scores],
             "total_marks": total_marks,
             "obtained_marks": total_obtained,
             "percentage": round(percentage, 2),
