@@ -135,9 +135,10 @@ export default function ManageExams({ user }) {
 
   const publishResults = async (examId) => {
     try {
-      await axios.post(`${API}/exams/${examId}/publish-results`);
+      await axios.post(`${API}/exams/${examId}/publish-results`, publishSettings);
       toast.success("Results published! Students can now see their scores.");
       fetchExams();
+      setPublishDialogOpen(false);
     } catch (error) {
       console.error("Publish error:", error);
       toast.error("Failed to publish results");
