@@ -266,7 +266,7 @@ export default function TeacherDashboard({ user }) {
                         <div className="min-w-0">
                           <p className="font-medium text-sm lg:text-base truncate">{submission.student_name}</p>
                           <p className="text-xs lg:text-sm text-muted-foreground">
-                            Score: {submission.total_score}
+                            Score: {submission.obtained_marks || submission.total_score || 0}/{submission.total_marks || 100} ({submission.percentage || 0}%)
                           </p>
                         </div>
                       </div>
