@@ -2947,7 +2947,7 @@ async def get_exams(
         sub_count = await db.submissions.count_documents({"exam_id": exam["exam_id"]})
         exam["submission_count"] = sub_count
     
-    return exams
+    return serialize_doc(exams)
 
 @api_router.post("/exams")
 async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
