@@ -960,6 +960,31 @@ export default function UploadGrade({ user }) {
     }
   };
 
+  const handleChangeQuestionMethod = () => {
+    // If user has manually entered questions with data, show confirmation
+    const hasManualQuestions = showManualEntry && formData.questions.length > 0 && 
+      formData.questions.some(q => q.max_marks > 0 || q.rubric || q.sub_questions?.length > 0);
+    
+    if (hasManualQuestions) {
+      setChangeMethodDialogOpen(true);
+    } else {
+      // No data to lose, just reset
+      confirmChangeMethod();
+    }
+  };
+
+  const confirmChangeMethod = () => {
+    setShowManualEntry(false);
+    setQuestionsSkipped(false);
+    // Reset questions to default single question
+    setFormData(prev => ({
+      ...prev,
+      questions: [{ question_number: 1, max_marks: 10, rubric: "", sub_questions: [] }]
+    }));
+    setChangeMethodDialogOpen(false);
+    toast.info("Question configuration method changed. You can select a new option.");
+  };
+
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center gap-1 lg:gap-2 mb-6 lg:mb-8 overflow-x-auto pb-2">
       {[1, 2, 3, 4, 5, 6].map((s) => (
