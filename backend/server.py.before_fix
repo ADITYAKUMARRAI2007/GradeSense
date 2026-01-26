@@ -26,35 +26,9 @@ import pickle
 from contextlib import asynccontextmanager
 import time
 import traceback
-from bson import ObjectId
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-
-# Helper function for MongoDB serialization
-def serialize_doc(doc):
-    """Convert MongoDB document to JSON-safe dict"""
-    if doc is None:
-        return None
-    if isinstance(doc, ObjectId):
-        return str(doc)
-    if isinstance(doc, list):
-        return [serialize_doc(d) for d in doc]
-    if isinstance(doc, dict):
-        result = {}
-        for key, value in doc.items():
-            if key == "_id":
-                continue  # Skip _id entirely
-            elif isinstance(value, ObjectId):
-                result[key] = str(value)
-            elif isinstance(value, dict):
-                result[key] = serialize_doc(value)
-            elif isinstance(value, list):
-                result[key] = serialize_doc(value)
-            else:
-                result[key] = value
-        return result
-    return doc
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -1601,7 +1575,7 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
 
 @api_router.post("/exams/student-mode")
 async def create_student_upload_exam(
-    exam_data: StudentExamCreate,
+    exam_data: str = Form(...),
     question_paper: UploadFile = File(...),
     model_answer: UploadFile = File(...),
     user: User = Depends(get_current_user)
@@ -1610,41 +1584,45 @@ async def create_student_upload_exam(
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create exams")
     
+    # Parse the JSON exam data from form
+    import json
+    exam_data_dict = json.loads(exam_data)
+    
     exam_id = f"exam_{uuid.uuid4().hex[:12]}"
     
     # Store question paper in GridFS
     qp_bytes = await question_paper.read()
     qp_file_ref = f"qp_{exam_id}"
-    await fs.upload_from_stream(qp_file_ref, qp_bytes)
+    qp_gridfs_id = fs.put(qp_bytes, filename=qp_file_ref)
     
     # Store model answer in GridFS
     ma_bytes = await model_answer.read()
     ma_file_ref = f"ma_{exam_id}"
-    await fs.upload_from_stream(ma_file_ref, ma_bytes)
+    ma_gridfs_id = fs.put(ma_bytes, filename=ma_file_ref)
     
     # Create exam document
     exam_doc = {
         "exam_id": exam_id,
-        "batch_id": exam_data.batch_id,
-        "exam_name": exam_data.exam_name,
-        "total_marks": exam_data.total_marks,
-        "grading_mode": exam_data.grading_mode,
+        "batch_id": exam_data_dict["batch_id"],
+        "exam_name": exam_data_dict["exam_name"],
+        "total_marks": exam_data_dict["total_marks"],
+        "grading_mode": exam_data_dict["grading_mode"],
         "exam_mode": "student_upload",  # Mark as student-upload mode
-        "show_question_paper": exam_data.show_question_paper,
+        "show_question_paper": exam_data_dict.get("show_question_paper", False),
         "question_paper_ref": qp_file_ref,
         "model_answer_ref": ma_file_ref,
-        "questions": [q.dict() for q in exam_data.questions],
+        "questions": exam_data_dict.get("questions", []),
         "teacher_id": user.user_id,
-        "selected_students": exam_data.student_ids,
+        "selected_students": exam_data_dict["student_ids"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "awaiting_submissions",
-        "total_students": len(exam_data.student_ids),
+        "total_students": len(exam_data_dict["student_ids"]),
         "submitted_count": 0
     }
     
     await db.exams.insert_one(exam_doc)
     
-    logger.info(f"Created student-upload exam {exam_id} with {len(exam_data.student_ids)} students")
+    logger.info(f"Created student-upload exam {exam_id} with {len(exam_data_dict['student_ids'])} students")
     
     return {"exam_id": exam_id, "message": "Exam created. Students can now submit their answers."}
 
@@ -1657,6 +1635,10 @@ async def get_submission_status(exam_id: str, user: User = Depends(get_current_u
     
     if exam.get("exam_mode") != "student_upload":
         raise HTTPException(status_code=400, detail="This is not a student-upload exam")
+    
+    # Only the teacher who created the exam can access submission status
+    if user.role != "teacher" or exam.get("teacher_id") != user.user_id:
+        raise HTTPException(status_code=403, detail="Only the exam creator can access submission status")
     
     # Get all submissions
     submissions = await db.student_submissions.find(
@@ -1724,7 +1706,7 @@ async def submit_student_answer(
     # Store answer paper in GridFS
     file_bytes = await answer_paper.read()
     file_ref = f"ans_{exam_id}_{user.user_id}"
-    await fs.upload_from_stream(file_ref, file_bytes)
+    answer_gridfs_id = fs.put(file_bytes, filename=file_ref)
     
     # Create submission record
     submission_id = f"sub_{uuid.uuid4().hex[:12]}"
@@ -1811,11 +1793,11 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     
     # Get model answer from GridFS
     ma_file_ref = exam.get("model_answer_ref")
-    ma_stream = await fs.open_download_stream_by_name(ma_file_ref)
-    ma_bytes = await ma_stream.read()
+    ma_file = fs.get_last_version(filename=ma_file_ref)
+    ma_bytes = ma_file.read()
     
     # Convert model answer to images
-    ma_images = pdf_to_base64_images(ma_bytes)
+    ma_images = pdf_to_images(ma_bytes)
     
     # Store model answer in GridFS with images
     await db.exam_files.update_one(
@@ -1835,11 +1817,11 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
         task_id = f"task_{uuid.uuid4().hex[:12]}"
         
         # Get answer paper from GridFS
-        ans_stream = await fs.open_download_stream_by_name(submission["answer_file_ref"])
-        ans_bytes = await ans_stream.read()
+        ans_file = fs.get_last_version(filename=submission["answer_file_ref"])
+        ans_bytes = ans_file.read()
         
         # Convert to images
-        ans_images = pdf_to_base64_images(ans_bytes)
+        ans_images = pdf_to_images(ans_bytes)
         
         # Store answer paper with GridFS reference
         await db.exam_files.update_one(
@@ -1901,6 +1883,150 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
         "message": f"Grading started for {len(submissions)} submissions",
         "total_papers": len(submissions)
     }
+
+@api_router.get("/students/my-exams")
+async def get_student_exams(user: User = Depends(get_current_user)):
+    """Get all exams for current student (student-upload mode only)"""
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can access this")
+    
+    # Find all exams where this student is in selected_students list
+    exams = await db.exams.find(
+        {
+            "exam_mode": "student_upload",
+            "selected_students": user.user_id
+        },
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Check submission status for each exam
+    result = []
+    for exam in exams:
+        # Get batch name
+        batch = await db.batches.find_one({"batch_id": exam["batch_id"]}, {"_id": 0})
+        
+        # Check if student has submitted
+        submission = await db.student_submissions.find_one({
+            "exam_id": exam["exam_id"],
+            "student_id": user.user_id
+        }, {"_id": 0})
+        
+        # Check if graded
+        graded_paper = await db.papers.find_one({
+            "exam_id": exam["exam_id"],
+            "student_id": user.user_id
+        }, {"_id": 0})
+        
+        result.append({
+            "exam_id": exam["exam_id"],
+            "exam_name": exam["exam_name"],
+            "batch_id": exam["batch_id"],
+            "batch_name": batch["name"] if batch else "Unknown",
+            "total_marks": exam["total_marks"],
+            "grading_mode": exam["grading_mode"],
+            "show_question_paper": exam.get("show_question_paper", False),
+            "status": exam.get("status", "awaiting_submissions"),
+            "submitted": submission is not None,
+            "submitted_at": submission["submitted_at"] if submission else None,
+            "graded": graded_paper is not None,
+            "obtained_marks": graded_paper.get("obtained_marks") if graded_paper else None,
+            "percentage": graded_paper.get("percentage") if graded_paper else None
+        })
+    
+    return result
+
+@api_router.post("/extract-questions-temp")
+async def extract_questions_temporary(
+    model_answer: UploadFile = File(...),
+    user: User = Depends(get_current_user)
+):
+    """Temporary endpoint to extract questions from model answer during exam creation"""
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can extract questions")
+    
+    try:
+        # Read the model answer PDF
+        ma_bytes = await model_answer.read()
+        
+        # Convert to images
+        ma_images = pdf_to_images(ma_bytes)
+        
+        if not ma_images:
+            raise HTTPException(status_code=400, detail="Could not process model answer PDF")
+        
+        # Extract questions using AI
+        # We'll try to extract up to 20 questions (reasonable default)
+        extracted_questions = await extract_questions_from_model_answer(ma_images, num_questions=20)
+        
+        if not extracted_questions:
+            return {"questions": [], "message": "No questions found"}
+        
+        # Convert to simple format for frontend
+        questions = []
+        for i, q in enumerate(extracted_questions, 1):
+            if isinstance(q, dict):
+                questions.append({
+                    "question_number": q.get("question_number", i),
+                    "max_marks": q.get("max_marks", 10)
+                })
+            else:
+                # Fallback for simple format
+                questions.append({
+                    "question_number": i,
+                    "max_marks": 10
+                })
+        
+        return {"questions": questions, "message": f"Extracted {len(questions)} questions"}
+        
+    except Exception as e:
+        logger.error(f"Error extracting questions: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to extract questions: {str(e)}")
+
+@api_router.get("/exams/{exam_id}/question-paper")
+async def download_question_paper(exam_id: str, user: User = Depends(get_current_user)):
+    """Download question paper for an exam (if allowed)"""
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Check if user is allowed to download
+    if user.role == "student":
+        # Check if student is in the exam
+        if user.user_id not in exam.get("selected_students", []):
+            raise HTTPException(status_code=403, detail="You are not enrolled in this exam")
+        
+        # Check if question paper is visible to students
+        if not exam.get("show_question_paper", False):
+            raise HTTPException(status_code=403, detail="Question paper is not available for students")
+    elif user.role == "teacher":
+        # Teachers can always download their own exam's question paper
+        if exam.get("teacher_id") != user.user_id:
+            raise HTTPException(status_code=403, detail="Not your exam")
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    # Get question paper from GridFS
+    qp_file_ref = exam.get("question_paper_ref")
+    if not qp_file_ref:
+        raise HTTPException(status_code=404, detail="Question paper not found")
+    
+    try:
+        from fastapi.responses import StreamingResponse
+        import io
+        
+        qp_file = fs.get_last_version(filename=qp_file_ref)
+        qp_bytes = qp_file.read()
+        
+        return StreamingResponse(
+            io.BytesIO(qp_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={exam['exam_name']}_Question_Paper.pdf"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error downloading question paper: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download question paper")
 
 # ============== BATCH ROUTES ==============
 
@@ -2096,208 +2222,202 @@ async def get_students(batch_id: Optional[str] = None, user: User = Depends(get_
 @api_router.get("/students/{student_user_id}")
 async def get_student_detail(student_user_id: str, user: User = Depends(get_current_user)):
     """Get detailed student information with performance analytics"""
-    try:
-        student = await db.users.find_one(
-            {"user_id": student_user_id},
-            {"_id": 0}
-        )
-        if not student:
-            raise HTTPException(status_code=404, detail="Student not found")
-
-        # Get all submissions for this student
-        submissions = await db.submissions.find(
-            {"student_id": student_user_id},
-            {"_id": 0, "file_data": 0, "file_images": 0}
-        ).to_list(100)
+    student = await db.users.find_one(
+        {"user_id": student_user_id},
+        {"_id": 0}
+    )
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Get all submissions for this student
+    submissions = await db.submissions.find(
+        {"student_id": student_user_id},
+        {"_id": 0, "file_data": 0, "file_images": 0}
+    ).to_list(100)
+    
+    # Calculate overall stats
+    if submissions:
+        percentages = [s.get("percentage", 0) for s in submissions]
+        avg_percentage = sum(percentages) / len(percentages)
+        highest = max(percentages)
+        lowest = min(percentages)
         
-        # Calculate overall stats
-        if submissions:
-            percentages = [s.get("percentage", 0) for s in submissions]
-            avg_percentage = sum(percentages) / len(percentages)
-            highest = max(percentages)
-            lowest = min(percentages)
-
-            # Trend calculation (last 5 vs previous 5)
-            sorted_subs = sorted(submissions, key=lambda x: x.get("created_at", ""))
-            if len(sorted_subs) >= 2:
-                recent = sorted_subs[-min(5, len(sorted_subs)):]
-                recent_avg = sum(s.get("percentage", 0) for s in recent) / len(recent)
-                if len(sorted_subs) > 5:
-                    older = sorted_subs[-min(10, len(sorted_subs)):-5]
-                    older_avg = sum(s.get("percentage", 0) for s in older) / len(older) if older else recent_avg
-                    trend = recent_avg - older_avg
-                else:
-                    trend = 0
+        # Trend calculation (last 5 vs previous 5)
+        sorted_subs = sorted(submissions, key=lambda x: x.get("created_at", ""))
+        if len(sorted_subs) >= 2:
+            recent = sorted_subs[-min(5, len(sorted_subs)):]
+            recent_avg = sum(s.get("percentage", 0) for s in recent) / len(recent)
+            if len(sorted_subs) > 5:
+                older = sorted_subs[-min(10, len(sorted_subs)):-5]
+                older_avg = sum(s.get("percentage", 0) for s in older) / len(older) if older else recent_avg
+                trend = recent_avg - older_avg
             else:
                 trend = 0
         else:
-            avg_percentage = 0
-            highest = 0
-            lowest = 0
             trend = 0
+    else:
+        avg_percentage = 0
+        highest = 0
+        lowest = 0
+        trend = 0
+    
+    # Subject-wise performance
+    subject_performance = {}
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "subject_id": 1})
+        if exam:
+            subj = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+            subj_name = subj.get("name", "Unknown") if subj else "Unknown"
+            if subj_name not in subject_performance:
+                subject_performance[subj_name] = {"scores": [], "total_exams": 0}
+            subject_performance[subj_name]["scores"].append(sub.get("percentage", 0))
+            subject_performance[subj_name]["total_exams"] += 1
+    
+    for subj_name, data in subject_performance.items():
+        data["average"] = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
+        data["highest"] = max(data["scores"]) if data["scores"] else 0
+        data["lowest"] = min(data["scores"]) if data["scores"] else 0
+    
+    # ====== TOPIC-BASED PERFORMANCE ANALYSIS ======
+    # Collect topic-wise performance across all exams with timestamps
+    topic_performance = {}  # {topic: [{"score": pct, "exam_date": date, "exam_name": name}]}
+    
+    for sub in submissions:
+        exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0})
+        if not exam:
+            continue
         
-        # Subject-wise performance
-        subject_performance = {}
-        for sub in submissions:
-            exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0, "subject_id": 1})
-            if exam:
-                subj = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
-                subj_name = subj.get("name", "Unknown") if subj else "Unknown"
-                if subj_name not in subject_performance:
-                    subject_performance[subj_name] = {"scores": [], "total_exams": 0}
-                subject_performance[subj_name]["scores"].append(sub.get("percentage", 0))
-                subject_performance[subj_name]["total_exams"] += 1
+        exam_name = exam.get("exam_name", "Unknown Exam")
+        exam_date = sub.get("created_at", "")
+        exam_questions = exam.get("questions", [])
         
-        for subj_name, data in subject_performance.items():
-            data["average"] = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
-            data["highest"] = max(data["scores"]) if data["scores"] else 0
-            data["lowest"] = min(data["scores"]) if data["scores"] else 0
+        # Create a map of question_number -> topics
+        question_topics = {}
+        for q in exam_questions:
+            q_num = q.get("question_number")
+            topics = q.get("topic_tags", [])
+            if not topics:
+                # If no topic tags, use subject name as fallback
+                subj = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
+                topics = [subj.get("name", "General")] if subj else ["General"]
+            question_topics[q_num] = topics
         
-        # ====== TOPIC-BASED PERFORMANCE ANALYSIS ======
-        # Collect topic-wise performance across all exams with timestamps
-        topic_performance = {}  # {topic: [{"score": pct, "exam_date": date, "exam_name": name}]}
-
-        for sub in submissions:
-            exam = await db.exams.find_one({"exam_id": sub["exam_id"]}, {"_id": 0})
-            if not exam:
-                continue
+        # Analyze each question score
+        for qs in sub.get("question_scores", []):
+            q_num = qs.get("question_number")
+            pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
             
-            exam_name = exam.get("exam_name", "Unknown Exam")
-            exam_date = sub.get("created_at", "")
-            exam_questions = exam.get("questions", [])
+            # Get topics for this question
+            topics = question_topics.get(q_num, ["General"])
             
-            # Create a map of question_number -> topics
-            question_topics = {}
-            for q in exam_questions:
-                q_num = q.get("question_number")
-                topics = q.get("topic_tags", [])
-                if not topics:
-                    # If no topic tags, use subject name as fallback
-                    subj = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
-                    topics = [subj.get("name", "General")] if subj else ["General"]
-                question_topics[q_num] = topics
-
-            # Analyze each question score
-            for qs in sub.get("question_scores", []):
-                q_num = qs.get("question_number")
-                pct = (qs["obtained_marks"] / qs["max_marks"]) * 100 if qs.get("max_marks", 0) > 0 else 0
+            for topic in topics:
+                if topic not in topic_performance:
+                    topic_performance[topic] = []
                 
-                # Get topics for this question
-                topics = question_topics.get(q_num, ["General"])
-
-                for topic in topics:
-                    if topic not in topic_performance:
-                        topic_performance[topic] = []
-
-                    topic_performance[topic].append({
-                        "score": pct,
-                        "exam_date": exam_date,
-                        "exam_name": exam_name,
-                        "question_number": q_num
-                    })
+                topic_performance[topic].append({
+                    "score": pct,
+                    "exam_date": exam_date,
+                    "exam_name": exam_name,
+                    "question_number": q_num
+                })
+    
+    # Analyze topics: identify weak areas, strengths, and improvement trends
+    weak_topics = []
+    strong_topics = []
+    
+    for topic, performances in topic_performance.items():
+        if len(performances) == 0:
+            continue
         
-        # Analyze topics: identify weak areas, strengths, and improvement trends
-        weak_topics = []
-        strong_topics = []
+        # Sort by exam date to calculate trend
+        sorted_perfs = sorted(performances, key=lambda x: x.get("exam_date", ""))
         
-        for topic, performances in topic_performance.items():
-            if len(performances) == 0:
-                continue
+        # Calculate overall average
+        avg_score = sum(p["score"] for p in sorted_perfs) / len(sorted_perfs)
+        
+        # Calculate trend (improvement/decline)
+        trend = 0
+        trend_text = "stable"
+        if len(sorted_perfs) >= 2:
+            # Compare first half vs second half
+            mid = len(sorted_perfs) // 2
+            first_half_avg = sum(p["score"] for p in sorted_perfs[:mid]) / mid if mid > 0 else 0
+            second_half_avg = sum(p["score"] for p in sorted_perfs[mid:]) / (len(sorted_perfs) - mid)
+            trend = second_half_avg - first_half_avg
             
-            # Sort by exam date to calculate trend
-            sorted_perfs = sorted(performances, key=lambda x: x.get("exam_date", ""))
-
-            # Calculate overall average
-            avg_score = sum(p["score"] for p in sorted_perfs) / len(sorted_perfs)
-
-            # Calculate trend (improvement/decline)
-            trend = 0
-            trend_text = "stable"
-            if len(sorted_perfs) >= 2:
-                # Compare first half vs second half
-                mid = len(sorted_perfs) // 2
-                first_half_avg = sum(p["score"] for p in sorted_perfs[:mid]) / mid if mid > 0 else 0
-                second_half_avg = sum(p["score"] for p in sorted_perfs[mid:]) / (len(sorted_perfs) - mid)
-                trend = second_half_avg - first_half_avg
-
-                if trend > 10:
-                    trend_text = "improving"
-                elif trend < -10:
-                    trend_text = "declining"
-                else:
-                    trend_text = "stable"
-
-            topic_data = {
-                "topic": topic,
-                "avg_score": round(avg_score, 1),
-                "total_attempts": len(sorted_perfs),
-                "trend": round(trend, 1),
-                "trend_text": trend_text,
-                "recent_score": round(sorted_perfs[-1]["score"], 1) if sorted_perfs else 0,
-                "first_score": round(sorted_perfs[0]["score"], 1) if sorted_perfs else 0
-            }
-
-            # Classify as weak or strong
-            if avg_score < 50:
-                weak_topics.append(topic_data)
-            elif avg_score >= 75:
-                strong_topics.append(topic_data)
+            if trend > 10:
+                trend_text = "improving"
+            elif trend < -10:
+                trend_text = "declining"
+            else:
+                trend_text = "stable"
         
-        # Sort weak topics by score (lowest first) and strong by score (highest first)
-        weak_topics = sorted(weak_topics, key=lambda x: x["avg_score"])[:5]
-        strong_topics = sorted(strong_topics, key=lambda x: -x["avg_score"])[:5]
+        topic_data = {
+            "topic": topic,
+            "avg_score": round(avg_score, 1),
+            "total_attempts": len(sorted_perfs),
+            "trend": round(trend, 1),
+            "trend_text": trend_text,
+            "recent_score": round(sorted_perfs[-1]["score"], 1) if sorted_perfs else 0,
+            "first_score": round(sorted_perfs[0]["score"], 1) if sorted_perfs else 0
+        }
         
-        # Generate smart recommendations based on topic analysis
-        recommendations = []
-
-        # Check for declining topics that need attention
-        declining_topics = [t for t in weak_topics if t["trend_text"] == "declining"]
-        if declining_topics:
-            recommendations.append(f"⚠️ {declining_topics[0]['topic']} needs urgent attention - performance is declining")
-
-        # Highlight improving weak topics
-        improving_weak = [t for t in weak_topics if t["trend_text"] == "improving"]
-        if improving_weak:
-            recommendations.append(f"📈 Great progress in {improving_weak[0]['topic']}! Keep practicing to master it")
-
-        # Stable weak topics need more focus
-        stable_weak = [t for t in weak_topics if t["trend_text"] == "stable" and t["total_attempts"] >= 2]
-        if stable_weak:
-            recommendations.append(f"💡 Focus more on {stable_weak[0]['topic']} - needs consistent practice")
-
-        # Celebrate consistent strengths
-        if strong_topics:
-            recommendations.append(f"⭐ Excellent in {strong_topics[0]['topic']}! Consider helping peers")
-
-        # Default recommendations if no specific insights
-        if not recommendations:
-            recommendations = [
-                "Complete more exams to get detailed topic insights",
-                "Focus on understanding concepts deeply",
-                "Practice regularly across all topics"
-            ]
-
-        return serialize_doc({
-            "student": student,
-            "stats": {
-                "total_exams": len(submissions),
-                "avg_percentage": round(avg_percentage, 1),
-                "highest_score": highest,
-                "lowest_score": lowest,
-                "trend": round(trend, 1)
-            },
-            "subject_performance": subject_performance,
-            "recent_submissions": submissions[-10:],
-            "weak_topics": weak_topics,
-            "strong_topics": strong_topics,
-            "topic_performance": topic_performance,  # Full topic data for detailed view
-            "recommendations": recommendations
-        })
-    except Exception as e:
-        logger.error(f"Error fetching student detail {student_user_id}: {e}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=str(e))
+        # Classify as weak or strong
+        if avg_score < 50:
+            weak_topics.append(topic_data)
+        elif avg_score >= 75:
+            strong_topics.append(topic_data)
+    
+    # Sort weak topics by score (lowest first) and strong by score (highest first)
+    weak_topics = sorted(weak_topics, key=lambda x: x["avg_score"])[:5]
+    strong_topics = sorted(strong_topics, key=lambda x: -x["avg_score"])[:5]
+    
+    # Generate smart recommendations based on topic analysis
+    recommendations = []
+    
+    # Check for declining topics that need attention
+    declining_topics = [t for t in weak_topics if t["trend_text"] == "declining"]
+    if declining_topics:
+        recommendations.append(f"⚠️ {declining_topics[0]['topic']} needs urgent attention - performance is declining")
+    
+    # Highlight improving weak topics
+    improving_weak = [t for t in weak_topics if t["trend_text"] == "improving"]
+    if improving_weak:
+        recommendations.append(f"📈 Great progress in {improving_weak[0]['topic']}! Keep practicing to master it")
+    
+    # Stable weak topics need more focus
+    stable_weak = [t for t in weak_topics if t["trend_text"] == "stable" and t["total_attempts"] >= 2]
+    if stable_weak:
+        recommendations.append(f"💡 Focus more on {stable_weak[0]['topic']} - needs consistent practice")
+    
+    # Celebrate consistent strengths
+    if strong_topics:
+        recommendations.append(f"⭐ Excellent in {strong_topics[0]['topic']}! Consider helping peers")
+    
+    # Default recommendations if no specific insights
+    if not recommendations:
+        recommendations = [
+            "Complete more exams to get detailed topic insights",
+            "Focus on understanding concepts deeply",
+            "Practice regularly across all topics"
+        ]
+    
+    return {
+        "student": student,
+        "stats": {
+            "total_exams": len(submissions),
+            "avg_percentage": round(avg_percentage, 1),
+            "highest_score": highest,
+            "lowest_score": lowest,
+            "trend": round(trend, 1)
+        },
+        "subject_performance": subject_performance,
+        "recent_submissions": submissions[-10:],
+        "weak_topics": weak_topics,
+        "strong_topics": strong_topics,
+        "topic_performance": topic_performance,  # Full topic data for detailed view
+        "recommendations": recommendations
+    }
 
 @api_router.post("/students")
 async def create_student(student: UserCreate, user: User = Depends(get_current_user)):
@@ -2579,27 +2699,21 @@ async def unapprove_submission(submission_id: str, user: User = Depends(get_curr
 @api_router.get("/exams/{exam_id}/submissions")
 async def get_exam_submissions(exam_id: str, user: User = Depends(get_current_user)):
     """Get all submissions for a specific exam"""
-    try:
-        if user.role != "teacher":
-            raise HTTPException(status_code=403, detail="Only teachers can view submissions")
-
-        # Verify exam belongs to teacher
-        exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
-        if not exam:
-            raise HTTPException(status_code=404, detail="Exam not found")
-
-        # Get all submissions for this exam
-        submissions = await db.submissions.find(
-            {"exam_id": exam_id},
-            {"_id": 0, "file_data": 0, "file_images": 0}  # Exclude large binary data
-        ).to_list(1000)
-
-        return serialize_doc(submissions)
-    except Exception as e:
-        logger.error(f"Error fetching submissions for exam {exam_id}: {e}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=str(e))
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view submissions")
+    
+    # Verify exam belongs to teacher
+    exam = await db.exams.find_one({"exam_id": exam_id, "teacher_id": user.user_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Get all submissions for this exam
+    submissions = await db.submissions.find(
+        {"exam_id": exam_id},
+        {"_id": 0, "file_data": 0, "file_images": 0}  # Exclude large binary data
+    ).to_list(1000)
+    
+    return submissions
 
 @api_router.delete("/submissions/{submission_id}")
 async def delete_submission(submission_id: str, user: User = Depends(get_current_user)):
@@ -2993,27 +3107,21 @@ async def create_exam(exam: ExamCreate, user: User = Depends(get_current_user)):
 @api_router.get("/exams/{exam_id}")
 async def get_exam(exam_id: str, user: User = Depends(get_current_user)):
     """Get exam details including files from separate collection"""
-    try:
-        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
-        if not exam:
-            raise HTTPException(status_code=404, detail="Exam not found")
-
-        # Fetch model answer images from separate collection
-        model_answer_imgs = await get_exam_model_answer_images(exam_id)
-        if model_answer_imgs:
-            exam["model_answer_images"] = model_answer_imgs
-
-        # Fetch question paper images from separate collection
-        question_paper_imgs = await get_exam_question_paper_images(exam_id)
-        if question_paper_imgs:
-            exam["question_paper_images"] = question_paper_imgs
-
-        return serialize_doc(exam)
-    except Exception as e:
-        logger.error(f"Error fetching exam {exam_id}: {e}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=str(e))
+    exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Fetch model answer images from separate collection
+    model_answer_imgs = await get_exam_model_answer_images(exam_id)
+    if model_answer_imgs:
+        exam["model_answer_images"] = model_answer_imgs
+    
+    # Fetch question paper images from separate collection  
+    question_paper_imgs = await get_exam_question_paper_images(exam_id)
+    if question_paper_imgs:
+        exam["question_paper_images"] = question_paper_imgs
+    
+    return exam
 
 @api_router.delete("/exams/{exam_id}")
 async def delete_exam(exam_id: str, user: User = Depends(get_current_user)):
@@ -5818,77 +5926,69 @@ async def get_submissions(
     return submissions
 
 @api_router.get("/submissions/{submission_id}")
-async def get_submission(
-    submission_id: str,
-    include_images: bool = True,
-    user: User = Depends(get_current_user)
-):
+async def get_submission(submission_id: str, user: User = Depends(get_current_user)):
     """Get submission details with PDF data and full question text"""
-    try:
-        projection = {"_id": 0}
-        if not include_images:
-            projection["file_images"] = 0
-            projection["file_data"] = 0  # Also exclude raw file data if not needed
-
-        submission = await db.submissions.find_one(
-            {"submission_id": submission_id},
-            projection
-        )
+    submission = await db.submissions.find_one(
+        {"submission_id": submission_id},
+        {"_id": 0}
+    )
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Enrich with full question text from exam
+    exam = await db.exams.find_one(
+        {"exam_id": submission["exam_id"]},
+        {"_id": 0, "questions": 1}
+    )
+    
+    if exam and exam.get("questions"):
+        # Create a map of question_number to question data
+        question_map = {q["question_number"]: q for q in exam["questions"]}
         
-        if not submission:
-            raise HTTPException(status_code=404, detail="Submission not found")
-
-        # Enrich with full question text from exam
-        exam = await db.exams.find_one(
+        # Enrich each question score with the full question text
+        for qs in submission.get("question_scores", []):
+            q_num = qs.get("question_number")
+            if q_num in question_map:
+                question_data = question_map[q_num]
+                qs["question_text"] = question_data.get("rubric", "")
+                qs["sub_questions"] = question_data.get("sub_questions", [])
+    
+    # For students, also provide question paper images (they should see the questions)
+    if user.role == "student":
+        # Get question paper from exam_files
+        exam_file = await db.exam_files.find_one(
             {"exam_id": submission["exam_id"]},
-            {"_id": 0, "questions": 1}
+            {"_id": 0, "question_paper_gridfs_id": 1, "gridfs_id": 1}
         )
         
-        if exam and exam.get("questions"):
-            # Create a map of question_number to question data
-            question_map = {q["question_number"]: q for q in exam["questions"]}
+        if exam_file:
+            # Try question_paper_gridfs_id first, then fallback to gridfs_id
+            file_id = exam_file.get("question_paper_gridfs_id") or exam_file.get("gridfs_id")
             
-            # Enrich each question score with the full question text
-            for qs in submission.get("question_scores", []):
-                q_num = qs.get("question_number")
-                if q_num in question_map:
-                    question_data = question_map[q_num]
-                    qs["question_text"] = question_data.get("rubric", "")
-                    qs["sub_questions"] = question_data.get("sub_questions", [])
-
-        # For students, also provide question paper images (they should see the questions)
-        if user.role == "student" and include_images:
-            # Get question paper from exam_files
-            exam_file = await db.exam_files.find_one(
-                {"exam_id": submission["exam_id"]},
-                {"_id": 0, "question_paper_gridfs_id": 1, "gridfs_id": 1}
-            )
-
-            if exam_file:
-                # Try question_paper_gridfs_id first, then fallback to gridfs_id
-                file_id_str = exam_file.get("question_paper_gridfs_id") or exam_file.get("gridfs_id")
-
-                if file_id_str:
-                    try:
-                        # Use global fs object which is safe
-                        from bson import ObjectId
-                        file_oid = ObjectId(file_id_str)
-                        if fs.exists(file_oid):
-                            grid_out = fs.get(file_oid)
-                            import pickle
-                            images_list = pickle.loads(grid_out.read())
-                            submission["question_paper_images"] = images_list
-                    except Exception as e:
-                        logger.error(f"Error retrieving question paper for student: {e}")
-                        submission["question_paper_images"] = []
-
-        return serialize_doc(submission)
-
-    except Exception as e:
-        logger.error(f"Error fetching submission {submission_id}: {e}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=str(e))
+            if file_id:
+                try:
+                    import pickle
+                    grid_fs = db_client["test_database"].get_collection("fs.files")
+                    chunks_collection = db_client["test_database"].get_collection("fs.chunks")
+                    
+                    # Retrieve file metadata
+                    file_doc = await grid_fs.find_one({"_id": file_id})
+                    if file_doc:
+                        # Retrieve all chunks
+                        chunks_cursor = chunks_collection.find({"files_id": file_id}).sort("n", 1)
+                        chunks = await chunks_cursor.to_list(None)
+                        
+                        # Reconstruct file
+                        file_data = b"".join([chunk["data"] for chunk in chunks])
+                        
+                        # Deserialize
+                        images_list = pickle.loads(file_data)
+                        submission["question_paper_images"] = images_list
+                except Exception as e:
+                    logger.error(f"Error retrieving question paper for student: {e}")
+                    submission["question_paper_images"] = []
+    
+    return submission
 
 @api_router.put("/submissions/{submission_id}")
 async def update_submission(
