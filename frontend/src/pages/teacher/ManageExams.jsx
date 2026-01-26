@@ -774,7 +774,7 @@ export default function ManageExams({ user }) {
                         if (selectedExam.results_published) {
                           unpublishResults(selectedExam.exam_id);
                         } else {
-                          publishResults(selectedExam.exam_id);
+                          setPublishDialogOpen(true);
                         }
                       }}
                       className={selectedExam.results_published ? "" : "bg-green-500 hover:bg-green-600"}
