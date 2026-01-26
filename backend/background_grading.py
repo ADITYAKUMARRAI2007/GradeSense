@@ -140,12 +140,13 @@ async def process_grading_job_in_background(
                     
                     logger.info(f"[Job {job_id}] Extracted {len(paper_images)} pages")
                     
-                    # Extract student info (returns tuple: student_id, student_name, student_email)
+                    # Extract student info (returns tuple: student_id, student_name)
                     student_info = await extract_student_info_from_paper(paper_images, filename)
                     
-                    # Unpack tuple properly
-                    if student_info and len(student_info) == 3:
-                        student_id_from_paper, student_name, student_email = student_info
+                    # Unpack tuple properly (2 values: id and name only)
+                    if student_info and len(student_info) == 2 and student_info[0] and student_info[1]:
+                        student_id_from_paper, student_name = student_info
+                        student_email = f"{student_id_from_paper}@school.edu"  # Generate placeholder email
                     else:
                         logger.error(f"[Job {job_id}] Failed to extract student information from {filename}")
                         return {
