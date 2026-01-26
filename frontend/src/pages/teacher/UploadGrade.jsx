@@ -877,6 +877,68 @@ export default function UploadGrade({ user }) {
     }
   };
 
+  const handleReset = async () => {
+    try {
+      // If there's an active job, cancel it on the backend
+      if (activeJobId) {
+        try {
+          await axios.post(`${API}/grading-jobs/${activeJobId}/cancel`, {}, {
+            withCredentials: true
+          });
+          console.log(`Cancelled job ${activeJobId}`);
+        } catch (error) {
+          console.error('Error cancelling job:', error);
+          // Continue with reset even if cancel fails
+        }
+      }
+
+      // Clear polling interval
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+
+      // Clear localStorage
+      localStorage.removeItem('activeGradingJob');
+      localStorage.removeItem('uploadGradeState');
+
+      // Reset all state to initial values
+      setStep(1);
+      setFormData({
+        batch_id: "",
+        subject_id: "",
+        exam_type: "",
+        exam_name: "",
+        total_marks: 100,
+        exam_date: new Date().toISOString().split("T")[0],
+        grading_mode: "balanced",
+        questions: [{ question_number: 1, max_marks: 10, rubric: "", sub_questions: [] }]
+      });
+      setModelAnswerFile(null);
+      setQuestionPaperFile(null);
+      setStudentFiles([]);
+      setExamId(null);
+      setResults(null);
+      setActiveJobId(null);
+      setProcessing(false);
+      setProcessingProgress(0);
+      setLoading(false);
+      setQuestionsSkipped(false);
+      setShowManualEntry(false);
+      setPaperUploaded(false);
+      setLabelFormats({});
+
+      // Close the dialog
+      setResetDialogOpen(false);
+
+      toast.success("Reset complete. You can start fresh!");
+    } catch (error) {
+      console.error('Error during reset:', error);
+      toast.error("Error during reset, but state has been cleared");
+      setResetDialogOpen(false);
+    }
+  };
+
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center gap-1 lg:gap-2 mb-6 lg:mb-8 overflow-x-auto pb-2">
       {[1, 2, 3, 4, 5, 6].map((s) => (
