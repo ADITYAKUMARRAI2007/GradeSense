@@ -1315,12 +1315,30 @@ export default function UploadGrade({ user }) {
         {step === 4 && (
           <Card className="animate-fade-in">
             <CardHeader>
-              <CardTitle>Step 4: Question Configuration</CardTitle>
-              <CardDescription>
-                {showManualEntry || questionsSkipped
-                  ? "Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed."
-                  : "Choose how you want to configure questions for this exam."}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <CardTitle>Step 4: Question Configuration</CardTitle>
+                  <CardDescription>
+                    {showManualEntry || questionsSkipped
+                      ? "Define the questions and marks distribution. Add sub-questions like 1a, 1b if needed."
+                      : "Choose how you want to configure questions for this exam."}
+                  </CardDescription>
+                </div>
+                {(showManualEntry || questionsSkipped) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowManualEntry(false);
+                      setQuestionsSkipped(false);
+                    }}
+                    className="ml-4"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Change Method
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {!showManualEntry && !questionsSkipped && (
