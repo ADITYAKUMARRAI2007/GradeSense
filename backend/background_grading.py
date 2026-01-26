@@ -195,10 +195,13 @@ async def process_grading_job_in_background(
                         "student_name": student_name,
                         "roll_number": student_id_from_paper,
                         "filename": filename,
+                        "file_images": paper_images,  # Store the answer sheet images
                         "obtained_marks": obtained_marks,
                         "total_marks": exam.get("total_marks", 100),
                         "percentage": round(percentage, 2),
                         "scores": [s.dict() for s in scores],
+                        "question_scores": [s.dict() for s in scores],  # Add for frontend compatibility
+                        "status": "ai_graded",
                         "submitted_at": datetime.now(timezone.utc).isoformat(),
                         "graded_at": datetime.now(timezone.utc).isoformat()
                     }
