@@ -2109,60 +2109,6 @@ async def get_student_detail(student_user_id: str, user: User = Depends(get_curr
             {"student_id": student_user_id},
             {"_id": 0, "file_data": 0, "file_images": 0}
         ).to_list(100)
-
-@api_router.get("/students/my-exams")
-async def get_my_exams(user: User = Depends(get_current_user)):
-    """Get exams assigned to the current student for submission"""
-    if user.role != "student":
-        raise HTTPException(status_code=403, detail="Only students can access this")
-    
-    # Find exams where this student is assigned and exam is in student-upload mode
-    exams = await db.exams.find(
-        {
-            "students": user.user_id,  # Student is in the students array
-            "is_student_upload": True   # This is a student-upload exam
-        },
-        {"_id": 0}
-    ).to_list(100)
-    
-    # Enrich with submission status
-    for exam in exams:
-        # Check if student has already submitted
-        submission = await db.submissions.find_one(
-            {
-                "exam_id": exam["exam_id"],
-                "student_id": user.user_id
-            },
-            {"_id": 0, "submission_id": 1, "status": 1, "percentage": 1, "obtained_marks": 1, "total_marks": 1}
-        )
-        
-        if submission:
-            exam["submitted"] = True
-            exam["submission_status"] = submission.get("status", "submitted")
-            exam["score"] = submission.get("percentage")
-            exam["submission_id"] = submission.get("submission_id")
-        else:
-            exam["submitted"] = False
-            exam["submission_status"] = "pending"
-    
-    return serialize_doc(exams)
-
-@api_router.get("/students/{student_user_id}")
-async def get_student_detail_old(student_user_id: str, user: User = Depends(get_current_user)):
-    """DEPRECATED: Use get_student_detail instead"""
-    try:
-        student = await db.users.find_one(
-            {"user_id": student_user_id},
-            {"_id": 0}
-        )
-        if not student:
-            raise HTTPException(status_code=404, detail="Student not found")
-
-        # Get all submissions for this student
-        submissions = await db.submissions.find(
-            {"student_id": student_user_id},
-            {"_id": 0, "file_data": 0, "file_images": 0}
-        ).to_list(100)
         
         # Calculate overall stats
         if submissions:
