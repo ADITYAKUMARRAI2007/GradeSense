@@ -253,27 +253,6 @@ export default function StudentResults({ user }) {
                                     </div>
                                   </div>
                                 </div>
-                                {/* Annotation Indicator */}
-                                {showAnnotations && (
-                                  <div className="absolute right-2 top-2 bottom-2 w-12 flex flex-col justify-around py-2 gap-2">
-                                    {selectedSubmission.question_scores?.map((qs) => {
-                                      const scorePercentage = (qs.obtained_marks / qs.max_marks) * 100;
-                                      if (scorePercentage < 60) {
-                                        return (
-                                          <div 
-                                            key={qs.question_number}
-                                            className="bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg flex flex-col items-center justify-center"
-                                            title={`Q${qs.question_number}: Needs Review`}
-                                          >
-                                            <span className="font-bold">Q{qs.question_number}</span>
-                                            <span className="text-[10px]">{qs.obtained_marks}/{qs.max_marks}</span>
-                                          </div>
-                                        );
-                                      }
-                                      return null;
-                                    })}
-                                  </div>
-                                )}
                               </div>
                             ))}
                           </div>
