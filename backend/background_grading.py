@@ -146,13 +146,24 @@ async def process_grading_job_in_background(
                     # Unpack tuple properly (2 values: id and name only)
                     if student_info and len(student_info) == 2 and student_info[0] and student_info[1]:
                         student_id_from_paper, student_name = student_info
-                        student_email = f"{student_id_from_paper}@school.edu"  # Generate placeholder email
+                        logger.info(f"[Job {job_id}] Extracted student info from paper: {student_name} (ID: {student_id_from_paper})")
                     else:
-                        logger.error(f"[Job {job_id}] Failed to extract student information from {filename}")
-                        return {
-                            "error": "Failed to extract student information",
-                            "filename": filename
-                        }
+                        # AI extraction failed, try filename parsing as fallback
+                        logger.warning(f"[Job {job_id}] AI extraction failed, trying filename parsing for {filename}")
+                        student_id_from_filename, student_name_from_filename = parse_student_from_filename(filename)
+                        
+                        if student_id_from_filename and student_name_from_filename:
+                            student_id_from_paper = student_id_from_filename
+                            student_name = student_name_from_filename
+                            logger.info(f"[Job {job_id}] Extracted from filename: {student_name} (ID: {student_id_from_paper})")
+                        else:
+                            # Both methods failed, use filename as student name
+                            logger.warning(f"[Job {job_id}] All extraction methods failed, using filename as student name")
+                            student_name = filename.replace(".pdf", "").replace(".PDF", "").strip()
+                            student_id_from_paper = f"UNKNOWN_{uuid.uuid4().hex[:8]}"
+                            logger.info(f"[Job {job_id}] Using default: {student_name} (ID: {student_id_from_paper})")
+                    
+                    student_email = f"{student_id_from_paper}@school.edu"  # Generate placeholder email
                     
                     # Get or create student
                     result = await get_or_create_student(
