@@ -2093,6 +2093,43 @@ async def get_students(batch_id: Optional[str] = None, user: User = Depends(get_
     students = await db.users.find(query, {"_id": 0}).to_list(500)
     return serialize_doc(students)
 
+@api_router.get("/students/my-exams")
+async def get_my_exams(user: User = Depends(get_current_user)):
+    """Get exams assigned to the current student for submission"""
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can access this")
+    
+    # Find exams where this student is assigned and exam is in student-upload mode
+    exams = await db.exams.find(
+        {
+            "students": user.user_id,  # Student is in the students array
+            "is_student_upload": True   # This is a student-upload exam
+        },
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Enrich with submission status
+    for exam in exams:
+        # Check if student has already submitted
+        submission = await db.submissions.find_one(
+            {
+                "exam_id": exam["exam_id"],
+                "student_id": user.user_id
+            },
+            {"_id": 0, "submission_id": 1, "status": 1, "percentage": 1, "obtained_marks": 1, "total_marks": 1}
+        )
+        
+        if submission:
+            exam["submitted"] = True
+            exam["submission_status"] = submission.get("status", "submitted")
+            exam["score"] = submission.get("percentage")
+            exam["submission_id"] = submission.get("submission_id")
+        else:
+            exam["submitted"] = False
+            exam["submission_status"] = "pending"
+    
+    return serialize_doc(exams)
+
 @api_router.get("/students/{student_user_id}")
 async def get_student_detail(student_user_id: str, user: User = Depends(get_current_user)):
     """Get detailed student information with performance analytics"""
