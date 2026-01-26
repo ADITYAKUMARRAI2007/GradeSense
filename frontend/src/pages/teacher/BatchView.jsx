@@ -70,6 +70,43 @@ const BatchView = () => {
     return { label: 'Upcoming', color: 'gray' };
   };
 
+  const handlePublishClick = (exam, e) => {
+    e.stopPropagation(); // Prevent card click
+    setExamToPublish(exam);
+    setPublishDialogOpen(true);
+  };
+
+  const publishResults = async () => {
+    if (!examToPublish) return;
+    
+    try {
+      await axios.post(`${API}/exams/${examToPublish.exam_id}/publish-results`, publishSettings, {
+        withCredentials: true
+      });
+      toast.success("Results published! Students can now see their scores.");
+      setPublishDialogOpen(false);
+      fetchBatchData(); // Refresh data
+    } catch (error) {
+      console.error("Publish error:", error);
+      toast.error("Failed to publish results");
+    }
+  };
+
+  const unpublishResults = async (examId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    try {
+      await axios.post(`${API}/exams/${examId}/unpublish-results`, {}, {
+        withCredentials: true
+      });
+      toast.success("Results hidden from students");
+      fetchBatchData(); // Refresh data
+    } catch (error) {
+      console.error("Unpublish error:", error);
+      toast.error("Failed to unpublish results");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
