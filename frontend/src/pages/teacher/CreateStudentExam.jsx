@@ -150,10 +150,10 @@ const CreateStudentExam = () => {
       return;
     }
 
-    // Check if files are provided when using AI extraction
+    // Optional warning if using AI extraction without files
     if (questionMode === 'ai-extract' && (!questionPaper || !modelAnswer)) {
-      toast.error('Please upload both question paper and model answer for AI extraction');
-      return;
+      toast.info('Note: Uploading question paper and model answer improves AI grading accuracy');
+      // Don't return - allow proceeding without files
     }
 
     setCreating(true);
