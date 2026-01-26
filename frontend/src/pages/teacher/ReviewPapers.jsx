@@ -1633,9 +1633,9 @@ export default function ReviewPapers({ user }) {
                             </div>
                             <div className="text-right flex-shrink-0 ml-2">
                               <p className="font-bold text-base lg:text-lg">
-                                {submission.total_score}
+                                {submission.obtained_marks || submission.total_score || 0}
                                 <span className="text-xs lg:text-sm font-normal text-muted-foreground">
-                                  /{exams.find(e => e.exam_id === submission.exam_id)?.total_marks || submission.question_scores?.reduce((sum, q) => sum + q.max_marks, 0) || "?"}
+                                  /{submission.total_marks || exams.find(e => e.exam_id === submission.exam_id)?.total_marks || submission.question_scores?.reduce((sum, q) => sum + q.max_marks, 0) || "?"}
                                 </span>
                               </p>
                               <Badge 
