@@ -7173,9 +7173,23 @@ async def update_question_topics(
 @api_router.get("/analytics/student-dashboard")
 async def get_student_dashboard(user: User = Depends(get_current_user)):
     """Get student's personal dashboard analytics"""
-    # Get student's submissions
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can access this")
+    
+    # Get student's submissions for PUBLISHED exams only
+    published_exam_ids = []
+    published_exams = await db.exams.find(
+        {"results_published": True},
+        {"_id": 0, "exam_id": 1}
+    ).to_list(1000)
+    published_exam_ids = [e["exam_id"] for e in published_exams]
+    
+    # Get submissions only for published results
     submissions = await db.submissions.find(
-        {"student_id": user.user_id},
+        {
+            "student_id": user.user_id,
+            "exam_id": {"$in": published_exam_ids}  # Only published
+        },
         {"_id": 0}
     ).to_list(100)
     
@@ -7194,10 +7208,10 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
             "strong_areas": []
         }
     
-    percentages = [s["percentage"] for s in submissions]
+    percentages = [s.get("percentage", 0) for s in submissions]
     
     # Recent results
-    recent = sorted(submissions, key=lambda x: x.get("created_at", ""), reverse=True)[:5]
+    recent = sorted(submissions, key=lambda x: x.get("graded_at", x.get("created_at", "")), reverse=True)[:5]
     recent_results = []
     for r in recent:
         exam = await db.exams.find_one({"exam_id": r["exam_id"]}, {"_id": 0, "exam_name": 1, "subject_id": 1})
@@ -7205,9 +7219,9 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
         recent_results.append({
             "exam_name": exam.get("exam_name", "Unknown") if exam else "Unknown",
             "subject": subject.get("name", "Unknown") if subject else "Unknown",
-            "score": r["total_score"],
-            "percentage": r["percentage"],
-            "date": r.get("created_at", "")
+            "score": f"{r.get('obtained_marks', 0)}/{r.get('total_marks', 100)}",
+            "percentage": r.get("percentage", 0),
+            "date": r.get("graded_at", r.get("created_at", ""))
         })
     
     # Subject-wise performance
