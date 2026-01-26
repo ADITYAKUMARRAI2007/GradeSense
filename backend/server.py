@@ -5861,12 +5861,29 @@ async def get_submission(
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
 
-        # Enrich with full question text from exam
+        # Get exam to check visibility settings for students
         exam = await db.exams.find_one(
             {"exam_id": submission["exam_id"]},
-            {"_id": 0, "questions": 1}
+            {"_id": 0, "questions": 1, "results_published": 1, "student_visibility": 1}
         )
         
+        # For students, enforce visibility settings
+        if user.role == "student":
+            # Check if results are published
+            if not exam or not exam.get("results_published"):
+                raise HTTPException(status_code=403, detail="Results not yet published")
+            
+            # Apply visibility settings
+            visibility = exam.get("student_visibility", {})
+            
+            # Remove answer sheet images if not allowed
+            if not visibility.get("show_answer_sheet", True):
+                submission["file_images"] = []
+                submission.pop("file_data", None)
+            
+            # Feedback is always shown (question_scores contains feedback)
+        
+        # Enrich with full question text from exam
         if exam and exam.get("questions"):
             # Create a map of question_number to question data
             question_map = {q["question_number"]: q for q in exam["questions"]}
@@ -5879,8 +5896,58 @@ async def get_submission(
                     qs["question_text"] = question_data.get("rubric", "")
                     qs["sub_questions"] = question_data.get("sub_questions", [])
 
-        # For students, also provide question paper images (they should see the questions)
-        if user.role == "student" and include_images:
+        # For students, handle question paper and model answer visibility
+        if user.role == "student" and include_images and exam:
+            visibility = exam.get("student_visibility", {})
+            
+            # Add question paper if allowed
+            if visibility.get("show_question_paper", True):
+                # Get question paper from exam_files
+                exam_file = await db.exam_files.find_one(
+                    {"exam_id": submission["exam_id"]},
+                    {"_id": 0, "question_paper_gridfs_id": 1, "gridfs_id": 1}
+                )
+
+                if exam_file:
+                    # Try question_paper_gridfs_id first, then fallback to gridfs_id
+                    file_id_str = exam_file.get("question_paper_gridfs_id") or exam_file.get("gridfs_id")
+
+                    if file_id_str:
+                        try:
+                            # Use global fs object which is safe
+                            from bson import ObjectId
+                            file_oid = ObjectId(file_id_str)
+                            if fs.exists(file_oid):
+                                grid_out = fs.get(file_oid)
+                                import pickle
+                                images_list = pickle.loads(grid_out.read())
+                                submission["question_paper_images"] = images_list
+                        except Exception as e:
+                            logger.error(f"Error retrieving question paper for student: {e}")
+                            submission["question_paper_images"] = []
+            
+            # Add model answer if allowed
+            if visibility.get("show_model_answer", False):
+                exam_file = await db.exam_files.find_one(
+                    {"exam_id": submission["exam_id"]},
+                    {"_id": 0, "model_answer_gridfs_id": 1}
+                )
+                
+                if exam_file and exam_file.get("model_answer_gridfs_id"):
+                    try:
+                        from bson import ObjectId
+                        file_oid = ObjectId(exam_file["model_answer_gridfs_id"])
+                        if fs.exists(file_oid):
+                            grid_out = fs.get(file_oid)
+                            import pickle
+                            images_list = pickle.loads(grid_out.read())
+                            submission["model_answer_images"] = images_list
+                    except Exception as e:
+                        logger.error(f"Error retrieving model answer for student: {e}")
+                        submission["model_answer_images"] = []
+        
+        # For teachers, always include everything
+        elif user.role == "teacher" and include_images:
             # Get question paper from exam_files
             exam_file = await db.exam_files.find_one(
                 {"exam_id": submission["exam_id"]},
@@ -5902,7 +5969,7 @@ async def get_submission(
                             images_list = pickle.loads(grid_out.read())
                             submission["question_paper_images"] = images_list
                     except Exception as e:
-                        logger.error(f"Error retrieving question paper for student: {e}")
+                        logger.error(f"Error retrieving question paper: {e}")
                         submission["question_paper_images"] = []
 
         return serialize_doc(submission)
