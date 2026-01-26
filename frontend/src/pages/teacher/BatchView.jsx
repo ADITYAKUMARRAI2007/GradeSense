@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Settings, UserPlus, AlertCircle, TrendingUp, Users, FileText } from 'lucide-react';
+import { ArrowLeft, Settings, UserPlus, AlertCircle, TrendingUp, Users, FileText, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
+import { Button } from '../../components/ui/button';
+import { Checkbox } from '../../components/ui/checkbox';
+import { Label } from '../../components/ui/label';
+import { toast } from 'sonner';
 import StudentProfileDrawer from '../../components/StudentProfileDrawer';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
