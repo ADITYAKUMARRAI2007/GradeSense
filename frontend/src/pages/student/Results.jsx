@@ -12,7 +12,6 @@ import {
   FileText, 
   Download, 
   Eye,
-  EyeOff,
   ChevronDown,
   ChevronUp,
   ZoomIn,
