@@ -215,7 +215,9 @@ async def process_grading_job_in_background(
                     if "error" in result:
                         errors.append({"filename": result["filename"], "error": result["error"]})
                     else:
-                        submissions.append(result["submission"])
+                        # Don't store the full submission in the job - it's already in db.submissions
+                        # Just track the submission_id
+                        submissions.append({"submission_id": result["submission"]["submission_id"], "filename": filename})
                     
                 except asyncio.TimeoutError:
                     logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 5 minutes")
