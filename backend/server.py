@@ -9691,9 +9691,19 @@ Analyze the student's response carefully and apply the grading criteria the teac
     }
 
 
+class PublishResultsRequest(BaseModel):
+    show_model_answer: bool = False
+    show_answer_sheet: bool = True
+    show_question_paper: bool = True
+    # Feedback is always shown
+
 @api_router.post("/exams/{exam_id}/publish-results")
-async def publish_exam_results(exam_id: str, user: User = Depends(get_current_user)):
-    """Publish exam results to make them visible to students"""
+async def publish_exam_results(
+    exam_id: str, 
+    settings: PublishResultsRequest,
+    user: User = Depends(get_current_user)
+):
+    """Publish exam results to make them visible to students with visibility controls"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can publish results")
     
@@ -9702,16 +9712,22 @@ async def publish_exam_results(exam_id: str, user: User = Depends(get_current_us
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found or access denied")
     
-    # Update exam to mark results as published
+    # Update exam to mark results as published with visibility settings
     await db.exams.update_one(
         {"exam_id": exam_id},
         {"$set": {
             "results_published": True,
-            "published_at": datetime.now(timezone.utc).isoformat()
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "student_visibility": {
+                "show_model_answer": settings.show_model_answer,
+                "show_answer_sheet": settings.show_answer_sheet,
+                "show_question_paper": settings.show_question_paper,
+                "show_feedback": True  # Always show feedback
+            }
         }}
     )
     
-    return {"message": "Results published successfully", "exam_id": exam_id}
+    return {"message": "Results published successfully", "exam_id": exam_id, "visibility": settings.dict()}
 
 @api_router.post("/exams/{exam_id}/unpublish-results")
 async def unpublish_exam_results(exam_id: str, user: User = Depends(get_current_user)):
