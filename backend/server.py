@@ -27,19 +27,6 @@ from contextlib import asynccontextmanager
 import time
 import traceback
 
-# Import all models from the models package
-from models import (
-    User, UserCreate, ProfileUpdate,
-    Batch, BatchCreate,
-    Subject, SubjectCreate,
-    SubQuestion, ExamQuestion, Exam, ExamCreate, StudentExamCreate, StudentSubmission,
-    SubQuestionScore, QuestionScore, Submission,
-    ReEvaluationRequest, ReEvaluationCreate,
-    GradingFeedback, FeedbackSubmit,
-    NaturalLanguageQuery, GradingAnalytics, FrontendEvent,
-    UserFeatureFlags, UserQuotas, UserStatusUpdate, UserFeedback
-)
-
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -254,6 +241,203 @@ logger = logging.getLogger(__name__)
 # Cache structure (memory-based cache)
 grading_cache = {}
 model_answer_cache = {}
+
+# ============== MODELS ==============
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    user_id: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+    role: str = "teacher"  # teacher or student
+    batches: List[str] = []
+    contact: Optional[str] = None  # Phone number
+    teacher_type: Optional[str] = None  # school, college, competitive, others
+    exam_category: Optional[str] = None  # For competitive: UPSC, CA, CLAT, JEE, NEET, others
+    profile_completed: bool = False  # Track if initial profile setup is done
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserCreate(BaseModel):
+    email: str
+    name: str
+    role: str = "student"
+    student_id: Optional[str] = None
+    batches: List[str] = []
+
+class ProfileUpdate(BaseModel):
+    name: str
+    contact: str
+    email: str
+    teacher_type: str  # school, college, competitive, others
+    exam_category: Optional[str] = None  # Only for competitive exams
+
+class Batch(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    batch_id: str
+    name: str
+    teacher_id: str
+    students: List[str] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class BatchCreate(BaseModel):
+    name: str
+
+class Subject(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    subject_id: str
+    name: str
+    teacher_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SubjectCreate(BaseModel):
+    name: str
+
+# Sub-question support
+class SubQuestion(BaseModel):
+    sub_id: str  # e.g., "a", "b", "c"
+    max_marks: float
+    rubric: Optional[str] = None
+
+class ExamQuestion(BaseModel):
+    question_number: int
+    max_marks: float
+    rubric: Optional[str] = None
+    sub_questions: List[SubQuestion] = []  # For questions like 1a, 1b, 1c
+
+class Exam(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    exam_id: str
+    batch_id: str
+    subject_id: str
+    exam_type: str
+    exam_name: str
+    total_marks: float
+    exam_date: str
+    grading_mode: str
+    questions: List[ExamQuestion] = []
+    model_answer_file: Optional[str] = None
+    teacher_id: str
+    status: str = "draft"  # draft, processing, completed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExamCreate(BaseModel):
+    batch_id: str
+    subject_id: str
+    exam_type: str
+    exam_name: str
+    total_marks: float = 100  # Default to 100, will be updated after extraction
+    exam_date: str
+    grading_mode: str
+    questions: List[dict] = []  # Now optional, will be populated by auto-extraction
+    exam_mode: str = "teacher_upload"  # ⭐ NEW: "teacher_upload" or "student_upload"
+    show_question_paper: bool = False  # ⭐ NEW: For student mode, whether to show question paper
+
+class StudentExamCreate(BaseModel):
+    """Model for creating exam in student-upload mode"""
+    batch_id: str
+    exam_name: str
+    total_marks: float
+    grading_mode: str = "balanced"
+    student_ids: List[str]  # Selected students
+    show_question_paper: bool = False
+    questions: List[ExamQuestion]
+
+class StudentSubmission(BaseModel):
+    """Model for student answer submission"""
+    submission_id: str
+    exam_id: str
+    student_id: str
+    student_name: str
+    student_email: str
+    answer_file_ref: str  # GridFS reference
+    submitted_at: str
+    status: str  # "submitted", "graded"
+
+class SubQuestionScore(BaseModel):
+    sub_id: str
+    max_marks: float
+    obtained_marks: float
+    ai_feedback: str
+
+class QuestionScore(BaseModel):
+    question_number: int
+    max_marks: float
+    obtained_marks: float
+    ai_feedback: str
+    teacher_comment: Optional[str] = None
+    is_reviewed: bool = False
+    sub_scores: List[SubQuestionScore] = []  # For sub-question scores
+    question_text: Optional[str] = None  # The question text
+    status: str = "graded"  # graded, not_attempted, not_found, error
+
+class Submission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    submission_id: str
+    exam_id: str
+    student_id: str
+    student_name: str
+    file_data: Optional[str] = None
+    total_score: float = 0
+    percentage: float = 0
+    question_scores: List[QuestionScore] = []
+    status: str = "pending"  # pending, ai_graded, teacher_reviewed
+    graded_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ReEvaluationRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    request_id: str
+    submission_id: str
+    student_id: str
+    student_name: str
+    exam_id: str
+    questions: List[int]
+    reason: str
+    status: str = "pending"  # pending, in_review, resolved
+    response: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ReEvaluationCreate(BaseModel):
+    submission_id: str
+    questions: List[int]
+    reason: str
+
+# Feedback system schemas
+class GradingFeedback(BaseModel):
+    feedback_id: str
+    teacher_id: str
+    submission_id: Optional[str] = None
+    question_number: Optional[int] = None
+    feedback_type: str  # "question_grading", "general_suggestion", "correction"
+    
+    # Context for grading feedback
+    question_text: Optional[str] = None
+    student_answer_summary: Optional[str] = None
+    ai_grade: Optional[float] = None
+    ai_feedback: Optional[str] = None
+    teacher_expected_grade: Optional[float] = None
+    teacher_correction: str  # The actual feedback/correction
+    
+    # Metadata
+    grading_mode: Optional[str] = None
+    exam_id: Optional[str] = None
+    is_common: bool = False  # Marked if pattern appears across multiple teachers
+    upvote_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FeedbackSubmit(BaseModel):
+    submission_id: Optional[str] = None
+    exam_id: Optional[str] = None
+    question_number: Optional[int] = None
+    sub_question_id: Optional[str] = None  # New: For sub-question specific feedback
+    feedback_type: str
+    teacher_correction: str
+    question_text: Optional[str] = None
+    ai_grade: Optional[float] = None
+    ai_feedback: Optional[str] = None
+    teacher_expected_grade: Optional[float] = None
+    apply_to_all_papers: Optional[bool] = False  # New: Apply to all students
 
 # ============== FILE HELPER FUNCTIONS ==============
 
@@ -1392,8 +1576,8 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
 @api_router.post("/exams/student-mode")
 async def create_student_upload_exam(
     exam_data: str = Form(...),
-    question_paper: Optional[UploadFile] = File(None),
-    model_answer: Optional[UploadFile] = File(None),
+    question_paper: UploadFile = File(...),
+    model_answer: UploadFile = File(...),
     user: User = Depends(get_current_user)
 ):
     """Create exam where students upload their answer papers"""
@@ -1406,20 +1590,15 @@ async def create_student_upload_exam(
     
     exam_id = f"exam_{uuid.uuid4().hex[:12]}"
     
-    qp_file_ref = None
-    ma_file_ref = None
+    # Store question paper in GridFS
+    qp_bytes = await question_paper.read()
+    qp_file_ref = f"qp_{exam_id}"
+    qp_gridfs_id = fs.put(qp_bytes, filename=qp_file_ref)
     
-    # Store question paper in GridFS if provided
-    if question_paper:
-        qp_bytes = await question_paper.read()
-        qp_file_ref = f"qp_{exam_id}"
-        qp_gridfs_id = fs.put(qp_bytes, filename=qp_file_ref)
-    
-    # Store model answer in GridFS if provided
-    if model_answer:
-        ma_bytes = await model_answer.read()
-        ma_file_ref = f"ma_{exam_id}"
-        ma_gridfs_id = fs.put(ma_bytes, filename=ma_file_ref)
+    # Store model answer in GridFS
+    ma_bytes = await model_answer.read()
+    ma_file_ref = f"ma_{exam_id}"
+    ma_gridfs_id = fs.put(ma_bytes, filename=ma_file_ref)
     
     # Create exam document
     exam_doc = {
@@ -1429,7 +1608,7 @@ async def create_student_upload_exam(
         "total_marks": exam_data_dict["total_marks"],
         "grading_mode": exam_data_dict["grading_mode"],
         "exam_mode": "student_upload",  # Mark as student-upload mode
-        "show_question_paper": exam_data_dict.get("show_question_paper", False) and qp_file_ref is not None,
+        "show_question_paper": exam_data_dict.get("show_question_paper", False),
         "question_paper_ref": qp_file_ref,
         "model_answer_ref": ma_file_ref,
         "questions": exam_data_dict.get("questions", []),
@@ -1782,33 +1961,19 @@ async def extract_questions_temporary(
         if not extracted_questions:
             return {"questions": [], "message": "No questions found"}
         
-        # Convert to format for frontend with sub-questions
+        # Convert to simple format for frontend
         questions = []
         for i, q in enumerate(extracted_questions, 1):
             if isinstance(q, dict):
-                question_obj = {
+                questions.append({
                     "question_number": q.get("question_number", i),
-                    "max_marks": q.get("max_marks", 10),
-                    "sub_questions": []
-                }
-                
-                # Include sub-questions if they exist
-                if "sub_questions" in q and isinstance(q["sub_questions"], list):
-                    for sub_q in q["sub_questions"]:
-                        if isinstance(sub_q, dict):
-                            question_obj["sub_questions"].append({
-                                "sub_id": sub_q.get("sub_id", "a"),
-                                "max_marks": sub_q.get("max_marks", 5),
-                                "rubric": sub_q.get("rubric", "")
-                            })
-                
-                questions.append(question_obj)
+                    "max_marks": q.get("max_marks", 10)
+                })
             else:
                 # Fallback for simple format
                 questions.append({
                     "question_number": i,
-                    "max_marks": 10,
-                    "sub_questions": []
+                    "max_marks": 10
                 })
         
         return {"questions": questions, "message": f"Extracted {len(questions)} questions"}
@@ -8268,6 +8433,12 @@ async def send_peer_group_email(
 
 # ============== NATURAL LANGUAGE QUERY (Ask Your Data) ==============
 
+class NaturalLanguageQuery(BaseModel):
+    query: str
+    batch_id: Optional[str] = None
+    exam_id: Optional[str] = None
+    subject_id: Optional[str] = None
+
 @api_router.post("/analytics/ask")
 async def ask_your_data(
     request: NaturalLanguageQuery,
@@ -10130,6 +10301,24 @@ async def get_dashboard_stats(user: User = Depends(get_admin_user)):
 
 # ============== ADVANCED USER CONTROLS ==============
 
+class UserFeatureFlags(BaseModel):
+    ai_suggestions: bool = True
+    sub_questions: bool = True
+    bulk_upload: bool = True
+    analytics: bool = True
+    peer_comparison: bool = True
+    export_data: bool = True
+
+class UserQuotas(BaseModel):
+    max_exams_per_month: int = 100
+    max_papers_per_month: int = 1000
+    max_students: int = 500
+    max_batches: int = 50
+
+class UserStatusUpdate(BaseModel):
+    status: str  # 'active', 'disabled', 'banned'
+    reason: Optional[str] = None
+
 @api_router.get("/admin/users/{user_id}/details")
 async def get_user_details(user_id: str, admin: User = Depends(get_admin_user)):
     """Get detailed user information including features and quotas"""
@@ -10248,6 +10437,37 @@ async def update_user_status(
     return {"success": True, "message": f"User status updated to {status_update.status}"}
 
 # ============== USER FEEDBACK SYSTEM ==============
+
+class UserFeedback(BaseModel):
+    type: str  # 'bug', 'suggestion', 'question'
+    data: Dict[str, Any]
+    metadata: Optional[Dict[str, Any]] = None
+
+class FrontendEvent(BaseModel):
+    event_type: str  # 'button_click', 'tab_switch', 'feature_use'
+    element_id: Optional[str] = None
+    page: str
+    metadata: Optional[Dict[str, Any]] = None
+
+class GradingAnalytics(BaseModel):
+    """Model for tracking detailed grading analytics"""
+    submission_id: str
+    exam_id: str
+    teacher_id: str
+    original_ai_grade: float
+    final_grade: float
+    grade_delta: float
+    original_ai_feedback: str
+    final_feedback: str
+    edit_distance: int  # Levenshtein distance or simple char diff
+    ai_confidence_score: float  # 0-100
+    tokens_input: int
+    tokens_output: int
+    estimated_cost: float  # in USD
+    edited_by_teacher: bool
+    edited_at: Optional[str] = None
+    grading_duration_seconds: float
+    timestamp: str
 
 @api_router.post("/feedback")
 async def submit_user_feedback(feedback: UserFeedback, user: User = Depends(get_current_user)):
