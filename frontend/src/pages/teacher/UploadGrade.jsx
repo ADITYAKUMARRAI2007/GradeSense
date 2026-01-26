@@ -1165,7 +1165,7 @@ export default function UploadGrade({ user }) {
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        onClick={(e) => { e.stopPropagation(); setQuestionPaperFile(null); }}
+                        onClick={removeQuestionPaperFile}
                       >
                         <X className="w-4 h-4" />
                       </Button>
