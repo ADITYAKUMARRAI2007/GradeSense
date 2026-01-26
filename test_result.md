@@ -878,6 +878,18 @@ agent_communication:
 
 
 backend:
+  - task: "Fix Grading System Critical Errors"
+    implemented: false
+    working: false
+    file: "/app/backend/background_grading.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "🔥 CRITICAL GRADING SYSTEM ERRORS IDENTIFIED: 1) Line 133 background_grading.py: 'await pdf_to_images()' - pdf_to_images is NOT async function but being awaited, causing 'object list can't be used in await expression' error. 2) grade_with_ai() function signature mismatch: 'TypeError: grade_with_ai() got an unexpected keyword argument student_answer_images'. 3) Multiple failed grading jobs in database (36 jobs, many failed). 4) Task worker errors show cascading failures. FIXES NEEDED: Remove 'await' from pdf_to_images() calls, fix grade_with_ai() function parameters, verify tuple unpacking from extract_student_info_from_paper() is correct. Database shows 0 papers created despite processing attempts, confirming grading pipeline is broken."
+
   - task: "Background Grading System for 30+ Papers (Critical P0 Fix)"
     implemented: true
     working: true
