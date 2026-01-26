@@ -139,7 +139,7 @@ export default function ManageExams({ user }) {
     try {
       await axios.post(`${API}/exams/${examId}/publish-results`, publishSettings);
       toast.success("Results published! Students can now see their scores.");
-      fetchExams();
+      fetchData();
       setPublishDialogOpen(false);
     } catch (error) {
       console.error("Publish error:", error);
@@ -151,7 +151,7 @@ export default function ManageExams({ user }) {
     try {
       await axios.post(`${API}/exams/${examId}/unpublish-results`);
       toast.success("Results hidden from students");
-      fetchExams();
+      fetchData();
     } catch (error) {
       console.error("Unpublish error:", error);
       toast.error("Failed to unpublish results");
