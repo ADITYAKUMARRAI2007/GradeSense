@@ -787,6 +787,18 @@ backend:
           agent: "testing"
           comment: "✅ COMPLETE E2E WORKFLOW TESTING SUCCESSFUL! All phases of student-upload workflow integrated and functional. ✅ DATA MODEL VERIFIED: Exams collection properly stores exam_mode='student_upload', selected_students array, submitted_count, show_question_paper boolean, GridFS file references. Student_submissions collection correctly tracks submissions with submission_id, exam_id, student_id, answer_file_ref, submitted_at, status. ✅ WORKFLOW INTEGRATION: Teacher creates exam → Students see exam in my-exams → Students download question paper → Students submit answers → Teacher views submission status → Teacher removes non-submitters → Teacher triggers grading → Grading jobs created. ✅ SECURITY MODEL: Proper role-based access control throughout workflow, enrollment verification, re-submission prevention, teacher-only administrative functions. ✅ FILE HANDLING: GridFS integration working correctly for question papers, model answers, and student answer papers. ✅ ERROR HANDLING: Comprehensive edge case testing passed - non-enrolled students, duplicate submissions, unauthorized access attempts. The complete student-upload exam workflow is production-ready and fully tested with 100% test success rate (19/19 tests passed)."
 
+  - task: "ObjectId Serialization Fix Verification"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "❌ CRITICAL OBJECTID SERIALIZATION FIX INCOMPLETE: The serialize_doc() function (lines 35-57) is properly implemented to strip _id fields and convert ObjectIds to strings, but it's NOT being applied consistently across all endpoints. ✅ FUNCTION IMPLEMENTATION VERIFIED: serialize_doc() correctly handles nested documents, arrays, and ObjectId conversion. ❌ INCONSISTENT APPLICATION: Only 4 endpoints use serialize_doc() (lines 2280, 2597, 3011, 5885), but critical endpoints are missing it. ❌ GRADING JOBS ENDPOINT: GET /api/grading-jobs/{job_id} (line 5757) returns raw MongoDB document with _id fields - MAJOR CRASH RISK. ❌ SUBMISSIONS LIST ENDPOINT: GET /api/submissions (line 5818) returns raw documents with _id fields. ❌ EXAMS LIST ENDPOINT: GET /api/exams (line 2950) returns raw documents with _id fields. ❌ TESTING RESULTS: 7/17 tests failed due to _id fields still present in API responses. The fix exists but needs to be applied to ALL endpoints that return MongoDB documents to prevent 520 serialization crashes."
+
 frontend:
   - task: "Review Papers & Grading Flow - No Submissions Found Issue"
     implemented: true
