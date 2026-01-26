@@ -7344,6 +7344,8 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
         ]
     
     # Calculate improvement trend
+    avg_percentage = sum(percentages) / len(percentages) if percentages else 0
+    
     if len(percentages) >= 2:
         recent_avg = sum(percentages[-3:]) / min(3, len(percentages))
         older_avg = sum(percentages[:-3]) / max(1, len(percentages) - 3) if len(percentages) > 3 else recent_avg
@@ -7354,7 +7356,7 @@ async def get_student_dashboard(user: User = Depends(get_current_user)):
     return {
         "stats": {
             "total_exams": len(submissions),
-            "avg_percentage": round(avg_pct, 1),
+            "avg_percentage": round(avg_percentage, 1),
             "rank": "Top 10",  # Simplified for MVP
             "improvement": improvement
         },
