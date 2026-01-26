@@ -1925,7 +1925,7 @@ async def get_batches(user: User = Depends(get_current_user)):
             {"students": user.user_id},
             {"_id": 0}
         ).to_list(100)
-    return batches
+    return serialize_doc(batches)
 
 @api_router.get("/batches/{batch_id}")
 async def get_batch(batch_id: str, user: User = Depends(get_current_user)):
@@ -2091,7 +2091,7 @@ async def get_students(batch_id: Optional[str] = None, user: User = Depends(get_
         query["batches"] = batch_id
     
     students = await db.users.find(query, {"_id": 0}).to_list(500)
-    return students
+    return serialize_doc(students)
 
 @api_router.get("/students/{student_user_id}")
 async def get_student_detail(student_user_id: str, user: User = Depends(get_current_user)):
