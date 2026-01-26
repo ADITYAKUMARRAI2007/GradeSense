@@ -5038,6 +5038,11 @@ print('Student session created: ' + sessionToken);
         print("-" * 60)
         self.test_background_grading_system()
         
+        # 🎯 COMPREHENSIVE GRADING SYSTEM E2E TEST - ALL WORKFLOWS
+        print("\n🎯 COMPREHENSIVE GRADING SYSTEM E2E TEST - ALL WORKFLOWS")
+        print("-" * 60)
+        self.test_grading_system_comprehensive()
+        
         # Cleanup
         self.cleanup_test_data()
         
