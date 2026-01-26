@@ -107,6 +107,33 @@ export default function ReviewPapers({ user }) {
   const fetchSubmissionDetails = useCallback(async (submissionId) => {
     try {
       const response = await axios.get(`${API}/submissions/${submissionId}`);
+      
+      // CRITICAL FIX: Deduplicate question_scores by question_number
+      // This prevents display bugs where questions appear multiple times
+      if (response.data.question_scores && Array.isArray(response.data.question_scores)) {
+        const uniqueScores = [];
+        const seenQuestions = new Set();
+        
+        for (const qs of response.data.question_scores) {
+          if (!seenQuestions.has(qs.question_number)) {
+            uniqueScores.push(qs);
+            seenQuestions.add(qs.question_number);
+          }
+        }
+        
+        response.data.question_scores = uniqueScores;
+        
+        // Recalculate total if deduplication occurred
+        if (uniqueScores.length !== response.data.question_scores.length) {
+          const newTotal = uniqueScores.reduce((sum, qs) => sum + (qs.obtained_marks || 0), 0);
+          response.data.obtained_marks = newTotal;
+          response.data.percentage = response.data.total_marks 
+            ? Math.round((newTotal / response.data.total_marks) * 100) 
+            : 0;
+          console.warn(`Deduplicated ${response.data.question_scores.length - uniqueScores.length} duplicate questions`);
+        }
+      }
+      
       setSelectedSubmission(response.data);
       setDialogOpen(true);
       
