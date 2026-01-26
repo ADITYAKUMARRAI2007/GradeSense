@@ -25,6 +25,15 @@ const BatchView = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [activeTab, setActiveTab] = useState('exams');
   const [showAtRiskOnly, setShowAtRiskOnly] = useState(false);
+  
+  // Publish dialog state
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [examToPublish, setExamToPublish] = useState(null);
+  const [publishSettings, setPublishSettings] = useState({
+    show_model_answer: false,
+    show_answer_sheet: true,
+    show_question_paper: true
+  });
 
   useEffect(() => {
     fetchBatchData();
