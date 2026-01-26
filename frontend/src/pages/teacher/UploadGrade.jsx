@@ -1935,6 +1935,30 @@ export default function UploadGrade({ user }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Change Question Method Confirmation Dialog */}
+        <AlertDialog open={changeMethodDialogOpen} onOpenChange={setChangeMethodDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Change Question Configuration Method?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have manually entered question data. Changing the method will clear all entered questions and marks.
+                <span className="block mt-2 text-orange-600 font-medium">
+                  ⚠️ This action cannot be undone.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmChangeMethod}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                Change Method
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
