@@ -6121,8 +6121,8 @@ async def get_dashboard_analytics(user: User = Depends(get_current_user)):
     # Recent activity
     recent_submissions = await db.submissions.find(
         {"exam_id": {"$in": exam_ids}},
-        {"_id": 0, "submission_id": 1, "student_name": 1, "exam_id": 1, "total_score": 1, "status": 1, "created_at": 1}
-    ).sort("created_at", -1).limit(10).to_list(10)
+        {"_id": 0, "submission_id": 1, "student_name": 1, "exam_id": 1, "student_id": 1, "obtained_marks": 1, "total_marks": 1, "percentage": 1, "total_score": 1, "status": 1, "created_at": 1, "graded_at": 1}
+    ).sort("graded_at", -1).limit(10).to_list(10)
     
     return {
         "stats": {
