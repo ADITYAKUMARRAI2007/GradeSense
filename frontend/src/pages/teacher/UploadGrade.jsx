@@ -1861,6 +1861,33 @@ export default function UploadGrade({ user }) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Reset Confirmation Dialog */}
+        <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Upload & Grade?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will cancel any ongoing grading process and clear all entered data. 
+                You will return to Step 1 and can start fresh.
+                {activeJobId && (
+                  <span className="block mt-2 text-orange-600 font-medium">
+                    ⚠️ An active grading job will be cancelled.
+                  </span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleReset}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Reset Everything
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
