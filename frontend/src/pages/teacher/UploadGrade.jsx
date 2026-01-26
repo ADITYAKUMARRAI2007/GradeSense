@@ -1356,10 +1356,7 @@ export default function UploadGrade({ user }) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setShowManualEntry(false);
-                      setQuestionsSkipped(false);
-                    }}
+                    onClick={handleChangeQuestionMethod}
                     className="ml-4"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
