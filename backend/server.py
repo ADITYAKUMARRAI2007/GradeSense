@@ -5754,7 +5754,7 @@ async def get_grading_job_status(job_id: str, user: User = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Job not found")
     if user.role == "teacher" and job["teacher_id"] != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    return job
+    return serialize_doc(job)
 
 
 # ============== SUBMISSION ROUTES ==============
@@ -5815,7 +5815,7 @@ async def get_submissions(
             batch = await db.batches.find_one({"batch_id": exam.get("batch_id")}, {"_id": 0, "name": 1})
             sub["batch_name"] = batch.get("name", "Unknown") if batch else "Unknown"
     
-    return submissions
+    return serialize_doc(submissions)
 
 @api_router.get("/submissions/{submission_id}")
 async def get_submission(
