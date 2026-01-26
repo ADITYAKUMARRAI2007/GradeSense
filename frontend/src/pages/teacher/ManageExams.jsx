@@ -158,11 +158,6 @@ export default function ManageExams({ user }) {
     }
   };
 
-    }
-  };
-
-
-
   const handleUploadMorePapers = async () => {
     if (paperFiles.length === 0) {
       toast.error("Please select PDF files to upload");
