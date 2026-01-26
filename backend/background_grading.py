@@ -140,18 +140,27 @@ async def process_grading_job_in_background(
                     
                     logger.info(f"[Job {job_id}] Extracted {len(paper_images)} pages")
                     
-                    # Extract student info
+                    # Extract student info (returns tuple: student_id, student_name, student_email)
                     student_info = await extract_student_info_from_paper(paper_images, filename)
                     
+                    # Unpack tuple properly
+                    if student_info and len(student_info) == 3:
+                        student_id_from_paper, student_name, student_email = student_info
+                    else:
+                        logger.error(f"[Job {job_id}] Failed to extract student information from {filename}")
+                        return {
+                            "error": "Failed to extract student information",
+                            "filename": filename
+                        }
+                    
                     # Get or create student
-                    student_id = None
-                    if student_info.get("name") or student_info.get("roll_number"):
-                        student = await get_or_create_student(
-                            name=student_info.get("name", ""),
-                            roll_number=student_info.get("roll_number", ""),
-                            email=student_info.get("email", "")
-                        )
-                        student_id = student["student_id"]
+                    student = await get_or_create_student(
+                        student_id=student_id_from_paper,
+                        name=student_name,
+                        email=student_email,
+                        batch_id=exam["batch_id"]
+                    )
+                    student_id = student["student_id"]
                     
                     logger.info(f"[Job {job_id}] Grading with AI...")
                     
