@@ -91,6 +91,9 @@ export default function UploadGrade({ user }) {
   // Reset confirmation dialog
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   
+  // Question method change confirmation dialog
+  const [changeMethodDialogOpen, setChangeMethodDialogOpen] = useState(false);
+  
   // New state for optional question entry
   const [questionsSkipped, setQuestionsSkipped] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
