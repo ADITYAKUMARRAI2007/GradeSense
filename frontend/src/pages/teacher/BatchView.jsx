@@ -300,18 +300,55 @@ const BatchView = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Completed</h3>
                 <div className="space-y-3">
                   {exams.filter(e => e.status === 'completed').map(exam => (
-                    <Card key={exam.exam_id} className="border-l-4 border-l-green-500 hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => navigate(`/teacher/analytics?exam_id=${exam.exam_id}`)}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{exam.exam_name}</h4>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Avg: {exam.average_score}%
-                          </p>
+                    <Card key={exam.exam_id} className="border-l-4 border-l-green-500 hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div 
+                            className="flex-1 cursor-pointer"
+                            onClick={() => navigate(`/teacher/analytics?exam_id=${exam.exam_id}`)}
+                          >
+                            <h4 className="font-semibold text-gray-900">{exam.exam_name}</h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Avg: {exam.average_score}% • {exam.total_submissions || 0} submissions
+                            </p>
+                          </div>
+                          {exam.results_published && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                              Published
+                            </span>
+                          )}
                         </div>
-                        <button className="px-4 py-2 border border-green-500 text-green-600 rounded-lg hover:bg-green-50 transition-colors">
-                          View Analytics
-                        </button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/teacher/analytics?exam_id=${exam.exam_id}`)}
+                            className="flex-1"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            View Analytics
+                          </Button>
+                          {exam.results_published ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => unpublishResults(exam.exam_id, e)}
+                              className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+                            >
+                              <EyeOff className="w-4 h-4 mr-2" />
+                              Unpublish
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={(e) => handlePublishClick(exam, e)}
+                              className="flex-1 bg-green-500 hover:bg-green-600"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              Publish Results
+                            </Button>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
