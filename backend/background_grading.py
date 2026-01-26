@@ -218,6 +218,29 @@ async def process_grading_job_in_background(
                     }
                     
                     await db.submissions.insert_one(submission)
+                    
+                    # Log grading analytics for admin dashboard
+                    try:
+                        analytics_entry = {
+                            "submission_id": submission_id,
+                            "exam_id": exam_id,
+                            "teacher_id": exam["teacher_id"],
+                            "graded_at": datetime.now(timezone.utc).isoformat(),
+                            "grading_mode": exam.get("grading_mode", "balanced"),
+                            "ai_confidence_score": 0.85,  # Placeholder - could be calculated from AI response
+                            "edited_by_teacher": False,  # Initially not edited
+                            "grade_delta": 0,  # No change from AI grade initially
+                            "grading_duration_seconds": 0,  # Could track actual duration if needed
+                            "estimated_cost": 0.0015,  # Rough estimate: ~$0.0015 per paper (Gemini 2.5 Flash)
+                            "tokens_input": len(str(paper_images)) // 4,  # Rough token estimate
+                            "tokens_output": len(str(scores)) // 4,  # Rough token estimate
+                        }
+                        await db.grading_analytics.insert_one(analytics_entry)
+                        logger.info(f"[Job {job_id}] Logged analytics for {filename}")
+                    except Exception as analytics_error:
+                        logger.error(f"[Job {job_id}] Failed to log analytics: {analytics_error}")
+                        # Don't fail the grading if analytics logging fails
+                    
                     logger.info(f"[Job {job_id}] ✓ Paper graded: {obtained_marks}/{exam.get('total_marks')} ({percentage:.1f}%)")
                     
                     return {"submission": submission, "filename": filename}
