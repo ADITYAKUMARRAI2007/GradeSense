@@ -5756,6 +5756,29 @@ async def get_grading_job_status(job_id: str, user: User = Depends(get_current_u
         raise HTTPException(status_code=403, detail="Access denied")
     return serialize_doc(job)
 
+@api_router.post("/grading-jobs/{job_id}/cancel")
+async def cancel_grading_job(job_id: str, user: User = Depends(get_current_user)):
+    """Cancel an ongoing grading job"""
+    # Find the job
+    job = await db.grading_jobs.find_one({"job_id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Verify ownership
+    if user.role == "teacher" and job["teacher_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Cancel the job if it's still running
+    if job["status"] in ["queued", "processing"]:
+        await db.grading_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {"status": "cancelled", "error": "Cancelled by user"}}
+        )
+        logger.info(f"Grading job {job_id} cancelled by user {user.user_id}")
+        return {"message": "Job cancelled successfully", "job_id": job_id}
+    else:
+        return {"message": f"Job already {job['status']}", "job_id": job_id}
+
 
 # ============== SUBMISSION ROUTES ==============
 
