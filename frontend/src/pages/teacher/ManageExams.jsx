@@ -132,7 +132,8 @@ export default function ManageExams({ user }) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
-
+    }
+  };
 
   const publishResults = async (examId) => {
     try {
