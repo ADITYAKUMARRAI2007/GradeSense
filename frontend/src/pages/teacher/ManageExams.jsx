@@ -1589,6 +1589,80 @@ export default function ManageExams({ user }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Publish Results Settings Dialog */}
+      <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish Results - Configure Student Visibility</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Choose what students can see when viewing their results:
+            </p>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <Label className="font-medium">Show Question Paper</Label>
+                  <p className="text-xs text-muted-foreground">Students can see the original questions</p>
+                </div>
+                <Checkbox 
+                  checked={publishSettings.show_question_paper}
+                  onCheckedChange={(checked) => 
+                    setPublishSettings(prev => ({...prev, show_question_paper: checked}))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <Label className="font-medium">Show Answer Sheet</Label>
+                  <p className="text-xs text-muted-foreground">Students can see their submitted answer paper</p>
+                </div>
+                <Checkbox 
+                  checked={publishSettings.show_answer_sheet}
+                  onCheckedChange={(checked) => 
+                    setPublishSettings(prev => ({...prev, show_answer_sheet: checked}))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <Label className="font-medium">Show Model Answer</Label>
+                  <p className="text-xs text-muted-foreground">Students can see the correct model answer</p>
+                </div>
+                <Checkbox 
+                  checked={publishSettings.show_model_answer}
+                  onCheckedChange={(checked) => 
+                    setPublishSettings(prev => ({...prev, show_model_answer: checked}))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <CheckCircle2 className="inline h-4 w-4 mr-1" />
+                <strong>Note:</strong> Feedback and scores are always visible to students
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => publishResults(selectedExam.exam_id)}
+              className="bg-green-500 hover:bg-green-600"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Publish Results
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
