@@ -1602,3 +1602,79 @@ agent_communication:
     - agent: "testing"
       message: "✅ OBJECTID SERIALIZATION FIX VERIFICATION SUCCESS! RE-TEST COMPLETE - ALL CRITICAL ENDPOINTS NOW WORKING! 🎉 COMPREHENSIVE TESTING PASSED: Created specialized ObjectId serialization test suite and verified all 6 critical endpoints mentioned in the review request. ✅ GRADING JOBS ENDPOINT FIXED: GET /api/grading-jobs/{job_id} now returns serialize_doc(job) with no _id fields in nested submissions - 520 crash issue RESOLVED. ✅ ALL CRITICAL ENDPOINTS VERIFIED: GET /api/submissions (serialize_doc applied), GET /api/exams (serialize_doc applied), GET /api/batches (serialize_doc applied), GET /api/students (serialize_doc applied), GET /api/admin/users (serialize_doc pattern confirmed). ✅ NESTED OBJECTS CLEAN: Grading job endpoint properly serializes nested submission objects with no _id fields anywhere in the response. ✅ BACKEND LOGS CLEAN: No serialization errors found in backend logs during testing. ✅ TEST RESULTS: 15/15 ObjectId serialization tests passed (100% success rate). ✅ JSON VALIDATION: All endpoints return valid JSON with no ObjectId types or _id fields. The main agent has successfully applied serialize_doc() to all critical endpoints that were causing 520 crashes. The grading workflow can now complete without ObjectId serialization errors. 🚀 PRODUCTION READY!"
 
+
+#====================================================================================================
+# NEW TESTING REQUEST - Multi-Format File Upload Feature
+#====================================================================================================
+
+backend:
+  - task: "Multi-Format File Upload - Backend Implementation"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/backend/file_utils.py"
+        - "/app/backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: Multi-format file upload support (PDF, Word, Images, ZIP, Google Drive links). Key changes: 1) Installed poppler-utils system dependency for PDF processing 2) Updated /api/exams/{exam_id}/upload-model-answer to support file uploads OR Google Drive links, handle ZIP files by extracting and processing all contents 3) Updated /api/exams/{exam_id}/upload-question-paper to use convert_to_images() with ZIP support 4) Updated /api/exams/{exam_id}/submit (student submission) to store content type metadata 5) Updated /api/exams/{exam_id}/grade-student-submissions to detect file type from GridFS metadata and use convert_to_images() 6) file_utils.py contains: convert_to_images() for PDF/Word/Images, extract_zip_files() for ZIP handling, download_from_google_drive() for link support, extract_file_id_from_url() for parsing Drive URLs. NEEDS TESTING: Upload Word doc, ZIP with multiple files, image files, and Google Drive links for all three upload types (question paper, model answer, student papers)."
+
+frontend:
+  - task: "Multi-Format File Upload - UI Updates"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/frontend/src/pages/teacher/UploadGrade.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "IMPLEMENTED: Updated all three file dropzone texts in UploadGrade.jsx to indicate multi-format support. Line 1226: Question paper dropzone now says 'PDF, Word, Images, or ZIP • Questions auto-extracted'. Line 1263: Model answer dropzone now says 'PDF, Word, Images, or ZIP • Used for AI grading'. Line 1756: Student papers dropzone now says 'PDF, Word, Images, ZIP • Multiple files allowed'. NEEDS TESTING: Visual verification of dropzone text changes."
+
+  - task: "DialogDescription Import Fix"
+    implemented: true
+    working: "NA"
+    files:
+        - "/app/frontend/src/pages/teacher/ReviewPapers.jsx"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "CRITICAL BUG: App crashes with 'DialogDescription is not defined' error in ReviewPapers component. Component uses DialogDescription but doesn't import it."
+        - working: "NA"
+          agent: "main"
+          comment: "FIXED: Added DialogDescription to the import statement from ../../components/ui/dialog at line 15. App now loads successfully without errors. Frontend compiled successfully with only warnings (no errors)."
+
+metadata:
+  created_by: "main_agent"
+  version: "3.0"
+  test_sequence: 3
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Multi-Format File Upload - Complete E2E Testing"
+    - "Verify poppler-utils fix for PDF processing"
+    - "Test ZIP file extraction and processing"
+    - "Test Word document conversion"
+    - "Test image file uploads"
+    - "Test Google Drive link downloads (if API key available)"
+  test_all: false
+  test_priority: "critical_first"
+
+agent_communication:
+    - agent: "main"
+      message: "CRITICAL POPPLER FIX + MULTI-FORMAT UPLOAD IMPLEMENTATION COMPLETE: ✅ POPPLER DEPENDENCY INSTALLED: Executed 'sudo apt-get install -y poppler-utils' successfully. Backend and task_worker services restarted. Verified pdfinfo v22.12.0 is available and pdf2image Python import works correctly. Created test PDF and verified conversion to base64 images works (110080 character output). ✅ MULTI-FORMAT BACKEND IMPLEMENTATION: Updated 3 upload endpoints to use convert_to_images() from file_utils.py with support for PDF, Word (.docx), Images (JPG, PNG), and ZIP files. ZIP files are extracted and all contents processed individually. Model answer endpoint also supports Google Drive links via download_from_google_drive() function. Student submission endpoint updated to store contentType metadata in GridFS for proper file type detection during grading. Grade student submissions endpoint updated to read file type from GridFS and use convert_to_images() instead of hardcoded pdf_to_images(). ✅ FRONTEND UI UPDATES: Updated all 3 dropzone placeholder texts in UploadGrade.jsx to reflect multi-format support: 'PDF, Word, Images, or ZIP' with helpful context messages. ✅ CRITICAL BUG FIX: Fixed DialogDescription import error in ReviewPapers.jsx (line 15) - app was crashing with 'DialogDescription is not defined'. App now loads successfully. ✅ FILE PROCESSING PIPELINE: file_utils.py contains complete pipeline: convert_to_images() handles PDF/Word/Images, extract_zip_files() unpacks ZIPs and returns list of (filename, bytes, type) tuples, download_from_google_drive() fetches files from Drive links, parse_student_from_filename() extracts student info from filenames for bulk uploads. IMPLEMENTATION STATUS: Backend and frontend code complete. Poppler dependency installed and verified. App loading without errors. NEEDS COMPREHENSIVE TESTING: 1) Upload Word document as question paper/model answer 2) Upload ZIP file with multiple PDFs/images 3) Upload image files (JPG/PNG) 4) Test file processing during grading workflow 5) Verify error handling for unsupported formats 6) Test Google Drive link downloads (requires API key setup)."
+
+Incorporate User Feedback:
+  - "User reported critical 'DialogDescription is not defined' error - FIXED"
+  - "Previous agent identified missing poppler-utils dependency - FIXED and VERIFIED"
+  - "Previous agent started multi-format upload implementation but didn't complete - NOW COMPLETE"
+
