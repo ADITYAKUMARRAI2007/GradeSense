@@ -173,14 +173,13 @@ export default function ReviewPapers({ user }) {
       });
       toast.success("Changes saved and approved!");
       
-      setSubmissions(prev => prev.map(s => 
-        s.submission_id === selectedSubmission.submission_id 
-          ? { ...s, status: "teacher_reviewed" }
-          : s
-      ));
+      // Refresh data from backend to get latest state
+      await fetchData();
       
-      // Check if this was the last paper to review
-      checkAndShowPublishDialog();
+      // Check if this was the last paper to review (after data refresh)
+      setTimeout(() => {
+        checkAndShowPublishDialog();
+      }, 300); // Small delay to ensure state is updated
       
     } catch (error) {
       toast.error("Failed to save changes");
