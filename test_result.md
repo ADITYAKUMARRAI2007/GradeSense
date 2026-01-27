@@ -445,11 +445,14 @@ backend:
         - "/app/frontend/src/pages/teacher/ClassReports.jsx"
     stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: false
           agent: "main"
           comment: "P1 ANALYTICS BUG: User reported Topic Mastery Heatmap is not interactive and shows question text instead of actual topics. User wants: 1) Heatmap to display actual topic names (not questions) 2) Topics to be clickable 3) Clicking a topic should show which students are struggling with which questions in that topic. Current implementation: Backend endpoint /api/analytics/topic-mastery returns topics with percentages and colors. Frontend shows basic grid. Needs: 1) Backend to properly aggregate by topic_tags 2) Frontend to render clickable topic blocks 3) TopicDetailModal to show struggling students per topic."
+        - working: false
+          agent: "testing"
+          comment: "❌ BACKEND ISSUE CONFIRMED: Topic Mastery Heatmap backend endpoint /api/analytics/topic-mastery returns 200 status but empty topics array. The endpoint is functional but not returning meaningful data. Root cause: No topic data available in test environment or aggregation logic not working properly. Backend needs to properly aggregate by topic_tags and return actual topic data with percentages and colors. Frontend cannot display heatmap without backend data."
 
   - task: "Student Deep-Dive Modal Logic Fix"
     implemented: true
