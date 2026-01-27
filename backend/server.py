@@ -27,6 +27,14 @@ from contextlib import asynccontextmanager
 import time
 import traceback
 from bson import ObjectId
+from file_utils import (
+    convert_to_images, 
+    extract_zip_files, 
+    parse_student_from_filename,
+    download_from_google_drive,
+    extract_file_id_from_url,
+    get_files_from_drive_folder
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
