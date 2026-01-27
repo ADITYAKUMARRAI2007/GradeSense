@@ -60,6 +60,14 @@ export default function ReviewPapers({ user }) {
   const [questionPaperImages, setQuestionPaperImages] = useState([]);
   const [examQuestions, setExamQuestions] = useState([]);
   const [zoomedImage, setZoomedImage] = useState(null);
+  
+  // Auto-publish dialog state
+  const [autoPublishDialogOpen, setAutoPublishDialogOpen] = useState(false);
+  const [publishSettings, setPublishSettings] = useState({
+    show_model_answer: false,
+    show_answer_sheet: true,
+    show_question_paper: true
+  });
   const [imageZoom, setImageZoom] = useState(100);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackQuestion, setFeedbackQuestion] = useState(null);
