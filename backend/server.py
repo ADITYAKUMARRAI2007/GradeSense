@@ -5334,7 +5334,7 @@ async def upload_question_paper(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user)
 ):
-    """Upload question paper PDF and AUTO-EXTRACT questions"""
+    """Upload question paper (PDF/Word/Image/ZIP) and AUTO-EXTRACT questions"""
     if user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can upload question papers")
     
@@ -5342,18 +5342,24 @@ async def upload_question_paper(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Read and convert PDF to images
-    pdf_bytes = await file.read()
+    # Read file and get file type
+    file_bytes = await file.read()
+    file_ext = os.path.splitext(file.filename)[1].lower().replace('.', '')
+    file_type = file_ext or file.content_type
     
     # Check file size - limit to 30MB for safety
-    file_size_mb = len(pdf_bytes) / (1024 * 1024)
-    if len(pdf_bytes) > 30 * 1024 * 1024:
+    file_size_mb = len(file_bytes) / (1024 * 1024)
+    if len(file_bytes) > 30 * 1024 * 1024:
         raise HTTPException(
             status_code=400, 
-            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the PDF or reducing scan quality."
+            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the file or reducing quality."
         )
     
-    images = pdf_to_images(pdf_bytes)
+    # Convert to images based on file type
+    try:
+        images = convert_to_images(file_bytes, file_type)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
     
     # Store images in GridFS to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
