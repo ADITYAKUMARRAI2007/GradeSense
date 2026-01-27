@@ -670,7 +670,14 @@ export default function UploadGrade({ user }) {
 
   const { getRootProps: getModelRootProps, getInputProps: getModelInputProps, isDragActive: isModelDragActive } = useDropzone({
     onDrop: onModelAnswerDrop,
-    accept: { 'application/pdf': ['.pdf'] },
+    accept: { 
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'application/zip': ['.zip']
+    },
     maxFiles: 1
   });
 
@@ -693,7 +700,14 @@ export default function UploadGrade({ user }) {
 
   const { getRootProps: getQuestionRootProps, getInputProps: getQuestionInputProps, isDragActive: isQuestionDragActive } = useDropzone({
     onDrop: onQuestionPaperDrop,
-    accept: { 'application/pdf': ['.pdf'] },
+    accept: { 
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'application/zip': ['.zip']
+    },
     maxFiles: 1
   });
 
