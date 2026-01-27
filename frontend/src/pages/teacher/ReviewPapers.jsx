@@ -36,7 +36,8 @@ import {
   Sparkles,
   Brain,
   Trash2,
-  Plus
+  Plus,
+  PartyPopper
 } from "lucide-react";
 
 export default function ReviewPapers({ user }) {
