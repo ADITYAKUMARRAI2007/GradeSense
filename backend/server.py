@@ -1822,8 +1822,11 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     ma_stream = await fs.open_download_stream_by_name(ma_file_ref)
     ma_bytes = await ma_stream.read()
     
-    # Convert model answer to images
-    ma_images = pdf_to_base64_images(ma_bytes)
+    # Convert model answer to images (supports multiple formats)
+    # Detect file type from GridFS metadata
+    ma_file_info = await fs.find_one({"filename": ma_file_ref})
+    ma_file_type = ma_file_info.get("contentType", "application/pdf").split('/')[-1] if ma_file_info else "pdf"
+    ma_images = convert_to_images(ma_bytes, ma_file_type)
     
     # Store model answer in GridFS with images
     await db.exam_files.update_one(
