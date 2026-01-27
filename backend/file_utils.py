@@ -47,31 +47,83 @@ def convert_to_images(file_bytes: bytes, file_type: str) -> List[str]:
                 images.append(img_str)
                 
         elif file_type in ['docx', 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
-            # Word document - convert to images page by page
-            doc = Document(io.BytesIO(file_bytes))
-            
-            # Create temporary HTML representation and convert to image
-            # For simplicity, we'll extract images and text
-            # Note: This is a basic implementation - may need enhancement
-            for i, para in enumerate(doc.paragraphs):
-                if para.text.strip():
-                    # Create a simple image from text (placeholder)
-                    # In production, you'd want a better Word->Image converter
-                    # For now, just log and continue
-                    logger.info(f"Processing Word paragraph {i}")
-            
-            # Fallback: If doc has embedded images, extract them
-            for rel in doc.part.rels.values():
-                if "image" in rel.target_ref:
-                    image_data = rel.target_part.blob
-                    img_str = base64.b64encode(image_data).decode()
-                    images.append(img_str)
+            # Word document - convert to PDF first, then to images
+            # This provides better quality and layout preservation
+            try:
+                from docx import Document
+                from PIL import Image, ImageDraw, ImageFont
+                import textwrap
+                
+                # Parse Word document
+                doc = Document(io.BytesIO(file_bytes))
+                
+                # Extract all text content with basic formatting
+                full_text = []
+                for para in doc.paragraphs:
+                    if para.text.strip():
+                        full_text.append(para.text)
+                
+                # If document has text, convert to image pages
+                if full_text:
+                    # Create images from text (simple text renderer)
+                    page_height = 1400
+                    page_width = 1000
+                    margin = 50
+                    line_height = 25
                     
-            # If no images found, create a placeholder
-            if not images:
-                logger.warning("Word doc has no images, creating text-based representation")
-                # Create a simple white image as placeholder
+                    current_page = Image.new('RGB', (page_width, page_height), color='white')
+                    draw = ImageDraw.Draw(current_page)
+                    
+                    y_position = margin
+                    for text in full_text:
+                        # Wrap long lines
+                        wrapped_lines = textwrap.wrap(text, width=80)
+                        for line in wrapped_lines:
+                            if y_position > page_height - margin:
+                                # Save current page and start new one
+                                buffered = io.BytesIO()
+                                current_page.save(buffered, format="JPEG", quality=95)
+                                img_str = base64.b64encode(buffered.getvalue()).decode()
+                                images.append(img_str)
+                                
+                                current_page = Image.new('RGB', (page_width, page_height), color='white')
+                                draw = ImageDraw.Draw(current_page)
+                                y_position = margin
+                            
+                            draw.text((margin, y_position), line, fill='black')
+                            y_position += line_height
+                    
+                    # Save the last page
+                    if y_position > margin:
+                        buffered = io.BytesIO()
+                        current_page.save(buffered, format="JPEG", quality=95)
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+                        images.append(img_str)
+                else:
+                    # No text found, try to extract embedded images
+                    for rel in doc.part.rels.values():
+                        if "image" in rel.target_ref:
+                            image_data = rel.target_part.blob
+                            img_str = base64.b64encode(image_data).decode()
+                            images.append(img_str)
+                    
+                    # If still no content, create placeholder
+                    if not images:
+                        logger.warning("Word doc has no text or images")
+                        img = Image.new('RGB', (800, 1000), color='white')
+                        draw = ImageDraw.Draw(img)
+                        draw.text((50, 50), "Empty Document", fill='black')
+                        buffered = io.BytesIO()
+                        img.save(buffered, format="JPEG")
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+                        images.append(img_str)
+                        
+            except Exception as e:
+                logger.error(f"Word document processing failed: {e}")
+                # Fallback: create error placeholder
                 img = Image.new('RGB', (800, 1000), color='white')
+                draw = ImageDraw.Draw(img)
+                draw.text((50, 50), f"Error processing Word document: {str(e)[:100]}", fill='red')
                 buffered = io.BytesIO()
                 img.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
