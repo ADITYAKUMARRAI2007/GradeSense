@@ -5145,10 +5145,11 @@ Return valid JSON only."""
 @api_router.post("/exams/{exam_id}/upload-model-answer")
 async def upload_model_answer(
     exam_id: str,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    link: Optional[str] = None,
     user: User = Depends(get_current_user)
 ):
-    """Upload model answer PDF and AUTO-EXTRACT questions"""
+    """Upload model answer (PDF/Word/Image/ZIP) or provide Google Drive link"""
     # Set processing flag immediately
     await db.exams.update_one(
         {"exam_id": exam_id},
@@ -5162,18 +5163,44 @@ async def upload_model_answer(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Read and convert PDF to images
-    pdf_bytes = await file.read()
+    # Get file bytes - either from upload or link
+    file_bytes = None
+    file_type = None
+    
+    if link:
+        # Download from Google Drive link
+        file_id = extract_file_id_from_url(link)
+        if not file_id:
+            raise HTTPException(status_code=400, detail="Invalid Google Drive link")
+        
+        try:
+            file_bytes, mime_type = download_from_google_drive(file_id)
+            # Map mime type to file extension
+            file_type = mime_type.split('/')[-1] if '/' in mime_type else 'pdf'
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to download from link: {str(e)}")
+    elif file:
+        # Read uploaded file
+        file_bytes = await file.read()
+        # Get file type from extension or content type
+        file_ext = os.path.splitext(file.filename)[1].lower().replace('.', '')
+        file_type = file_ext or file.content_type
+    else:
+        raise HTTPException(status_code=400, detail="Either file or link must be provided")
     
     # Check file size - limit to 30MB for safety
-    file_size_mb = len(pdf_bytes) / (1024 * 1024)
-    if len(pdf_bytes) > 30 * 1024 * 1024:
+    file_size_mb = len(file_bytes) / (1024 * 1024)
+    if len(file_bytes) > 30 * 1024 * 1024:
         raise HTTPException(
             status_code=400, 
-            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the PDF or reducing scan quality."
+            detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB."
         )
     
-    images = pdf_to_images(pdf_bytes)
+    # Convert to images based on file type
+    try:
+        images = convert_to_images(file_bytes, file_type)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
     
     # Store images in GridFS to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
