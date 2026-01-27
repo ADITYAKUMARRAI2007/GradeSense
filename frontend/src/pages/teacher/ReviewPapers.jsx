@@ -237,6 +237,82 @@ export default function ReviewPapers({ user }) {
     });
   };
 
+  const handleSaveChanges = async () => {
+    if (!selectedSubmission) return;
+    
+    setSaving(true);
+    try {
+      await axios.put(`${API}/submissions/${selectedSubmission.submission_id}`, {
+        question_scores: selectedSubmission.question_scores,
+        obtained_marks: selectedSubmission.obtained_marks,
+        total_marks: selectedSubmission.total_marks,
+        percentage: selectedSubmission.percentage,
+        teacher_edited: true,
+        final_decision: "approved"
+      });
+      
+      toast.success("Changes saved and approved!");
+      await fetchData();
+      
+      // Check if this was the last paper to review
+      checkAndShowPublishDialog();
+      
+    } catch (error) {
+      toast.error("Failed to save changes");
+      console.error("Save error:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const checkAndShowPublishDialog = () => {
+    if (!filters.exam_id) return;
+    
+    // Check if popup already shown for this exam in this session
+    const shownKey = `publish_popup_shown_${filters.exam_id}`;
+    if (sessionStorage.getItem(shownKey)) {
+      return; // Already shown in this session
+    }
+    
+    // Get all submissions for this exam
+    const examSubmissions = submissions.filter(s => s.exam_id === filters.exam_id);
+    
+    // Check if all papers are reviewed (have teacher_edited or final_decision)
+    const allReviewed = examSubmissions.every(s => 
+      s.teacher_edited === true || s.final_decision === "approved"
+    );
+    
+    if (allReviewed && examSubmissions.length > 0) {
+      // Mark as shown for this session
+      sessionStorage.setItem(shownKey, 'true');
+      
+      // Check if already published
+      const exam = exams.find(e => e.exam_id === filters.exam_id);
+      if (exam && !exam.results_published) {
+        // Show auto-publish dialog
+        setTimeout(() => {
+          setAutoPublishDialogOpen(true);
+        }, 500); // Small delay for better UX
+      }
+    }
+  };
+
+  const handlePublishFromDialog = async () => {
+    if (!filters.exam_id) return;
+    
+    try {
+      await axios.post(`${API}/exams/${filters.exam_id}/publish-results`, publishSettings, {
+        withCredentials: true
+      });
+      toast.success("🎉 Results published! Students can now see their scores.");
+      setAutoPublishDialogOpen(false);
+      await fetchData(); // Refresh to update published status
+    } catch (error) {
+      console.error("Publish error:", error);
+      toast.error("Failed to publish results");
+    }
+  };
+
   const filteredSubmissions = useMemo(() => {
     return submissions.filter(s => {
       // Filter by batch
