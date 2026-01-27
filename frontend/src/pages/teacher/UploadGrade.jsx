@@ -1260,8 +1260,8 @@ export default function UploadGrade({ user }) {
                   ) : (
                     <>
                       <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="font-medium text-sm">Drop your model answer PDF here</p>
-                      <p className="text-xs text-muted-foreground mt-1">Used as reference for AI grading</p>
+                      <p className="font-medium text-sm">Drop model answer here</p>
+                      <p className="text-xs text-muted-foreground mt-1">PDF, Word, Images, or ZIP • Used for AI grading</p>
                     </>
                   )}
                 </div>
