@@ -1223,8 +1223,8 @@ export default function UploadGrade({ user }) {
                   ) : (
                     <>
                       <Upload className="w-8 h-8 mx-auto text-blue-400 mb-2" />
-                      <p className="font-medium text-sm">Drop your question paper PDF here</p>
-                      <p className="text-xs text-muted-foreground mt-1">✨ Questions will be auto-extracted and shown in review</p>
+                      <p className="font-medium text-sm">Drop question paper here</p>
+                      <p className="text-xs text-muted-foreground mt-1">PDF, Word, Images, or ZIP • Questions auto-extracted</p>
                     </>
                   )}
                 </div>
