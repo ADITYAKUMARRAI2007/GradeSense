@@ -1729,10 +1729,18 @@ async def submit_student_answer(
     if existing:
         raise HTTPException(status_code=400, detail="You have already submitted. Re-submission is not allowed.")
     
-    # Store answer paper in GridFS
+    # Store answer paper in GridFS with file type metadata
     file_bytes = await answer_paper.read()
     file_ref = f"ans_{exam_id}_{user.user_id}"
-    await fs.upload_from_stream(file_ref, file_bytes)
+    
+    # Store content type for proper file handling during grading
+    gridfs_id = fs.put(
+        file_bytes,
+        filename=file_ref,
+        contentType=answer_paper.content_type or 'application/pdf',
+        exam_id=exam_id,
+        student_id=user.user_id
+    )
     
     # Create submission record
     submission_id = f"sub_{uuid.uuid4().hex[:12]}"
