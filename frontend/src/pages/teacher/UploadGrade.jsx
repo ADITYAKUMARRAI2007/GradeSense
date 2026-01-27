@@ -718,8 +718,16 @@ export default function UploadGrade({ user }) {
 
   const { getRootProps: getStudentRootProps, getInputProps: getStudentInputProps, isDragActive: isStudentDragActive } = useDropzone({
     onDrop: onStudentPapersDrop,
-    accept: { 'application/pdf': ['.pdf'] },
-    multiple: true
+    accept: { 
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'application/zip': ['.zip']  // ZIP for bulk upload
+    },
+    multiple: true,
+    maxFiles: 50  // Allow up to 50 files or 1 ZIP
   });
 
   const removeStudentFile = (index) => {
