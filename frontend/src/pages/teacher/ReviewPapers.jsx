@@ -1781,6 +1781,90 @@ export default function ReviewPapers({ user }) {
               {selectedSubmission && DetailContent}
             </DialogContent>
           </Dialog>
+
+          {/* Auto-Publish Dialog */}
+          <Dialog open={autoPublishDialogOpen} onOpenChange={setAutoPublishDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <PartyPopper className="w-6 h-6 text-green-500" />
+                  <DialogTitle>All Papers Reviewed!</DialogTitle>
+                </div>
+                <DialogDescription>
+                  Great job! You've reviewed all papers for this exam. 
+                  Would you like to publish the results now so students can see their scores?
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <p className="text-sm font-medium">Choose what students can see:</p>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <Label className="font-medium">Show Question Paper</Label>
+                      <p className="text-xs text-muted-foreground">Students can see the original questions</p>
+                    </div>
+                    <Checkbox 
+                      checked={publishSettings.show_question_paper}
+                      onCheckedChange={(checked) => 
+                        setPublishSettings(prev => ({...prev, show_question_paper: checked}))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <Label className="font-medium">Show Answer Sheet</Label>
+                      <p className="text-xs text-muted-foreground">Students can see their submitted answers</p>
+                    </div>
+                    <Checkbox 
+                      checked={publishSettings.show_answer_sheet}
+                      onCheckedChange={(checked) => 
+                        setPublishSettings(prev => ({...prev, show_answer_sheet: checked}))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <Label className="font-medium">Show Model Answer</Label>
+                      <p className="text-xs text-muted-foreground">Students can see the correct answers</p>
+                    </div>
+                    <Checkbox 
+                      checked={publishSettings.show_model_answer}
+                      onCheckedChange={(checked) => 
+                        setPublishSettings(prev => ({...prev, show_model_answer: checked}))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <CheckCircle2 className="inline h-4 w-4 mr-1" />
+                    <strong>Note:</strong> Feedback and scores are always visible to students
+                  </p>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setAutoPublishDialogOpen(false)}
+                >
+                  Maybe Later
+                </Button>
+                <Button 
+                  onClick={handlePublishFromDialog}
+                  className="bg-green-500 hover:bg-green-600"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Publish Results
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </Layout>
     );
