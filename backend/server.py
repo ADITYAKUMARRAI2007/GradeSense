@@ -5394,11 +5394,36 @@ async def upload_question_paper(
             detail=f"File too large ({file_size_mb:.1f}MB). Maximum size is 30MB. Try compressing the file or reducing quality."
         )
     
-    # Convert to images based on file type
-    try:
-        images = convert_to_images(file_bytes, file_type)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
+    # Handle ZIP files - extract and process all files inside
+    all_images = []
+    if file_type in ['zip', 'application/zip', 'application/x-zip-compressed']:
+        try:
+            extracted_files = extract_zip_files(file_bytes)
+            logger.info(f"Extracted {len(extracted_files)} files from ZIP")
+            
+            # Process each extracted file
+            for filename, extracted_bytes, extracted_type in extracted_files:
+                try:
+                    file_images = convert_to_images(extracted_bytes, extracted_type)
+                    all_images.extend(file_images)
+                    logger.info(f"Processed {filename}: {len(file_images)} images")
+                except Exception as e:
+                    logger.warning(f"Failed to process {filename}: {e}")
+                    # Continue with other files
+            
+            if not all_images:
+                raise HTTPException(status_code=400, detail="No valid files found in ZIP")
+                
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to process ZIP file: {str(e)}")
+    else:
+        # Convert single file to images
+        try:
+            all_images = convert_to_images(file_bytes, file_type)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
+    
+    images = all_images
     
     # Store images in GridFS to avoid MongoDB 16MB document limit
     file_id = str(uuid.uuid4())
