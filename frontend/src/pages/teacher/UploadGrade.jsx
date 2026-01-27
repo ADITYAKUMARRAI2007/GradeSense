@@ -1753,9 +1753,9 @@ export default function UploadGrade({ user }) {
               >
                 <input {...getStudentInputProps()} />
                 <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium">Drop student answer PDFs here</p>
+                <p className="font-medium">Drop student answer papers here</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Multiple files allowed
+                  PDF, Word, Images, ZIP • Multiple files allowed
                 </p>
               </div>
 
