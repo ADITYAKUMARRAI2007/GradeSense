@@ -6,7 +6,7 @@ from datetime import datetime
 import subprocess
 
 def test_infer_topics():
-    base_url = "https://gradesense-ai-2.preview.emergentagent.com/api"
+    base_url = "https://gradecraft-ai.preview.emergentagent.com/api"
     
     # Create test user and session
     timestamp = int(datetime.now().timestamp())
