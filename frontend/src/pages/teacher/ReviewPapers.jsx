@@ -205,18 +205,29 @@ export default function ReviewPapers({ user }) {
       s.teacher_edited === true || s.final_decision === "approved"
     );
     
+    console.log('Auto-publish check:', {
+      exam_id: filters.exam_id,
+      totalSubmissions: examSubmissions.length,
+      allReviewed,
+      shownBefore: !!sessionStorage.getItem(shownKey)
+    });
+    
     if (allReviewed && examSubmissions.length > 0) {
-      // Mark as shown for this session
-      sessionStorage.setItem(shownKey, 'true');
-      
       // Check if already published
       const exam = exams.find(e => e.exam_id === filters.exam_id);
       if (exam && !exam.results_published) {
+        // Mark as shown for this session BEFORE showing dialog
+        sessionStorage.setItem(shownKey, 'true');
+        
         // Show auto-publish dialog
         setTimeout(() => {
           setAutoPublishDialogOpen(true);
         }, 500); // Small delay for better UX
+      } else {
+        console.log('Not showing publish dialog - exam already published or not found');
       }
+    } else {
+      console.log('Not all papers reviewed yet');
     }
   };
 
