@@ -7,7 +7,7 @@ import logging
 from typing import List, Tuple, Optional
 from docx import Document
 from pdf2image import convert_from_bytes
-from PIL import Image
+from PIL import Image, ImageDraw
 import base64
 import re
 from googleapiclient.discovery import build
@@ -51,7 +51,7 @@ def convert_to_images(file_bytes: bytes, file_type: str) -> List[str]:
             # This provides better quality and layout preservation
             try:
                 from docx import Document
-                from PIL import Image, ImageDraw, ImageFont
+                from PIL import Image, ImageDraw, ImageDraw, ImageFont
                 import textwrap
                 
                 # Parse Word document
