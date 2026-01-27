@@ -129,13 +129,42 @@ def convert_to_images(file_bytes: bytes, file_type: str) -> List[str]:
                 img_str = base64.b64encode(buffered.getvalue()).decode()
                 images.append(img_str)
                 
-        elif file_type in ['jpg', 'jpeg', 'png', 'image/jpeg', 'image/png']:
+        elif file_type in ['jpg', 'jpeg', 'png', 'image/jpeg', 'image/png', 'gif', 'bmp', 'image/gif', 'image/bmp']:
             # Direct image file
-            img = Image.open(io.BytesIO(file_bytes))
-            buffered = io.BytesIO()
-            img.save(buffered, format="JPEG", quality=95)
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            images.append(img_str)
+            try:
+                img = Image.open(io.BytesIO(file_bytes))
+                
+                # Convert RGBA/Palette images to RGB
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    # Create white background
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = background
+                elif img.mode not in ('RGB', 'L'):
+                    img = img.convert('RGB')
+                
+                # Ensure minimum size for OCR (at least 100x100)
+                if img.size[0] < 100 or img.size[1] < 100:
+                    logger.warning(f"Image too small ({img.size}), resizing to 800x800")
+                    img = img.resize((800, 800), Image.Resampling.LANCZOS)
+                
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG", quality=95)
+                img_str = base64.b64encode(buffered.getvalue()).decode()
+                images.append(img_str)
+                
+            except Exception as e:
+                logger.error(f"Image processing failed: {e}")
+                # Create error placeholder
+                img = Image.new('RGB', (800, 600), color='white')
+                draw = ImageDraw.Draw(img)
+                draw.text((50, 50), f"Error processing image: {str(e)[:100]}", fill='red')
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG")
+                img_str = base64.b64encode(buffered.getvalue()).decode()
+                images.append(img_str)
             
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
