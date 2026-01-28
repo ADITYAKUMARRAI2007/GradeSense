@@ -201,6 +201,10 @@ def apply_annotations_to_image(
         Base64 encoded annotated image
     """
     try:
+        # Skip if no annotations
+        if not annotations:
+            return image_base64
+            
         # Decode base64 image
         img_data = base64.b64decode(image_base64)
         img = Image.open(io.BytesIO(img_data))
@@ -238,9 +242,9 @@ def apply_annotations_to_image(
             elif ann.annotation_type == AnnotationType.POINT_NUMBER:
                 draw_circle_with_text(draw, ann.x, ann.y, ann.text, "black", ann.size // 2, font)
         
-        # Convert back to base64
+        # Convert back to base64 with optimized quality for faster processing
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=95)
+        img.save(buffered, format="JPEG", quality=85, optimize=False)  # Reduced quality, disabled optimize for speed
         annotated_base64 = base64.b64encode(buffered.getvalue()).decode()
         
         return annotated_base64
