@@ -663,7 +663,7 @@ async def exam_has_model_answer(exam_id: str) -> bool:
 # ============== AUTH HELPERS ==============
 
 async def get_current_user(request: Request) -> User:
-    """Get current user from session token"""
+    """Get current user from session token (supports both OAuth sessions and JWT tokens)"""
     session_token = request.cookies.get("session_token")
     
     if not session_token:
@@ -674,6 +674,35 @@ async def get_current_user(request: Request) -> User:
     if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
+    # Try to decode as JWT first
+    jwt_payload = decode_token(session_token)
+    if jwt_payload:
+        # JWT token - extract user_id and fetch from database
+        user_id = jwt_payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Check account status
+        account_status = user.get("account_status", "active")
+        if account_status == "banned":
+            raise HTTPException(status_code=403, detail="Account banned. Contact support.")
+        elif account_status == "disabled":
+            raise HTTPException(status_code=403, detail="Account disabled. Contact support.")
+        
+        # Return user object
+        return User(
+            user_id=user["user_id"],
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            picture=user.get("picture")
+        )
+    
+    # Fallback to session-based auth (OAuth)
     session = await db.user_sessions.find_one(
         {"session_token": session_token},
         {"_id": 0}
