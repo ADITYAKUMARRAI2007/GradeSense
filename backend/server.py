@@ -5357,7 +5357,8 @@ Return valid JSON only."""
                 sq_data = current_sub_map.get(sq["sub_id"])
                 if sq_data:
                     marks = sq_data.get("obtained_marks", -1.0)
-                    if marks < 0: marks = 0.0
+                    if marks < 0:
+                        marks = 0.0
                     
                     # Extract annotations for sub-question
                     sq_annotations = sq_data.get("annotations", [])
