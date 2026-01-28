@@ -677,14 +677,23 @@ export default function ReviewPapers({ user }) {
               
               {/* Answer Sheets */}
               <div className="space-y-4">
-                {selectedSubmission.file_images.map((img, idx) => (
-                  <img 
-                    key={idx}
-                    src={`data:image/jpeg;base64,${img}`}
-                    alt={`Page ${idx + 1}`}
-                    className="w-full rounded-lg shadow-md cursor-zoom-in"
-                    onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
-                  />
+                {/* Show annotated images if available and toggle is on */}
+                {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                  selectedSubmission.annotated_images : selectedSubmission.file_images
+                ).map((img, idx) => (
+                  <div key={idx} className="relative">
+                    <img 
+                      src={`data:image/jpeg;base64,${img}`}
+                      alt={`Page ${idx + 1}`}
+                      className="w-full rounded-lg shadow-md cursor-zoom-in"
+                      onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
+                    />
+                    {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
+                      <Badge className="absolute top-2 right-2 bg-green-500 text-white">
+                        With Annotations
+                      </Badge>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
