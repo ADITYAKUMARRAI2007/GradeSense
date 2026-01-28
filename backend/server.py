@@ -415,11 +415,22 @@ class StudentSubmission(BaseModel):
     submitted_at: str
     status: str  # "submitted", "graded"
 
+class AnnotationData(BaseModel):
+    """Represents a single annotation on an answer paper"""
+    type: str  # checkmark, score_circle, flag_circle, step_label, point_number
+    x: int
+    y: int
+    text: str = ""
+    color: str = "green"
+    size: int = 30
+    page_index: int = 0  # Which page/image this annotation belongs to
+
 class SubQuestionScore(BaseModel):
     sub_id: str
     max_marks: float
     obtained_marks: float
     ai_feedback: str
+    annotations: List[AnnotationData] = []  # Annotations for this sub-question
 
 class QuestionScore(BaseModel):
     question_number: int
@@ -431,6 +442,7 @@ class QuestionScore(BaseModel):
     sub_scores: List[SubQuestionScore] = []  # For sub-question scores
     question_text: Optional[str] = None  # The question text
     status: str = "graded"  # graded, not_attempted, not_found, error
+    annotations: List[AnnotationData] = []  # Annotations for this question
 
 class Submission(BaseModel):
     model_config = ConfigDict(extra="ignore")
