@@ -764,7 +764,22 @@ async def create_session(request: Request, response: Response):
             )
             if auth_response.status_code != 200:
                 logger.error(f"Auth service returned {auth_response.status_code}: {auth_response.text}")
-                raise HTTPException(status_code=401, detail="Invalid session_id")
+                
+                # Parse the error response to provide better error messages
+                try:
+                    error_data = auth_response.json()
+                    error_detail = error_data.get("detail", {})
+                    if isinstance(error_detail, dict):
+                        error_msg = error_detail.get("error_description", "Invalid or expired session")
+                    else:
+                        error_msg = str(error_detail)
+                except:
+                    error_msg = "Invalid or expired session"
+                
+                raise HTTPException(
+                    status_code=401, 
+                    detail=f"Authentication failed: {error_msg}. Please try logging in again."
+                )
             
             auth_data = auth_response.json()
         except httpx.TimeoutException:
