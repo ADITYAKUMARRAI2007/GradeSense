@@ -940,7 +940,9 @@ export default function ReviewPapers({ user }) {
                         <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student&apos;s Answer</h3>
                       )}
                       <div className="space-y-4">
-                        {selectedSubmission.file_images.map((img, idx) => (
+                        {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                          selectedSubmission.annotated_images : selectedSubmission.file_images
+                        ).map((img, idx) => (
                           <div key={idx} className="relative group">
                             <div 
                               className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
@@ -948,6 +950,15 @@ export default function ReviewPapers({ user }) {
                             >
                               <img 
                                 src={`data:image/jpeg;base64,${img}`}
+                                alt={`Page ${idx + 1}`}
+                                className="w-full rounded-lg shadow-md"
+                                style={{ maxWidth: `${imageZoom}%` }}
+                              />
+                              {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
+                                <Badge className="absolute top-2 right-2 bg-green-500 text-white">
+                                  With Annotations
+                                </Badge>
+                              )}
                                 alt={`Page ${idx + 1}`}
                                 className="w-full rounded-lg shadow-md"
                                 style={{ minHeight: '400px', objectFit: 'contain' }}
