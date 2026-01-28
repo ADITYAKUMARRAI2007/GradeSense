@@ -5434,27 +5434,95 @@ def generate_annotated_images(
     try:
         logger.info(f"Generating annotated images for {len(original_images)} pages")
         
-        # Group annotations by page_index
+        # Auto-generate annotations from scores if AI didn't provide them
+        # This ensures annotations are always created
         annotations_by_page = {}
         for page_idx in range(len(original_images)):
             annotations_by_page[page_idx] = []
         
-        # Extract all annotations from question scores
-        for q_score in question_scores:
-            # Add question-level annotations
-            for ann_data in q_score.annotations:
-                page_idx = ann_data.page_index
-                if page_idx < len(original_images):
-                    annotations_by_page[page_idx].append(ann_data)
-            
-            # Add sub-question annotations
-            for sub_score in q_score.sub_scores:
-                for ann_data in sub_score.annotations:
-                    page_idx = ann_data.page_index
-                    if page_idx < len(original_images):
-                        annotations_by_page[page_idx].append(ann_data)
+        # Auto-generate annotations based on question scores
+        current_y = 120  # Starting Y position
+        y_spacing = 100  # Space between question annotations
+        margin_left = 30
         
-        # Now auto-position annotations for each page
+        for q_score in question_scores:
+            # Determine which page this question likely appears on
+            # Simple heuristic: distribute questions evenly across pages
+            page_idx = min(
+                int((q_score.question_number - 1) / max(1, len(question_scores) / len(original_images))),
+                len(original_images) - 1
+            )
+            
+            # Check if AI provided annotations
+            has_ai_annotations = len(q_score.annotations) > 0 or any(
+                len(sub.annotations) > 0 for sub in q_score.sub_scores
+            )
+            
+            if not has_ai_annotations:
+                # Auto-generate basic annotations
+                # Add question number circle
+                annotations_by_page[page_idx].append(AnnotationData(
+                    type=AnnotationType.POINT_NUMBER,
+                    x=margin_left,
+                    y=current_y,
+                    text=str(q_score.question_number),
+                    color="black",
+                    size=25,
+                    page_index=page_idx
+                ))
+                
+                # Add score based on performance
+                score_percentage = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+                
+                # Add checkmark or flag based on score
+                if score_percentage >= 60:
+                    # Good score - add checkmark
+                    annotations_by_page[page_idx].append(AnnotationData(
+                        type=AnnotationType.CHECKMARK,
+                        x=margin_left + 60,
+                        y=current_y,
+                        text="",
+                        color="green",
+                        size=25,
+                        page_index=page_idx
+                    ))
+                elif score_percentage < 30:
+                    # Low score - add flag
+                    annotations_by_page[page_idx].append(AnnotationData(
+                        type=AnnotationType.FLAG_CIRCLE,
+                        x=margin_left + 60,
+                        y=current_y + 5,
+                        text="R",
+                        color="red",
+                        size=30,
+                        page_index=page_idx
+                    ))
+                
+                # Add score circle
+                annotations_by_page[page_idx].append(AnnotationData(
+                    type=AnnotationType.SCORE_CIRCLE,
+                    x=margin_left + 120,
+                    y=current_y + 5,
+                    text=str(int(q_score.obtained_marks)) if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}",
+                    color="green" if score_percentage >= 60 else "red",
+                    size=32,
+                    page_index=page_idx
+                ))
+                
+                current_y += y_spacing
+            else:
+                # Use AI-provided annotations
+                for ann_data in q_score.annotations:
+                    if ann_data.page_index < len(original_images):
+                        annotations_by_page[ann_data.page_index].append(ann_data)
+                
+                # Add sub-question annotations
+                for sub_score in q_score.sub_scores:
+                    for ann_data in sub_score.annotations:
+                        if ann_data.page_index < len(original_images):
+                            annotations_by_page[ann_data.page_index].append(ann_data)
+        
+        # Now apply annotations to each page
         annotated_images = []
         for page_idx, original_image in enumerate(original_images):
             page_annotations = annotations_by_page.get(page_idx, [])
@@ -5464,24 +5532,29 @@ def generate_annotated_images(
                 annotated_images.append(original_image)
                 continue
             
-            # Auto-position annotations vertically on the left margin
+            # Convert AnnotationData to Annotation objects with positioning
             positioned_annotations = []
-            margin_left = 50
-            current_y = 100
-            y_spacing = 80
+            current_y_pos = 120
             
             for ann_data in page_annotations:
-                # Create Annotation object with auto-positioned coordinates
+                # For AI-provided annotations, auto-position them
+                if ann_data.x == 0 and ann_data.y == 0:
+                    x_pos = 30 if ann_data.type in [AnnotationType.CHECKMARK, AnnotationType.POINT_NUMBER] else 90
+                    y_pos = current_y_pos
+                    current_y_pos += 80
+                else:
+                    x_pos = ann_data.x if ann_data.x > 0 else 30
+                    y_pos = ann_data.y if ann_data.y > 0 else current_y_pos
+                
                 ann = Annotation(
                     annotation_type=ann_data.type,
-                    x=margin_left if ann_data.type in [AnnotationType.CHECKMARK, AnnotationType.POINT_NUMBER] else margin_left + 100,
-                    y=current_y,
+                    x=x_pos,
+                    y=y_pos,
                     text=ann_data.text,
                     color=ann_data.color,
                     size=ann_data.size
                 )
                 positioned_annotations.append(ann)
-                current_y += y_spacing
             
             # Apply annotations to this page
             annotated_image = apply_annotations_to_image(original_image, positioned_annotations)
