@@ -5407,6 +5407,89 @@ Return valid JSON only."""
                 "paper_hash": paper_hash,
                 "results": results_json,
                 "created_at": datetime.now(timezone.utc).isoformat()
+
+
+def generate_annotated_images(
+    original_images: List[str],
+    question_scores: List[QuestionScore]
+) -> List[str]:
+    """
+    Generate annotated images by overlaying grading annotations on original student answer images
+    
+    Args:
+        original_images: List of base64 encoded original student answer images
+        question_scores: List of QuestionScore objects with annotation data
+        
+    Returns:
+        List of base64 encoded annotated images
+    """
+    try:
+        logger.info(f"Generating annotated images for {len(original_images)} pages")
+        
+        # Group annotations by page_index
+        annotations_by_page = {}
+        for page_idx in range(len(original_images)):
+            annotations_by_page[page_idx] = []
+        
+        # Extract all annotations from question scores
+        for q_score in question_scores:
+            # Add question-level annotations
+            for ann_data in q_score.annotations:
+                page_idx = ann_data.page_index
+                if page_idx < len(original_images):
+                    annotations_by_page[page_idx].append(ann_data)
+            
+            # Add sub-question annotations
+            for sub_score in q_score.sub_scores:
+                for ann_data in sub_score.annotations:
+                    page_idx = ann_data.page_index
+                    if page_idx < len(original_images):
+                        annotations_by_page[page_idx].append(ann_data)
+        
+        # Now auto-position annotations for each page
+        annotated_images = []
+        for page_idx, original_image in enumerate(original_images):
+            page_annotations = annotations_by_page.get(page_idx, [])
+            
+            if not page_annotations:
+                # No annotations for this page, keep original
+                annotated_images.append(original_image)
+                continue
+            
+            # Auto-position annotations vertically on the left margin
+            positioned_annotations = []
+            margin_left = 50
+            current_y = 100
+            y_spacing = 80
+            
+            for ann_data in page_annotations:
+                # Create Annotation object with auto-positioned coordinates
+                ann = Annotation(
+                    annotation_type=ann_data.type,
+                    x=margin_left if ann_data.type in [AnnotationType.CHECKMARK, AnnotationType.POINT_NUMBER] else margin_left + 100,
+                    y=current_y,
+                    text=ann_data.text,
+                    color=ann_data.color,
+                    size=ann_data.size
+                )
+                positioned_annotations.append(ann)
+                current_y += y_spacing
+            
+            # Apply annotations to this page
+            annotated_image = apply_annotations_to_image(original_image, positioned_annotations)
+            annotated_images.append(annotated_image)
+            
+            logger.info(f"Page {page_idx + 1}: Applied {len(positioned_annotations)} annotations")
+        
+        logger.info(f"Successfully generated {len(annotated_images)} annotated images")
+        return annotated_images
+        
+    except Exception as e:
+        logger.error(f"Error generating annotated images: {e}", exc_info=True)
+        # Return original images on error
+        return original_images
+
+
             }},
             upsert=True
         )
