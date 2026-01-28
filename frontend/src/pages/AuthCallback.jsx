@@ -39,9 +39,13 @@ export default function AuthCallback() {
         console.log("Calling API:", `${API}/auth/session`);
         
         // Exchange session_id for session_token (include preferred_role)
+        // Use withCredentials to ensure cookies are sent
         const response = await axios.post(`${API}/auth/session`, {
           session_id: sessionId,
           preferred_role: preferredRole,
+        }, {
+          withCredentials: true,
+          timeout: 15000  // 15 second timeout
         });
 
         console.log("API Response:", response.data);
