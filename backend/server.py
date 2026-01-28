@@ -5397,11 +5397,13 @@ Return valid JSON only."""
 
     # Store in Cache and DB
     try:
+        import json as json_lib
+        
         # Update memory cache
         grading_cache[paper_hash] = final_scores
 
         # Update DB cache
-        results_json = json.dumps([s.model_dump() for s in final_scores])
+        results_json = json_lib.dumps([s.model_dump() for s in final_scores])
         await db.grading_results.update_one(
             {"paper_hash": paper_hash},
             {"$set": {
