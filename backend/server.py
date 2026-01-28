@@ -451,6 +451,8 @@ class Submission(BaseModel):
     student_id: str
     student_name: str
     file_data: Optional[str] = None
+    file_images: Optional[List[str]] = None  # Original student answer images
+    annotated_images: Optional[List[str]] = None  # Annotated images with grading marks
     total_score: float = 0
     percentage: float = 0
     question_scores: List[QuestionScore] = []
