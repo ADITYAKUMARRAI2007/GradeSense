@@ -56,6 +56,7 @@ export default function ReviewPapers({ user }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showModelAnswer, setShowModelAnswer] = useState(true);
   const [showQuestionPaper, setShowQuestionPaper] = useState(true);
+  const [showAnnotations, setShowAnnotations] = useState(true); // NEW: Toggle for annotated view
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
   const [questionPaperImages, setQuestionPaperImages] = useState([]);
   const [examQuestions, setExamQuestions] = useState([]);
