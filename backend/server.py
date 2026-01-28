@@ -6036,6 +6036,10 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     model_answer_text=model_answer_text
                 )
                 
+                # Generate annotated images with grading marks
+                logger.info(f"Generating annotated images for {student_name}")
+                annotated_images = generate_annotated_images(images, scores)
+                
                 total_score = sum(s.obtained_marks for s in scores)
                 percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
                 
@@ -6046,7 +6050,8 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     "student_id": user_id,
                     "student_name": student_name,
                     "file_data": base64.b64encode(pdf_bytes).decode(),
-                    "file_images": images,
+                    "file_images": images,  # Original images
+                    "annotated_images": annotated_images,  # NEW: Annotated images with grading marks
                     "total_score": total_score,
                     "percentage": round(percentage, 2),
                     "question_scores": [s.model_dump() for s in scores],
