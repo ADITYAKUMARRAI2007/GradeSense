@@ -29,6 +29,7 @@ from server import (
     get_exam_model_answer_images,
     get_exam_model_answer_text,
     grade_with_ai,
+    generate_annotated_images,
     create_notification
 )
 
