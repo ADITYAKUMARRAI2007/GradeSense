@@ -245,9 +245,9 @@ async def process_grading_job_in_background(
                     
                     return {"submission": submission, "filename": filename}
                 
-                # Process with 5-minute timeout
+                # Process with 10-minute timeout (increased for annotation generation)
                 try:
-                    result = await asyncio.wait_for(process_single_paper(), timeout=300.0)
+                    result = await asyncio.wait_for(process_single_paper(), timeout=600.0)
                     
                     if "error" in result:
                         errors.append({"filename": result["filename"], "error": result["error"]})
@@ -260,10 +260,10 @@ async def process_grading_job_in_background(
                         submissions.append(submission_data)
                     
                 except asyncio.TimeoutError:
-                    logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 5 minutes")
+                    logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 10 minutes")
                     errors.append({
                         "filename": filename,
-                        "error": "Processing timeout - exceeded 5 minutes (paper too complex or API slow)"
+                        "error": "Processing timeout - exceeded 10 minutes (paper too complex or API slow)"
                     })
                 
                 # Explicit memory cleanup
