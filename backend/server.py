@@ -4908,15 +4908,41 @@ Return your response in this exact JSON format:
       "what_done_well": "Brief summary of correct elements",
       "areas_to_improve": "Specific improvement suggestions",
       "sub_scores": [
-        {{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Feedback for part a"}},
-        {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b"}}
+        {{
+          "sub_id": "a",
+          "obtained_marks": 3,
+          "ai_feedback": "Feedback for part a",
+          "annotations": [
+            {{"type": "step_label", "text": "2aStep1", "page_index": 0}},
+            {{"type": "score_circle", "text": "3", "color": "green", "page_index": 0}},
+            {{"type": "checkmark", "page_index": 0}}
+          ]
+        }},
+        {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b", "annotations": []}}
       ],
       "confidence": 0.95,
-      "flags": []
+      "flags": [],
+      "annotations": []
     }}
   ],
   "grading_notes": "Any overall observations about the paper"
 }}
+
+### ANNOTATION INSTRUCTIONS (NEW):
+For each question/sub-question, provide annotation markers:
+- "step_label": Text label like "2aStep1", "2aStep2" to mark evaluation steps
+- "score_circle": Green circle with marks awarded (e.g., "3", "0")
+- "checkmark": Green checkmark for correct points
+- "flag_circle": Red circle with "R" for issues needing attention
+- "point_number": Numbered circles (1, 2, 3) for main points
+
+Each annotation should specify:
+- type: One of [step_label, score_circle, checkmark, flag_circle, point_number]
+- text: The text to display (for labels and circles)
+- page_index: Which page (0-indexed) this annotation belongs to
+- color: "green" or "red" (optional, defaults to green)
+
+NOTE: You don't need to provide x, y coordinates. The system will auto-position annotations based on the order and page.
 
 **CRITICAL - SUB-QUESTION HANDLING:**
 - If a question has sub-parts (like Q32 has parts a and b), you MUST populate the sub_scores array
