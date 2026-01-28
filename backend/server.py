@@ -5498,14 +5498,6 @@ def generate_annotated_images(
         return original_images
 
 
-            }},
-            upsert=True
-        )
-    except Exception as e:
-        logger.error(f"Error saving grading cache: {e}")
-
-    return final_scores
-
 @api_router.post("/exams/{exam_id}/upload-model-answer")
 async def upload_model_answer(
     exam_id: str,
