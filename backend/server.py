@@ -903,6 +903,138 @@ async def create_session(request: Request, response: Response):
     }
 
 
+
+# ============== JWT AUTH ENDPOINTS (Email/Password Alternative) ==============
+from auth_utils import verify_password, get_password_hash, create_access_token, decode_token
+from pydantic import EmailStr, Field
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    name: str
+    role: str = Field(..., pattern="^(teacher|student)$")
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+@api_router.post("/auth/register")
+async def register_user(request: RegisterRequest, response: Response):
+    """Register a new user with email and password (JWT-based auth)"""
+    # Check if user already exists
+    existing_user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create new user
+    user_id = str(uuid.uuid4())
+    hashed_password = get_password_hash(request.password)
+    
+    new_user = {
+        "user_id": user_id,
+        "email": request.email,
+        "name": request.name,
+        "role": request.role,
+        "password_hash": hashed_password,
+        "auth_type": "jwt",  # Mark as JWT auth vs OAuth
+        "picture": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_login": datetime.now(timezone.utc).isoformat(),
+        "account_status": "active"
+    }
+    
+    await db.users.insert_one(new_user)
+    logger.info(f"New user registered via JWT: {request.email} as {request.role}")
+    
+    # Create JWT token
+    token_data = {
+        "user_id": user_id,
+        "email": request.email,
+        "role": request.role
+    }
+    access_token = create_access_token(token_data)
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=access_token,
+        httponly=True,
+        max_age=7 * 24 * 60 * 60,  # 7 days
+        samesite="lax",
+        secure=True,
+        path="/"
+    )
+    
+    return {
+        "user_id": user_id,
+        "email": request.email,
+        "name": request.name,
+        "role": request.role,
+        "picture": None,
+        "token": access_token
+    }
+
+@api_router.post("/auth/login")
+async def login_user(request: LoginRequest, response: Response):
+    """Login with email and password (JWT-based auth)"""
+    # Find user
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # Verify password
+    if "password_hash" not in user:
+        raise HTTPException(
+            status_code=400, 
+            detail="This account uses Google sign-in. Please use the 'Sign in with Google' button."
+        )
+    
+    if not verify_password(request.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # Check account status
+    account_status = user.get("account_status", "active")
+    if account_status == "banned":
+        raise HTTPException(status_code=403, detail="Account banned. Contact support.")
+    elif account_status == "disabled":
+        raise HTTPException(status_code=403, detail="Account disabled. Contact support.")
+    
+    # Update last login
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Create JWT token
+    token_data = {
+        "user_id": user["user_id"],
+        "email": user["email"],
+        "role": user["role"]
+    }
+    access_token = create_access_token(token_data)
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=access_token,
+        httponly=True,
+        max_age=7 * 24 * 60 * 60,  # 7 days
+        samesite="lax",
+        secure=True,
+        path="/"
+    )
+    
+    logger.info(f"User logged in via JWT: {user['email']}")
+    
+    return {
+        "user_id": user["user_id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "picture": user.get("picture"),
+        "token": access_token
+    }
+
 # ============== ADMIN ROUTES (PROTECTED) ==============
 
 @api_router.get("/admin/export-users")
