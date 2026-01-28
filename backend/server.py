@@ -5407,6 +5407,13 @@ Return valid JSON only."""
                 "paper_hash": paper_hash,
                 "results": results_json,
                 "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"Error saving grading cache: {e}")
+
+    return final_scores
 
 
 def generate_annotated_images(
