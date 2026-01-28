@@ -5297,8 +5297,8 @@ Return valid JSON only."""
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
             chunk = images[i : i + CHUNK_SIZE]
-            if not chunk: break
-            chunks.append((i, chunk))
+            if chunk:
+                chunks.append((i, chunk))
             if i + CHUNK_SIZE >= total_student_pages:
                 break
     
