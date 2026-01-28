@@ -164,6 +164,8 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/email-auth" element={<EmailAuthPage />} />
+      <Route path="/callback" element={<AuthCallback />} />
       <Route
         path="/profile/setup"
         element={
