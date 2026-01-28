@@ -967,17 +967,13 @@ export default function ReviewPapers({ user }) {
                                 src={`data:image/jpeg;base64,${img}`}
                                 alt={`Page ${idx + 1}`}
                                 className="w-full rounded-lg shadow-md"
-                                style={{ maxWidth: `${imageZoom}%` }}
+                                style={{ minHeight: '400px', objectFit: 'contain' }}
                               />
                               {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
                                 <Badge className="absolute top-2 right-2 bg-green-500 text-white">
                                   With Annotations
                                 </Badge>
                               )}
-                                alt={`Page ${idx + 1}`}
-                                className="w-full rounded-lg shadow-md"
-                                style={{ minHeight: '400px', objectFit: 'contain' }}
-                              />
                               {/* Zoom Overlay */}
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                                 <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
