@@ -914,6 +914,21 @@ export default function ReviewPapers({ user }) {
                         </div>
                       )}
                       
+                      {/* Annotations Toggle - NEW */}
+                      {selectedSubmission.annotated_images?.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id="show-annotations-desktop"
+                            checked={showAnnotations}
+                            onCheckedChange={setShowAnnotations}
+                          />
+                          <Label htmlFor="show-annotations-desktop" className="text-xs cursor-pointer flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-green-600" />
+                            Annotations
+                          </Label>
+                        </div>
+                      )}
+                      
                       {/* Model Answer Toggle */}
                       {modelAnswerImages.length > 0 && (
                         <div className="flex items-center gap-2">
