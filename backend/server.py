@@ -154,10 +154,37 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager - starts/stops background worker"""
     global _worker_task
     
-    # Startup: Start the background worker
+    # Startup: Check system dependencies
     logger.info("🚀 FastAPI app starting up...")
+    logger.info("🔍 Checking system dependencies...")
+    
+    # Check if poppler-utils is installed
+    import subprocess
+    import shutil
+    if not shutil.which("pdftoppm"):
+        logger.warning("⚠️  poppler-utils not found. Attempting to install...")
+        try:
+            subprocess.run(
+                ["sudo", "apt-get", "update", "-qq"],
+                check=True,
+                capture_output=True
+            )
+            subprocess.run(
+                ["sudo", "apt-get", "install", "-y", "poppler-utils"],
+                check=True,
+                capture_output=True
+            )
+            logger.info("✅ poppler-utils installed successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to install poppler-utils: {e}")
+            logger.error("⚠️  PDF processing may not work correctly!")
+    else:
+        logger.info("✅ poppler-utils is already installed")
+    
     logger.info("🔄 Starting integrated background task worker...")
     _worker_task = asyncio.create_task(run_background_worker())
+    logger.info("🔄 Background worker started")
+    logger.info("=" * 60)
     
     yield
     
