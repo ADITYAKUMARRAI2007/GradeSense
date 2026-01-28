@@ -147,6 +147,33 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
+        {/* Email/Password Auth Option */}
+        <div className="mt-6 text-center animate-fade-in stagger-2">
+          <div className="relative mb-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-500">
+                Or use email & password
+              </span>
+            </div>
+          </div>
+          
+          <Button
+            variant="outline"
+            onClick={() => navigate("/email-auth")}
+            className="w-full max-w-sm border-2 hover:border-blue-400 hover:bg-blue-50"
+          >
+            <Mail className="w-5 h-5 mr-2" />
+            Sign in with Email
+          </Button>
+          
+          <p className="text-xs text-gray-500 mt-3">
+            Use this if Google sign-in isn't working
+          </p>
+        </div>
+
         {/* Footer */}
         <p className="text-center text-sm text-muted-foreground mt-8 animate-fade-in stagger-2">
           Secure authentication powered by Google OAuth
