@@ -216,7 +216,7 @@ def apply_annotations_to_image(
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
             font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-        except:
+        except Exception:
             logger.warning("Could not load custom font, using default")
             font = None
             font_large = None
