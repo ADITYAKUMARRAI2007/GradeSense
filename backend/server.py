@@ -5352,12 +5352,17 @@ Return valid JSON only."""
                 if sq_data:
                     marks = sq_data.get("obtained_marks", -1.0)
                     if marks < 0: marks = 0.0
+                    
+                    # Extract annotations for sub-question
+                    sq_annotations = sq_data.get("annotations", [])
+                    annotations_list = [AnnotationData(**ann) for ann in sq_annotations] if sq_annotations else []
 
                     final_sub_scores.append(SubQuestionScore(
                         sub_id=sq["sub_id"],
                         max_marks=sq["max_marks"],
                         obtained_marks=min(marks, sq["max_marks"]),
-                        ai_feedback=sq_data.get("ai_feedback", "")
+                        ai_feedback=sq_data.get("ai_feedback", ""),
+                        annotations=annotations_list
                     ))
                 else:
                     final_sub_scores.append(SubQuestionScore(
@@ -5366,6 +5371,10 @@ Return valid JSON only."""
                         obtained_marks=0.0,
                         ai_feedback="Not attempted/found"
                     ))
+        
+        # Extract question-level annotations
+        q_annotations = best_score_data.get("annotations", [])
+        annotations_list = [AnnotationData(**ann) for ann in q_annotations] if q_annotations else []
 
         qs_obj = QuestionScore(
             question_number=q_num,
@@ -5374,7 +5383,8 @@ Return valid JSON only."""
             ai_feedback=best_score_data["ai_feedback"],
             sub_scores=[s.model_dump() for s in final_sub_scores],
             question_text=q.get("question_text") or q.get("rubric"),
-            status=status
+            status=status,
+            annotations=annotations_list
         )
         final_scores.append(qs_obj)
 
