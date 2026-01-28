@@ -5,6 +5,7 @@ import { Toaster } from "./components/ui/sonner";
 
 // Pages
 import LoginPage from "./pages/LoginPage";
+import EmailAuthPage from "./pages/EmailAuthPage";
 import AuthCallback from "./pages/AuthCallback";
 import ProfileSetup from "./pages/ProfileSetup";
 import BatchView from './pages/teacher/BatchView';
