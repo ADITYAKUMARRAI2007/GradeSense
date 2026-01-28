@@ -35,6 +35,12 @@ from file_utils import (
     extract_file_id_from_url,
     get_files_from_drive_folder
 )
+from annotation_utils import (
+    Annotation,
+    AnnotationType,
+    apply_annotations_to_image,
+    auto_position_annotations_for_question
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
