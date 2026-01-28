@@ -79,7 +79,18 @@ export default function AuthCallback() {
         console.error("Error details:", error);
         console.error("Error response:", error.response?.data);
         console.error("Error status:", error.response?.status);
-        alert(`Authentication failed: ${error.response?.data?.detail || error.message}`);
+        
+        // Better error message handling
+        let errorMessage = "Authentication failed";
+        if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response?.status === 401) {
+          errorMessage = "Authentication session expired. Please try logging in again.";
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        alert(`Authentication failed: ${errorMessage}`);
         navigate("/login", { replace: true });
       }
     };
