@@ -657,6 +657,20 @@ export default function ReviewPapers({ user }) {
               <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10 gap-2 flex-wrap">
                 <span className="text-sm font-medium">Answer Sheet</span>
                 <div className="flex items-center gap-3">
+                  {/* Annotations Toggle - NEW */}
+                  {selectedSubmission.annotated_images?.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="show-annotations-mobile"
+                        checked={showAnnotations}
+                        onCheckedChange={setShowAnnotations}
+                      />
+                      <Label htmlFor="show-annotations-mobile" className="text-xs cursor-pointer flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Annotations
+                      </Label>
+                    </div>
+                  )}
                   {/* Model Answer Toggle */}
                   {modelAnswerImages.length > 0 && (
                     <div className="flex items-center gap-2">
