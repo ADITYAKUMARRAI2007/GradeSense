@@ -9,7 +9,7 @@ import os
 
 class GradeSenseAPITester:
     def __init__(self):
-        self.base_url = "https://gradecraft-ai.preview.emergentagent.com/api"
+        self.base_url = "https://papergrade-2.preview.emergentagent.com/api"
         self.session_token = None
         self.user_id = None
         self.tests_run = 0

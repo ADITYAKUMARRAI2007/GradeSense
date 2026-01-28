@@ -11,7 +11,7 @@ import base64
 
 class StudentUploadWorkflowTester:
     def __init__(self):
-        self.base_url = "https://gradecraft-ai.preview.emergentagent.com/api"
+        self.base_url = "https://papergrade-2.preview.emergentagent.com/api"
         self.teacher_session_token = None
         self.student_session_token = None
         self.teacher_user_id = None
@@ -809,7 +809,7 @@ submissions.forEach(function(sub) {{
 def main():
     """Main test execution"""
     print("🚀 Starting Student-Upload Workflow Comprehensive Testing...")
-    print("Testing Backend URL: https://gradecraft-ai.preview.emergentagent.com/api")
+    print("Testing Backend URL: https://papergrade-2.preview.emergentagent.com/api")
     
     tester = StudentUploadWorkflowTester()
     
