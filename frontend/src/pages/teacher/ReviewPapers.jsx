@@ -1694,6 +1694,7 @@ export default function ReviewPapers({ user }) {
     questionPaperImages,
     showModelAnswer, 
     showQuestionPaper,
+    showAnnotations,
     examQuestions,
     imageZoom,
     zoomedImage,
@@ -1701,7 +1702,10 @@ export default function ReviewPapers({ user }) {
     feedbackQuestion,
     feedbackCorrections,
     submittingFeedback,
-    applyToAllPapers
+    applyToAllPapers,
+    saving,
+    currentIndex,
+    filteredSubmissions
   ]);
 
   return (
