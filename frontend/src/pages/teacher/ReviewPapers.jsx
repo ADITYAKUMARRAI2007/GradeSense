@@ -1439,51 +1439,57 @@ export default function ReviewPapers({ user }) {
       </Dialog>
 
       {/* Multi-Page Continuous Scroll Viewer */}
-      <Dialog open={!!zoomedImages} onOpenChange={(open) => {
-        if (!open) setZoomedImages(null);
-      }}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
-          <DialogHeader className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                {zoomedImages?.title || "Document Viewer"} - All Pages
-                <span className="text-sm text-muted-foreground font-normal">
-                  ({zoomedImages?.images?.length || 0} pages)
-                </span>
-              </DialogTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-                <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImageZoom(100)}
-                >
-                  Reset
-                </Button>
-                {/* Explicit Close Button */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setZoomedImages(null)}
-                  className="ml-2"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
+      <Dialog 
+        open={!!zoomedImages} 
+        onOpenChange={(isOpen) => {
+          // Simplified: just set to null when closing
+          if (!isOpen) {
+            setZoomedImages(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          {/* Header with extra padding-right to avoid blocking close button */}
+          <DialogHeader className="px-4 pt-4 pb-2 pr-16 border-b">
+            <DialogTitle className="text-left">
+              {zoomedImages?.title || "Document"} - All Pages
+              <span className="text-sm text-muted-foreground font-normal ml-2">
+                ({zoomedImages?.images?.length || 0} pages)
+              </span>
+            </DialogTitle>
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageZoom(Math.max(50, imageZoom - 25));
+                }}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageZoom(Math.min(200, imageZoom + 25));
+                }}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageZoom(100);
+                }}
+              >
+                Reset
+              </Button>
             </div>
           </DialogHeader>
           <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
