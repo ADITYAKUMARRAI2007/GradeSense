@@ -5581,19 +5581,40 @@ def generate_annotated_images(
                 annotated_images.append(original_image)
                 continue
             
+            # Get image dimensions for coordinate conversion
+            try:
+                image_data = base64.b64decode(original_image)
+                with Image.open(io.BytesIO(image_data)) as img:
+                    img_width, img_height = img.size
+            except Exception as e:
+                logger.warning(f"Could not get image dimensions: {e}, using defaults")
+                img_width, img_height = 1000, 1400  # Default A4-ish dimensions
+            
             # Convert AnnotationData to Annotation objects with positioning
             positioned_annotations = []
             current_y_pos = 120
             
             for ann_data in page_annotations:
-                # For AI-provided annotations, auto-position them
-                if ann_data.x == 0 and ann_data.y == 0:
+                # Check if AI provided box_2d coordinates (normalized 0-1000)
+                if ann_data.box_2d and len(ann_data.box_2d) == 4:
+                    # Convert normalized coordinates to pixel coordinates
+                    # box_2d format: [ymin, xmin, ymax, xmax]
+                    ymin, xmin, ymax, xmax = ann_data.box_2d
+                    x_pos = int(xmin / 1000 * img_width)
+                    y_pos = int(ymin / 1000 * img_height)
+                    # Optionally use center of box instead of top-left
+                    # x_pos = int((xmin + xmax) / 2 / 1000 * img_width)
+                    # y_pos = int((ymin + ymax) / 2 / 1000 * img_height)
+                    logger.debug(f"Converted box_2d {ann_data.box_2d} to pixels ({x_pos}, {y_pos})")
+                elif ann_data.x > 0 or ann_data.y > 0:
+                    # Use provided pixel coordinates
+                    x_pos = ann_data.x if ann_data.x > 0 else 30
+                    y_pos = ann_data.y if ann_data.y > 0 else current_y_pos
+                else:
+                    # Fallback: auto-position in margin
                     x_pos = 30 if ann_data.type in [AnnotationType.CHECKMARK, AnnotationType.POINT_NUMBER] else 90
                     y_pos = current_y_pos
                     current_y_pos += 80
-                else:
-                    x_pos = ann_data.x if ann_data.x > 0 else 30
-                    y_pos = ann_data.y if ann_data.y > 0 else current_y_pos
                 
                 ann = Annotation(
                     annotation_type=ann_data.type,
