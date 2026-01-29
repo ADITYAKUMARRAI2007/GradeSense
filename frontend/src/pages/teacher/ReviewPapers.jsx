@@ -1506,11 +1506,6 @@ export default function ReviewPapers({ user }) {
               </div>
             )}
           </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </DialogContent>
       </Dialog>
 
