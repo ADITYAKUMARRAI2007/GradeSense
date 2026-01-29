@@ -1369,23 +1369,6 @@ export default function ReviewPapers({ user }) {
                   Reset
                 </Button>
               </div>
-
-              {/* Apply to Batch Checkbox */}
-              <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <Checkbox 
-                  id="apply-batch"
-                  checked={applyToBatch}
-                  onCheckedChange={setApplyToBatch}
-                />
-                <div className="flex-1">
-                  <Label htmlFor="apply-batch" className="cursor-pointer font-medium text-sm">
-                    Apply this correction to all papers in this batch
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Re-grades only Question {feedbackQuestion?.question_number} for all students in this exam (saves credits)
-                  </p>
-                </div>
-              </div>
             </div>
           </DialogHeader>
           <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
