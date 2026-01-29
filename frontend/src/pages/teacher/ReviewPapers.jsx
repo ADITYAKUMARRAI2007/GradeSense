@@ -1443,10 +1443,10 @@ export default function ReviewPapers({ user }) {
 
       {/* Multi-Page Continuous Scroll Viewer */}
       <Dialog 
-        open={!!zoomedImages} 
-        onOpenChange={(isOpen) => {
-          // Simplified: just set to null when closing
-          if (!isOpen) {
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
             setZoomedImages(null);
           }
         }}
