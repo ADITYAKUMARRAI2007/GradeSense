@@ -4967,21 +4967,36 @@ Return your response in this exact JSON format:
   "grading_notes": "Any overall observations about the paper"
 }}
 
-### ANNOTATION INSTRUCTIONS (NEW):
-For each question/sub-question, provide annotation markers:
+### ANNOTATION INSTRUCTIONS WITH COORDINATES:
+For each question/sub-question, provide annotation markers with LOCATION information:
 - "step_label": Text label like "2aStep1", "2aStep2" to mark evaluation steps
 - "score_circle": Green circle with marks awarded (e.g., "3", "0")
 - "checkmark": Green checkmark for correct points
 - "flag_circle": Red circle with "R" for issues needing attention
-- "point_number": Numbered circles (1, 2, 3) for main points
+- "cross_mark": Red X mark for incorrect answers
+- "error_underline": Underline marking an error location
 
-Each annotation should specify:
-- type: One of [step_label, score_circle, checkmark, flag_circle, point_number]
+Each annotation MUST specify:
+- type: One of [step_label, score_circle, checkmark, flag_circle, cross_mark, error_underline, point_number]
 - text: The text to display (for labels and circles)
 - page_index: Which page (0-indexed) this annotation belongs to
-- color: "green" or "red" (optional, defaults to green)
+- color: "green" for correct, "red" for errors (optional, defaults to green)
+- box_2d: [ymin, xmin, ymax, xmax] - Bounding box coordinates (0-1000 scale) of WHERE on the image to place this annotation
+  - Coordinates are normalized to 0-1000 range (will be scaled to actual image size)
+  - ymin, xmin = top-left corner; ymax, xmax = bottom-right corner
+  - Place annotations near the ACTUAL location of the answer/error in the student's handwriting
 
-NOTE: You don't need to provide x, y coordinates. The system will auto-position annotations based on the order and page.
+IMPORTANT - Accurate Positioning:
+- Look at WHERE the student wrote each answer on the page
+- Provide box_2d coordinates pointing to that EXACT location
+- For errors: Place cross_mark or error_underline at the actual error location
+- For correct answers: Place checkmark near the correct work
+- For scores: Place score_circle in the margin near that question's answer
+
+Example with coordinates:
+{{"type": "checkmark", "page_index": 0, "box_2d": [150, 50, 200, 100], "color": "green"}}
+{{"type": "cross_mark", "page_index": 0, "box_2d": [350, 200, 400, 280], "color": "red", "text": "Wrong formula"}}
+{{"type": "score_circle", "page_index": 0, "box_2d": [150, 850, 200, 950], "text": "3", "color": "green"}}
 
 **CRITICAL - SUB-QUESTION HANDLING:**
 - If a question has sub-parts (like Q32 has parts a and b), you MUST populate the sub_scores array
