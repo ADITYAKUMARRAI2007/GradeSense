@@ -108,6 +108,17 @@ export default function ReviewPapers({ user }) {
         axios.get(`${API}/batches`)
       ]);
       setSubmissions(submissionsRes.data);
+
+
+  // Debug: Monitor modal state changes
+  useEffect(() => {
+    console.log('🔄 isModalOpen changed to:', isModalOpen);
+  }, [isModalOpen]);
+
+  useEffect(() => {
+    console.log('🔄 zoomedImages changed:', zoomedImages ? `${zoomedImages.images?.length} pages` : 'null');
+  }, [zoomedImages]);
+
       setExams(examsRes.data);
       setBatches(batchesRes.data);
     } catch (error) {
