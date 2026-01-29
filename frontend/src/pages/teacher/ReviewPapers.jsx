@@ -1492,7 +1492,14 @@ export default function ReviewPapers({ user }) {
             </div>
           </DialogHeader>
           <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
-            {zoomedImages && zoomedImages.images && (
+            {loadingZoom ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="flex flex-col items-center gap-3">
+                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+                  <p className="text-sm text-muted-foreground">Loading pages...</p>
+                </div>
+              </div>
+            ) : zoomedImages && zoomedImages.images ? (
               <div className="space-y-6">
                 {zoomedImages.images.map((image, idx) => (
                   <div key={idx} className="relative bg-white p-2 rounded-lg shadow-sm">
@@ -1514,7 +1521,7 @@ export default function ReviewPapers({ user }) {
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
