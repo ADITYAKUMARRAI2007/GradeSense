@@ -3839,7 +3839,7 @@ async def extract_model_answer_content(
                 questions_context += f"  - Part {sq_id} ({sq_marks} marks)\n"
         
         # Process in chunks for large model answers
-        CHUNK_SIZE = 16  # Increased from 8 to 16 for faster processing
+        CHUNK_SIZE = 8  # Process 8 pages at a time for stability
         all_extracted_content = []
         
         for chunk_start in range(0, len(model_answer_images), CHUNK_SIZE):
