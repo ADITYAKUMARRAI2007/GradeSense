@@ -5467,6 +5467,249 @@ Return valid JSON only."""
     return final_scores
 
 
+async def generate_annotated_images_with_vision_ocr(
+    original_images: List[str],
+    question_scores: List[QuestionScore],
+    use_vision_ocr: bool = True
+) -> List[str]:
+    """
+    Generate annotated images using Google Cloud Vision OCR for precise positioning.
+    
+    This function:
+    1. Uses Vision OCR to detect all text regions with bounding boxes
+    2. Matches AI feedback to detected text regions
+    3. Places annotations at accurate positions based on OCR results
+    
+    Args:
+        original_images: List of base64 encoded original student answer images
+        question_scores: List of QuestionScore objects with grading data
+        use_vision_ocr: If True, use Vision OCR for precise positioning
+        
+    Returns:
+        List of base64 encoded annotated images
+    """
+    try:
+        logger.info(f"Generating annotated images with Vision OCR for {len(original_images)} pages")
+        
+        vision_service = get_vision_service()
+        if not vision_service.is_available():
+            logger.warning("Vision OCR not available, falling back to basic annotations")
+            return generate_annotated_images(original_images, question_scores)
+        
+        annotated_images = []
+        
+        for page_idx, original_image in enumerate(original_images):
+            try:
+                # Detect text regions with Vision OCR
+                ocr_result = vision_service.detect_text_from_base64(original_image)
+                logger.info(f"Page {page_idx + 1}: Vision OCR detected {ocr_result.get('total_words', 0)} words")
+                
+                # Get image dimensions
+                image_data = base64.b64decode(original_image)
+                with Image.open(io.BytesIO(image_data)) as img:
+                    img_width, img_height = img.size
+                
+                # Generate annotations based on OCR regions and grading results
+                page_annotations = _generate_ocr_based_annotations(
+                    page_idx=page_idx,
+                    ocr_result=ocr_result,
+                    question_scores=question_scores,
+                    total_pages=len(original_images),
+                    img_width=img_width,
+                    img_height=img_height
+                )
+                
+                if page_annotations:
+                    # Apply annotations to the image
+                    annotated_image = apply_annotations_to_image(original_image, page_annotations)
+                    annotated_images.append(annotated_image)
+                    logger.info(f"Page {page_idx + 1}: Applied {len(page_annotations)} OCR-positioned annotations")
+                else:
+                    annotated_images.append(original_image)
+                    
+            except Exception as e:
+                logger.error(f"Error processing page {page_idx + 1} with Vision OCR: {e}")
+                annotated_images.append(original_image)
+        
+        return annotated_images
+        
+    except Exception as e:
+        logger.error(f"Error in Vision OCR annotation: {e}", exc_info=True)
+        # Fallback to basic annotations
+        return generate_annotated_images(original_images, question_scores)
+
+
+def _generate_ocr_based_annotations(
+    page_idx: int,
+    ocr_result: Dict,
+    question_scores: List[QuestionScore],
+    total_pages: int,
+    img_width: int,
+    img_height: int
+) -> List[Annotation]:
+    """
+    Generate annotations positioned using OCR-detected text regions.
+    
+    Strategy:
+    1. Divide page into vertical sections (one per question assigned to this page)
+    2. For each question, find the relevant OCR text regions
+    3. Place checkmarks near correct answers, X marks near errors
+    4. Place score circles in the margin at the question's Y position
+    """
+    annotations = []
+    
+    # Estimate which questions are on this page
+    questions_per_page = max(1, len(question_scores) / total_pages)
+    start_q_idx = int(page_idx * questions_per_page)
+    end_q_idx = int((page_idx + 1) * questions_per_page)
+    
+    page_questions = question_scores[start_q_idx:min(end_q_idx, len(question_scores))]
+    
+    if not page_questions:
+        return annotations
+    
+    # Get all OCR word regions sorted by Y position
+    words = sorted(
+        ocr_result.get("words", []),
+        key=lambda w: w.get("top_left", (0, 0))[1]
+    )
+    
+    if not words:
+        # No OCR words detected, fall back to margin annotations
+        return _generate_margin_annotations(page_idx, page_questions, img_height)
+    
+    # Divide page height among questions
+    section_height = img_height // max(1, len(page_questions))
+    margin_x = 30  # Left margin for annotations
+    
+    for q_idx, q_score in enumerate(page_questions):
+        section_y_start = q_idx * section_height
+        section_y_end = section_y_start + section_height
+        section_y_center = section_y_start + section_height // 2
+        
+        # Find OCR words in this section
+        section_words = [
+            w for w in words
+            if section_y_start <= w.get("top_left", (0, 0))[1] < section_y_end
+        ]
+        
+        # Calculate score percentage
+        score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+        
+        # Determine annotation type based on score
+        if score_pct >= 80:
+            ann_type = AnnotationType.CHECKMARK
+            ann_color = "green"
+        elif score_pct >= 50:
+            ann_type = AnnotationType.SCORE_CIRCLE
+            ann_color = "green"
+        elif score_pct >= 30:
+            ann_type = AnnotationType.SCORE_CIRCLE
+            ann_color = "orange"
+        else:
+            ann_type = AnnotationType.CROSS_MARK
+            ann_color = "red"
+        
+        # If we have OCR words in this section, place annotation near the first word
+        if section_words:
+            first_word = section_words[0]
+            word_x, word_y = first_word.get("top_left", (100, section_y_center))
+            
+            # Place checkmark/X near the answer (slightly to the left of text)
+            if ann_type == AnnotationType.CHECKMARK:
+                annotations.append(Annotation(
+                    annotation_type=AnnotationType.CHECKMARK,
+                    x=max(5, word_x - 40),
+                    y=word_y,
+                    text="",
+                    color="green",
+                    size=25
+                ))
+            elif ann_type == AnnotationType.CROSS_MARK:
+                annotations.append(Annotation(
+                    annotation_type=AnnotationType.CROSS_MARK,
+                    x=max(5, word_x - 40),
+                    y=word_y,
+                    text="",
+                    color="red",
+                    size=25
+                ))
+        
+        # Always add question number and score in left margin
+        annotations.append(Annotation(
+            annotation_type=AnnotationType.POINT_NUMBER,
+            x=margin_x,
+            y=section_y_start + 20,
+            text=str(q_score.question_number),
+            color="black",
+            size=22
+        ))
+        
+        # Add score circle
+        score_text = str(int(q_score.obtained_marks)) if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}"
+        annotations.append(Annotation(
+            annotation_type=AnnotationType.SCORE_CIRCLE,
+            x=margin_x + 50,
+            y=section_y_start + 20,
+            text=f"{score_text}/{int(q_score.max_marks)}",
+            color=ann_color,
+            size=28
+        ))
+        
+        # For low scores, mark specific errors if we can find relevant words
+        if score_pct < 50 and len(section_words) > 1:
+            # Add error marks near the middle and end of the answer
+            mid_word = section_words[len(section_words) // 2]
+            mid_x, mid_y = mid_word.get("top_left", (100, section_y_center))
+            
+            annotations.append(Annotation(
+                annotation_type=AnnotationType.FLAG_CIRCLE,
+                x=max(5, mid_x - 30),
+                y=mid_y,
+                text="!",
+                color="red",
+                size=20
+            ))
+    
+    return annotations
+
+
+def _generate_margin_annotations(
+    page_idx: int,
+    page_questions: List[QuestionScore],
+    img_height: int
+) -> List[Annotation]:
+    """Generate simple margin-based annotations when OCR fails"""
+    annotations = []
+    margin_x = 30
+    section_height = img_height // max(1, len(page_questions))
+    
+    for q_idx, q_score in enumerate(page_questions):
+        y_pos = q_idx * section_height + 40
+        score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+        
+        annotations.append(Annotation(
+            annotation_type=AnnotationType.POINT_NUMBER,
+            x=margin_x,
+            y=y_pos,
+            text=str(q_score.question_number),
+            color="black",
+            size=22
+        ))
+        
+        score_text = str(int(q_score.obtained_marks)) if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}"
+        annotations.append(Annotation(
+            annotation_type=AnnotationType.SCORE_CIRCLE,
+            x=margin_x + 50,
+            y=y_pos,
+            text=f"{score_text}/{int(q_score.max_marks)}",
+            color="green" if score_pct >= 50 else "red",
+            size=28
+        ))
+    
+    return annotations
+
+
 def generate_annotated_images(
     original_images: List[str],
     question_scores: List[QuestionScore]
