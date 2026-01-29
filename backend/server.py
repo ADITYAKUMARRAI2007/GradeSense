@@ -424,8 +424,8 @@ class StudentSubmission(BaseModel):
 class AnnotationData(BaseModel):
     """Represents a single annotation on an answer paper"""
     type: str  # checkmark, score_circle, flag_circle, step_label, point_number
-    x: int
-    y: int
+    x: int = 0  # X coordinate, default 0 if not provided by AI
+    y: int = 0  # Y coordinate, default 0 if not provided by AI
     text: str = ""
     color: str = "green"
     size: int = 30
