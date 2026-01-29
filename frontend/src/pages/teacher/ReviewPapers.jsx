@@ -1967,6 +1967,92 @@ export default function ReviewPapers({ user }) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Multi-Page Continuous Scroll Viewer - Rendered at top level to avoid nested dialog issues */}
+          <Dialog 
+            key={modalKey}
+            open={isModalOpen}
+            onOpenChange={(open) => {
+              console.log('🚪 Dialog onOpenChange called. New state:', open);
+              setIsModalOpen(open);
+              if (!open) {
+                setZoomedImages(null);
+                console.log('❌ Modal CLOSED');
+              } else {
+                console.log('✅ Modal OPENED');
+              }
+            }}
+          >
+            <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+              {/* Header with extra padding-right to avoid blocking close button */}
+              <DialogHeader className="px-4 pt-4 pb-2 pr-16 border-b">
+                <DialogTitle className="text-left">
+                  {zoomedImages?.title || "Document"} - All Pages
+                  <span className="text-sm text-muted-foreground font-normal ml-2">
+                    ({zoomedImages?.images?.length || 0} pages)
+                  </span>
+                </DialogTitle>
+                {/* Zoom Controls */}
+                <div className="flex items-center gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImageZoom(Math.max(50, imageZoom - 25));
+                    }}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImageZoom(Math.min(200, imageZoom + 25));
+                    }}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImageZoom(100);
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </DialogHeader>
+              <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+                {zoomedImages?.images && (
+                  <div className="space-y-6">
+                    {zoomedImages.images.map((image, idx) => (
+                      <div key={idx} className="relative bg-white p-2 rounded-lg shadow-sm">
+                        <div className="sticky top-2 left-2 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium z-10 inline-block shadow-md">
+                          📄 {image.title}
+                        </div>
+                        <img 
+                          src={image.src}
+                          alt={image.title}
+                          className="mx-auto rounded-lg mt-2"
+                          style={{ 
+                            width: `${imageZoom}%`,
+                            maxWidth: '100%',
+                            height: 'auto'
+                          }}
+                          loading="lazy"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </Layout>
     );
