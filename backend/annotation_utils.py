@@ -188,6 +188,75 @@ def draw_step_label(
         draw.text((text_x, text_y), text, fill=text_color)
 
 
+def draw_cross_mark(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    size: int = 30,
+    text: str = "",
+    font: Optional[ImageFont.FreeTypeFont] = None
+):
+    """Draw a red X mark for incorrect answers"""
+    cross_color = get_color_rgb("red")
+    line_width = 3
+    
+    # Draw X shape
+    # Line 1: top-left to bottom-right
+    draw.line([(x, y), (x + size, y + size)], fill=cross_color, width=line_width)
+    # Line 2: top-right to bottom-left
+    draw.line([(x + size, y), (x, y + size)], fill=cross_color, width=line_width)
+    
+    # Optionally draw text below the X
+    if text:
+        text_y = y + size + 5
+        text_color = get_color_rgb("red")
+        if font:
+            draw.text((x, text_y), text, fill=text_color, font=font)
+        else:
+            draw.text((x, text_y), text, fill=text_color)
+
+
+def draw_error_underline(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    width: int = 100,
+    text: str = "",
+    font: Optional[ImageFont.FreeTypeFont] = None
+):
+    """Draw a red wavy underline for errors"""
+    underline_color = get_color_rgb("red")
+    line_width = 2
+    
+    # Draw a wavy line (zigzag pattern)
+    wave_height = 4
+    wave_width = 8
+    points = []
+    current_x = x
+    going_up = True
+    
+    while current_x < x + width:
+        if going_up:
+            points.append((current_x, y))
+        else:
+            points.append((current_x, y + wave_height))
+        current_x += wave_width // 2
+        going_up = not going_up
+    
+    # Draw the wavy line
+    if len(points) > 1:
+        draw.line(points, fill=underline_color, width=line_width)
+    
+    # Optionally draw text below
+    if text:
+        text_y = y + wave_height + 5
+        text_color = get_color_rgb("red")
+        if font:
+            draw.text((x, text_y), text, fill=text_color, font=font)
+        else:
+            draw.text((x, text_y), text, fill=text_color)
+
+
 def apply_annotations_to_image(
     image_base64: str,
     annotations: List[Annotation]
