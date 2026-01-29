@@ -5551,32 +5551,155 @@ def _generate_ocr_based_annotations(
     Generate annotations positioned using OCR-detected text regions.
     
     Strategy:
-    1. Divide page into vertical sections (one per question assigned to this page)
-    2. For each question, find the relevant OCR text regions
-    3. Place checkmarks near correct answers, X marks near errors
-    4. Place score circles in the margin at the question's Y position
+    1. Search for question number patterns in OCR text (Q1, Q2, Question 1, 1-a, etc.)
+    2. Match detected question numbers to grading results
+    3. Place annotations near the detected question locations
     """
+    import re
     annotations = []
     
-    # Estimate which questions are on this page
-    questions_per_page = max(1, len(question_scores) / total_pages)
-    start_q_idx = int(page_idx * questions_per_page)
-    end_q_idx = int((page_idx + 1) * questions_per_page)
-    
-    page_questions = question_scores[start_q_idx:min(end_q_idx, len(question_scores))]
-    
-    if not page_questions:
-        return annotations
-    
-    # Get all OCR word regions sorted by Y position
-    words = sorted(
-        ocr_result.get("words", []),
-        key=lambda w: w.get("top_left", (0, 0))[1]
-    )
+    # Get all OCR word regions
+    words = ocr_result.get("words", [])
+    paragraphs = ocr_result.get("paragraphs", [])
+    full_text = ocr_result.get("full_text", "")
     
     if not words:
-        # No OCR words detected, fall back to margin annotations
-        return _generate_margin_annotations(page_idx, page_questions, img_height)
+        return _generate_margin_annotations(page_idx, question_scores, img_height)
+    
+    # Build a map of question numbers to their Y positions based on OCR detection
+    question_positions = {}
+    
+    # Patterns to match question numbers
+    # Matches: Q1, Q2, Q.1, Question 1, 1., 1), 1-a, 1.a, 1a, etc.
+    question_patterns = [
+        r'\bQ\.?\s*(\d+)\b',  # Q1, Q.1, Q 1
+        r'\bQuestion\s*(\d+)\b',  # Question 1
+        r'\b(\d+)\s*[\.\)\-:]\s*[a-z]?\b',  # 1., 1), 1-, 1:, 1.a, 1-a
+        r'\b(\d+)\s*[a-z]\b',  # 1a, 2b
+    ]
+    
+    # Search through words for question number patterns
+    for word in words:
+        word_text = word.get("text", "")
+        word_y = word.get("top_left", (0, 0))[1]
+        word_x = word.get("top_left", (0, 0))[0]
+        
+        for pattern in question_patterns:
+            match = re.search(pattern, word_text, re.IGNORECASE)
+            if match:
+                q_num = int(match.group(1))
+                if q_num <= len(question_scores) and q_num not in question_positions:
+                    question_positions[q_num] = {
+                        "y": word_y,
+                        "x": word_x,
+                        "text": word_text
+                    }
+                    logger.debug(f"Found Q{q_num} at y={word_y}, x={word_x}")
+                break
+    
+    # Also search in nearby word combinations
+    for i, word in enumerate(words):
+        word_text = word.get("text", "").lower()
+        word_y = word.get("top_left", (0, 0))[1]
+        word_x = word.get("top_left", (0, 0))[0]
+        
+        # Check if this is "question" followed by a number
+        if word_text in ["question", "q", "q."]:
+            # Look at next word for the number
+            if i + 1 < len(words):
+                next_word = words[i + 1]
+                next_text = next_word.get("text", "")
+                if next_text.isdigit():
+                    q_num = int(next_text)
+                    if q_num <= len(question_scores) and q_num not in question_positions:
+                        question_positions[q_num] = {
+                            "y": word_y,
+                            "x": word_x,
+                            "text": f"{word_text} {next_text}"
+                        }
+    
+    logger.info(f"Page {page_idx + 1}: Detected question positions: {list(question_positions.keys())}")
+    
+    # For questions we found positions for, place annotations at those positions
+    # For questions we didn't find, use estimated positions
+    margin_x = 25
+    
+    for q_score in question_scores:
+        q_num = q_score.question_number
+        score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+        
+        # Determine annotation style based on score
+        if score_pct >= 70:
+            mark_type = AnnotationType.CHECKMARK
+            mark_color = "green"
+        elif score_pct >= 40:
+            mark_type = AnnotationType.SCORE_CIRCLE
+            mark_color = "orange"
+        else:
+            mark_type = AnnotationType.CROSS_MARK
+            mark_color = "red"
+        
+        if q_num in question_positions:
+            pos = question_positions[q_num]
+            y_pos = pos["y"]
+            x_pos = pos["x"]
+            
+            # Place question number circle at the left margin
+            annotations.append(Annotation(
+                annotation_type=AnnotationType.POINT_NUMBER,
+                x=margin_x,
+                y=y_pos,
+                text=str(q_num),
+                color="blue",
+                size=24
+            ))
+            
+            # Place score next to question number
+            score_text = f"{int(q_score.obtained_marks)}" if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}"
+            annotations.append(Annotation(
+                annotation_type=AnnotationType.SCORE_CIRCLE,
+                x=margin_x + 45,
+                y=y_pos,
+                text=f"{score_text}/{int(q_score.max_marks)}",
+                color=mark_color,
+                size=26
+            ))
+            
+            # Place checkmark or X mark near the answer area (to the right of where the question was found)
+            if mark_type == AnnotationType.CHECKMARK:
+                annotations.append(Annotation(
+                    annotation_type=AnnotationType.CHECKMARK,
+                    x=max(x_pos - 50, margin_x + 100),
+                    y=y_pos + 30,
+                    text="",
+                    color="green",
+                    size=28
+                ))
+            elif mark_type == AnnotationType.CROSS_MARK:
+                annotations.append(Annotation(
+                    annotation_type=AnnotationType.CROSS_MARK,
+                    x=max(x_pos - 50, margin_x + 100),
+                    y=y_pos + 30,
+                    text="",
+                    color="red",
+                    size=28
+                ))
+                # Add review flag for low scores
+                annotations.append(Annotation(
+                    annotation_type=AnnotationType.FLAG_CIRCLE,
+                    x=max(x_pos - 50, margin_x + 100) + 40,
+                    y=y_pos + 30,
+                    text="!",
+                    color="red",
+                    size=22
+                ))
+    
+    # If no questions were detected on this page, don't add any annotations
+    # (they'll be added on the page where the question IS detected)
+    if not question_positions:
+        logger.info(f"Page {page_idx + 1}: No questions detected, skipping annotations")
+    
+    return annotations
     
     # Divide page height among questions
     section_height = img_height // max(1, len(page_questions))
