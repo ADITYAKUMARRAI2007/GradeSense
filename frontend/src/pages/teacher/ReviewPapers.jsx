@@ -14,6 +14,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/dialog";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import ScrollableImageModal from "../../components/ScrollableImageModal";
 import { toast } from "sonner";
 import { 
   Search, 
@@ -59,7 +60,7 @@ export default function ReviewPapers({ user }) {
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
   const [questionPaperImages, setQuestionPaperImages] = useState([]);
   const [examQuestions, setExamQuestions] = useState([]);
-  const [zoomedImage, setZoomedImage] = useState(null);
+  const [modalImages, setModalImages] = useState([]);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   
   // Auto-publish dialog state
@@ -69,31 +70,18 @@ export default function ReviewPapers({ user }) {
     show_answer_sheet: true,
     show_question_paper: true
   });
-  const [imageZoom, setImageZoom] = useState(100);
 
-  const openImageModal = useCallback((image) => {
-    setZoomedImage(image);
+  const openImageModal = useCallback((images) => {
+    const imgArray = Array.isArray(images) ? images : (images ? [images] : []);
+    console.log('Opening modal with', imgArray.length, 'images');
+    setModalImages(imgArray);
     setIsImageModalOpen(true);
   }, []);
 
   const closeImageModal = useCallback(() => {
     setIsImageModalOpen(false);
-    setZoomedImage(null);
-    setImageZoom(100);
+    setModalImages([]);
   }, []);
-
-  // ESC key listener
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') closeImageModal();
-    };
-
-    if (isImageModalOpen) {
-      document.addEventListener('keydown', handleEsc);
-    }
-
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [isImageModalOpen]);
 
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackQuestion, setFeedbackQuestion] = useState(null);
@@ -693,7 +681,7 @@ export default function ReviewPapers({ user }) {
                     src={`data:image/jpeg;base64,${img}`}
                     alt={`Page ${idx + 1}`}
                     className="w-full rounded-lg shadow-md cursor-zoom-in"
-                    onClick={() => openImageModal({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
+                    onClick={() => openImageModal(selectedSubmission.file_images)}
                   />
                 ))}
               </div>
@@ -931,7 +919,7 @@ export default function ReviewPapers({ user }) {
                           <div key={idx} className="relative group">
                             <div 
                               className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                              onClick={() => openImageModal({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
+                              onClick={() => openImageModal(selectedSubmission.file_images)}
                             >
                               <img 
                                 src={`data:image/jpeg;base64,${img}`}
@@ -961,7 +949,7 @@ export default function ReviewPapers({ user }) {
                             <div key={idx} className="relative group">
                               <div 
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                                onClick={() => openImageModal({ src: `data:image/jpeg;base64,${img}`, title: `Model Answer - Page ${idx + 1}` })}
+                                onClick={() => openImageModal(modelAnswerImages)}
                               >
                                 <img 
                                   src={`data:image/jpeg;base64,${img}`}
@@ -992,7 +980,7 @@ export default function ReviewPapers({ user }) {
                             <div key={idx} className="relative group">
                               <div 
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                                onClick={() => openImageModal({ src: `data:image/jpeg;base64,${img}`, title: `Question Paper - Page ${idx + 1}` })}
+                                onClick={() => openImageModal(questionPaperImages)}
                               >
                                 <img 
                                   src={`data:image/jpeg;base64,${img}`}
@@ -1304,86 +1292,12 @@ export default function ReviewPapers({ user }) {
         </div>
       </div>
 
-      {/* Image Zoom Modal - Custom Implementation */}
-      {isImageModalOpen && (
-        <div
-          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
-          onClick={closeImageModal}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-background rounded-lg shadow-lg max-w-[95vw] max-h-[95vh] w-full flex flex-col overflow-hidden"
-          >
-            <div className="p-4 border-b flex items-center justify-between bg-background">
-              <div className="flex items-center gap-4 flex-1">
-                <h3 className="text-lg font-semibold truncate">{zoomedImage?.title || "Image Viewer"}</h3>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </Button>
-                  <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setImageZoom(100)}
-                  >
-                    Reset
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                {/* Apply to Batch Checkbox - Only show if feedbackQuestion exists */}
-                {feedbackQuestion && (
-                  <div className="flex items-start space-x-2 p-2 bg-blue-50 rounded-lg border border-blue-200 hidden md:flex">
-                    <Checkbox
-                      id="apply-batch"
-                      checked={applyToBatch}
-                      onCheckedChange={setApplyToBatch}
-                    />
-                    <div className="flex-1">
-                      <Label htmlFor="apply-batch" className="cursor-pointer font-medium text-sm">
-                        Apply correction to batch
-                      </Label>
-                    </div>
-                  </div>
-                )}
-
-                <Button variant="ghost" size="icon" onClick={closeImageModal} className="rounded-full">
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-auto p-4 bg-muted/20 text-center">
-              {zoomedImage && (
-                <img
-                  src={zoomedImage.src}
-                  alt={zoomedImage.title}
-                  className="inline-block shadow-md rounded-md"
-                  style={{
-                    width: `${imageZoom}%`,
-                    maxWidth: 'none',
-                    transition: 'width 0.2s ease-in-out'
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Image Zoom Modal - Scrollable */}
+      <ScrollableImageModal
+        isOpen={isImageModalOpen}
+        images={modalImages}
+        onClose={closeImageModal}
+      />
 
       {/* AI Feedback Dialog */}
       <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
@@ -1616,8 +1530,6 @@ export default function ReviewPapers({ user }) {
     showModelAnswer, 
     showQuestionPaper,
     examQuestions,
-    imageZoom,
-    zoomedImage,
     isImageModalOpen,
     openImageModal,
     closeImageModal,
@@ -1817,7 +1729,7 @@ export default function ReviewPapers({ user }) {
                   <DialogTitle>All Papers Reviewed!</DialogTitle>
                 </div>
                 <DialogDescription>
-                  Great job! You&apos;ve reviewed all papers for this exam. 
+                  Great job! You've reviewed all papers for this exam. 
                   Would you like to publish the results now so students can see their scores?
                 </DialogDescription>
               </DialogHeader>
