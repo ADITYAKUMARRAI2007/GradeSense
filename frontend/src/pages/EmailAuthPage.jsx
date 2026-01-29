@@ -272,17 +272,6 @@ export default function EmailAuthPage() {
                 )}
               </>
             )}
-                <>
-                  Don't have an account?{" "}
-                  <span className="font-semibold text-blue-600">Sign up</span>
-                </>
-              ) : (
-                <>
-                  Already have an account?{" "}
-                  <span className="font-semibold text-blue-600">Sign in</span>
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>
