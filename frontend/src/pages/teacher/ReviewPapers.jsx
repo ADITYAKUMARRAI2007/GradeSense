@@ -1054,11 +1054,13 @@ export default function ReviewPapers({ user }) {
                                     src: `data:image/jpeg;base64,${image}`,
                                     title: `Page ${index + 1}`
                                   }));
+                                  setModalKey(prev => prev + 1);
                                   setZoomedImages({ 
                                     images: allImages, 
                                     title: "Model Answer", 
                                     initialIndex: idx 
                                   });
+                                  setIsModalOpen(true);
                                 }}
                               >
                                 <img 
