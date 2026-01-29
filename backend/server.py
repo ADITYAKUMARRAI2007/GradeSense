@@ -1039,13 +1039,14 @@ async def set_password_for_google_account(request: SetPasswordRequest):
     if "password_hash" in user:
         raise HTTPException(status_code=400, detail="This account already has a password. Use the login page or reset password if you forgot it.")
     
-    # Set password hash
+    # Set password hash and mark profile as completed for existing Google users
     password_hash = get_password_hash(request.new_password)
     await db.users.update_one(
         {"email": request.email},
         {"$set": {
             "password_hash": password_hash,
-            "password_set_at": datetime.now(timezone.utc).isoformat()
+            "password_set_at": datetime.now(timezone.utc).isoformat(),
+            "profile_completed": True  # Mark existing Google users as having completed profile
         }}
     )
     
