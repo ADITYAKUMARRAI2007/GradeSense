@@ -715,23 +715,22 @@ export default function ReviewPapers({ user }) {
                       console.log('🖱️ Image clicked! Index:', idx);
                       e.preventDefault();
                       e.stopPropagation();
-                      // Use flushSync to force immediate synchronous update
-                      flushSync(() => {
-                        const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                          selectedSubmission.annotated_images : selectedSubmission.file_images
-                        ).map((image, index) => ({
-                          src: `data:image/jpeg;base64,${image}`,
-                          title: `Page ${index + 1}`
-                        }));
-                        console.log('📸 Setting images:', allImages.length, 'pages');
-                        setZoomedImages({ 
-                          images: allImages, 
-                          title: "Student Answer", 
-                          initialIndex: idx 
-                        });
-                        setIsModalOpen(true);
-                        console.log('✅ Modal state set to OPEN');
+                      const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                        selectedSubmission.annotated_images : selectedSubmission.file_images
+                      ).map((image, index) => ({
+                        src: `data:image/jpeg;base64,${image}`,
+                        title: `Page ${index + 1}`
+                      }));
+                      console.log('📸 Setting images:', allImages.length, 'pages');
+                      // Update key first to force Dialog remount, then set state
+                      setModalKey(prev => prev + 1);
+                      setZoomedImages({ 
+                        images: allImages, 
+                        title: "Student Answer", 
+                        initialIndex: idx 
                       });
+                      setIsModalOpen(true);
+                      console.log('✅ Modal state set to OPEN');
                     }}
                   >
                     <img 
