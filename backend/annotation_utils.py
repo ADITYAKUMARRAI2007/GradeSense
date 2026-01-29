@@ -17,6 +17,8 @@ class AnnotationType:
     FLAG_CIRCLE = "flag_circle"  # Red circle with 'R'
     STEP_LABEL = "step_label"  # Step label like "2aStep1"
     POINT_NUMBER = "point_number"  # Numbered circles (1, 2, 3)
+    CROSS_MARK = "cross_mark"  # Red X mark for incorrect answers
+    ERROR_UNDERLINE = "error_underline"  # Underline marking an error
 
 class Annotation:
     """Represents a single annotation on an image"""
