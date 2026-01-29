@@ -1454,10 +1454,13 @@ export default function ReviewPapers({ user }) {
       <Dialog 
         open={isModalOpen}
         onOpenChange={(open) => {
-          setIsModalOpen(open);
-          if (!open) {
-            setZoomedImages(null);
-          }
+          // Use flushSync for immediate close
+          flushSync(() => {
+            setIsModalOpen(open);
+            if (!open) {
+              setZoomedImages(null);
+            }
+          });
         }}
       >
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
