@@ -48,6 +48,39 @@ export default function EmailAuthPage() {
     } catch (error) {
       console.error("Auth error:", error);
       const errorMessage = error.response?.data?.detail || error.message || "Authentication failed";
+      
+      // If error mentions Google sign-in, show helpful message
+      if (errorMessage.includes("Google sign-in")) {
+        toast.error(errorMessage, {
+          action: {
+            label: "Set Password",
+            onClick: () => setIsLogin("setPassword")
+          }
+        });
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await axios.post(`${API}/auth/set-password`, {
+        email: formData.email,
+        new_password: formData.password
+      });
+
+      toast.success("Password set successfully! You can now login with your email and password.");
+      setIsLogin(true); // Switch back to login
+      
+    } catch (error) {
+      console.error("Set password error:", error);
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to set password";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
