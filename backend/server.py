@@ -1108,6 +1108,12 @@ async def login_user(request: LoginRequest, response: Response):
     return {
         "user_id": user["user_id"],
         "email": user["email"],
+        "name": user.get("name"),
+        "picture": user.get("picture"),
+        "role": user["role"],
+        "token": access_token,
+        "profile_completed": user.get("profile_completed", True)  # Default to True for existing users
+    }
         "name": user["name"],
         "role": user["role"],
         "picture": user.get("picture"),
