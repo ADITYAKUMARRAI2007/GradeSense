@@ -159,7 +159,7 @@ export default function EmailAuthPage() {
             {/* Password */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1 block">
-                Password
+                Password {isLogin === "setPassword" && "(New)"}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
