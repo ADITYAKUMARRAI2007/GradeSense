@@ -64,6 +64,7 @@ export default function ReviewPapers({ user }) {
   const [zoomedImage, setZoomedImage] = useState(null);
   const [zoomedImages, setZoomedImages] = useState(null); // For multi-page continuous scrolling
   const [isModalOpen, setIsModalOpen] = useState(false); // Explicit open state for reliable modal control
+  const [modalKey, setModalKey] = useState(0); // Forces Dialog remount to fix stale closure issue
   
   // Auto-publish dialog state
   const [autoPublishDialogOpen, setAutoPublishDialogOpen] = useState(false);
