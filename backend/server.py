@@ -423,13 +423,14 @@ class StudentSubmission(BaseModel):
 
 class AnnotationData(BaseModel):
     """Represents a single annotation on an answer paper"""
-    type: str  # checkmark, score_circle, flag_circle, step_label, point_number
-    x: int = 0  # X coordinate, default 0 if not provided by AI
-    y: int = 0  # Y coordinate, default 0 if not provided by AI
+    type: str  # checkmark, score_circle, flag_circle, step_label, point_number, cross_mark, error_underline
+    x: int = 0  # X coordinate (pixel), auto-calculated from box_2d if not provided
+    y: int = 0  # Y coordinate (pixel), auto-calculated from box_2d if not provided
     text: str = ""
     color: str = "green"
     size: int = 30
     page_index: int = 0  # Which page/image this annotation belongs to
+    box_2d: Optional[List[int]] = None  # [ymin, xmin, ymax, xmax] normalized 0-1000
 
 class SubQuestionScore(BaseModel):
     sub_id: str
