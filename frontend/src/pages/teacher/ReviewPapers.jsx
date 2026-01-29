@@ -975,24 +975,25 @@ export default function ReviewPapers({ user }) {
                         {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
                           selectedSubmission.annotated_images : selectedSubmission.file_images
                         ).map((img, idx) => (
-                          <div key={idx} className="relative group">
-                            <div 
-                              className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                              onClick={() => {
-                                // Open all pages in continuous scroll view - instant
-                                const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                                  selectedSubmission.annotated_images : selectedSubmission.file_images
-                                ).map((image, index) => ({
-                                  src: `data:image/jpeg;base64,${image}`,
-                                  title: `Page ${index + 1}`
-                                }));
-                                setZoomedImages({ 
-                                  images: allImages, 
-                                  title: "Student Answer", 
-                                  initialIndex: idx 
-                                });
-                              }}
-                            >
+                          <div 
+                            key={idx} 
+                            className="relative group cursor-pointer"
+                            onClick={() => {
+                              // Open all pages in continuous scroll view - instant
+                              const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                                selectedSubmission.annotated_images : selectedSubmission.file_images
+                              ).map((image, index) => ({
+                                src: `data:image/jpeg;base64,${image}`,
+                                title: `Page ${index + 1}`
+                              }));
+                              setZoomedImages({ 
+                                images: allImages, 
+                                title: "Student Answer", 
+                                initialIndex: idx 
+                              });
+                            }}
+                          >
+                            <div className="relative hover:shadow-xl transition-shadow">
                               <img 
                                 src={`data:image/jpeg;base64,${img}`}
                                 alt={`Page ${idx + 1}`}
