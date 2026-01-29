@@ -1018,6 +1018,38 @@ async def register_user(request: RegisterRequest, response: Response):
         "user_id": user_id,
         "email": request.email,
         "name": request.name,
+
+
+class SetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
+
+@api_router.post("/auth/set-password")
+async def set_password_for_google_account(request: SetPasswordRequest):
+    """Allow Google OAuth users to set a password for email/password login"""
+    # Find user
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with this email")
+    
+    # Check if this is a Google account without a password
+    if "password_hash" in user:
+        raise HTTPException(status_code=400, detail="This account already has a password. Use the login page or reset password if you forgot it.")
+    
+    # Set password hash
+    password_hash = get_password_hash(request.new_password)
+    await db.users.update_one(
+        {"email": request.email},
+        {"$set": {
+            "password_hash": password_hash,
+            "password_set_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {
+        "message": "Password set successfully! You can now login with your email and password."
+    }
+
         "role": request.role,
         "picture": None,
         "token": access_token
