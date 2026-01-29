@@ -108,12 +108,16 @@ export default function EmailAuthPage() {
               GradeSense
             </h1>
             <p className="text-gray-600">
-              {isLogin ? "Sign in to your account" : "Create your account"}
+              {isLogin === "setPassword" 
+                ? "Set a password for your account" 
+                : isLogin 
+                ? "Sign in to your account" 
+                : "Create your account"}
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={isLogin === "setPassword" ? handleSetPassword : handleSubmit} className="space-y-4">
             {/* Name (only for registration) */}
             {!isLogin && (
               <div>
