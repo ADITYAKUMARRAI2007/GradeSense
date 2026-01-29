@@ -102,8 +102,8 @@ export default function ReviewPapers({ user }) {
 
   // Debug: Monitor modal state changes
   useEffect(() => {
-    console.log('🔄 isModalOpen changed to:', isModalOpen);
-  }, [isModalOpen]);
+    console.log('🔄 isModalOpen changed to:', isModalOpen, '| modalKey:', modalKey);
+  }, [isModalOpen, modalKey]);
 
   useEffect(() => {
     console.log('🔄 zoomedImages changed:', zoomedImages ? `${zoomedImages.images?.length} pages` : 'null');
