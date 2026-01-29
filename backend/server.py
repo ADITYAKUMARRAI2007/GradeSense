@@ -5333,19 +5333,17 @@ Return valid JSON only."""
         return []
 
     # CHUNKED PROCESSING LOGIC - REDUCED chunk size for better timeout handling
-    CHUNK_SIZE = 10  # Process 10 pages at a time
-    OVERLAP = 2
+    CHUNK_SIZE = 40  # Process up to 40 pages in one API call
+    OVERLAP = 0  # No overlap needed for single-chunk processing
     total_student_pages = len(images)
     
-    if total_student_pages > 15:  # Only chunk for very large documents
-        logger.warning(f"Large document detected ({total_student_pages} pages). Using chunked processing.")
-    
-    # Create chunks
+    # Create chunks - most papers will be single chunk
     chunks = []
-    if total_student_pages <= 12:  # Process up to 12 pages in one go (most papers)
+    if total_student_pages <= 40:  # Process up to 40 pages in one go
         chunks.append((0, images))
     else:
-        for i in range(0, total_student_pages, CHUNK_SIZE - OVERLAP):
+        # Only chunk for extremely large papers (40+ pages)
+        for i in range(0, total_student_pages, CHUNK_SIZE):
             chunk = images[i : i + CHUNK_SIZE]
             if chunk:
                 chunks.append((i, chunk))
