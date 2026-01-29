@@ -25,7 +25,8 @@ async def process_grading_job_in_background(
     get_exam_model_answer_images,  # Function reference
     get_exam_model_answer_text,  # Function reference
     grade_with_ai,  # Function reference
-    create_notification  # Function reference
+    create_notification,  # Function reference
+    generate_annotated_images_with_vision_ocr=None  # Optional: Vision OCR annotation function
 ):
     """
     Background task to process papers one by one with progress tracking
