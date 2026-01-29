@@ -701,7 +701,7 @@ export default function ReviewPapers({ user }) {
                     key={idx} 
                     className="relative cursor-pointer"
                     onClick={() => {
-                      // Open all pages in continuous scroll view - instant
+                      // Open all pages in continuous scroll view - with explicit open state
                       const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
                         selectedSubmission.annotated_images : selectedSubmission.file_images
                       ).map((image, index) => ({
@@ -713,6 +713,7 @@ export default function ReviewPapers({ user }) {
                         title: "Student Answer", 
                         initialIndex: idx 
                       });
+                      setIsModalOpen(true); // Explicit open
                     }}
                   >
                     <img 
