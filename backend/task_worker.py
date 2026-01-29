@@ -30,6 +30,7 @@ from server import (
     get_exam_model_answer_text,
     grade_with_ai,
     generate_annotated_images,
+    generate_annotated_images_with_vision_ocr,
     create_notification
 )
 
