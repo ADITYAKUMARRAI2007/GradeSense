@@ -1435,14 +1435,19 @@ export default function ReviewPapers({ user }) {
       </Dialog>
 
       {/* Multi-Page Continuous Scroll Viewer */}
-      <Dialog open={!!zoomedImages} onOpenChange={(open) => {
-        if (!open) setZoomedImages(null);
-      }}>
+      <Dialog 
+        open={!!zoomedImages} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setZoomedImages(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
-          <DialogHeader className="p-4 border-b">
+          <DialogHeader className="p-4 border-b sticky top-0 bg-white z-20">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
-                {zoomedImages?.title || "Document Viewer"} - All Pages
+                {zoomedImages?.title || "Document"} - All Pages
                 <span className="text-sm text-muted-foreground font-normal">
                   ({zoomedImages?.images?.length || 0} pages)
                 </span>
@@ -1451,7 +1456,10 @@ export default function ReviewPapers({ user }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageZoom(Math.max(50, imageZoom - 25));
+                  }}
                 >
                   <ZoomOut className="w-4 h-4" />
                 </Button>
@@ -1459,38 +1467,28 @@ export default function ReviewPapers({ user }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageZoom(Math.min(200, imageZoom + 25));
+                  }}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setImageZoom(100)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageZoom(100);
+                  }}
                 >
                   Reset
-                </Button>
-                {/* Explicit Close Button */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setZoomedImages(null)}
-                  className="ml-2"
-                >
-                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </div>
           </DialogHeader>
           <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
-            {loadingZoom ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="flex flex-col items-center gap-3">
-                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-                  <p className="text-sm text-muted-foreground">Loading pages...</p>
-                </div>
-              </div>
-            ) : zoomedImages && zoomedImages.images ? (
+            {zoomedImages?.images && (
               <div className="space-y-6">
                 {zoomedImages.images.map((image, idx) => (
                   <div key={idx} className="relative bg-white p-2 rounded-lg shadow-sm">
@@ -1503,7 +1501,6 @@ export default function ReviewPapers({ user }) {
                       className="mx-auto rounded-lg mt-2"
                       style={{ 
                         width: `${imageZoom}%`,
-                        transition: 'width 0.2s ease-in-out',
                         maxWidth: '100%',
                         height: 'auto'
                       }}
@@ -1512,7 +1509,7 @@ export default function ReviewPapers({ user }) {
                   </div>
                 ))}
               </div>
-            ) : null}
+            )}
           </div>
         </DialogContent>
       </Dialog>
