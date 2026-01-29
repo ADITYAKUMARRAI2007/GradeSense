@@ -182,12 +182,7 @@ export default function UploadGrade({ user }) {
             toast.success(`✓ Successfully graded all ${jobData.successful} papers!`);
           }
           
-          setStep(6);
-          setProcessing(false);
-          setActiveJobId(null);
-          
-          // Clear from localStorage
-          localStorage.removeItem('activeGradingJob');
+          // Clear remaining localStorage
           localStorage.removeItem('uploadGradeState');
           
         } else if (jobData.status === 'failed') {
