@@ -5310,16 +5310,16 @@ Return valid JSON only."""
         return []
 
     # CHUNKED PROCESSING LOGIC - REDUCED chunk size for better timeout handling
-    CHUNK_SIZE = 15  # Process 15 pages at a time for reliability
+    CHUNK_SIZE = 20  # Process 20 pages at a time (no Vision OCR overhead)
     OVERLAP = 0
     total_student_pages = len(images)
     
     # Create chunks
     chunks = []
-    if total_student_pages <= 15:  # Process up to 15 pages in one go
+    if total_student_pages <= 20:  # Process up to 20 pages in one go
         chunks.append((0, images))
     else:
-        # Split larger papers into chunks of 15 pages
+        # Split larger papers into chunks of 20 pages
         for i in range(0, total_student_pages, CHUNK_SIZE):
             chunk = images[i : i + CHUNK_SIZE]
             if chunk:
