@@ -1000,21 +1000,20 @@ export default function ReviewPapers({ user }) {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              // Use flushSync to force immediate synchronous update
-                              flushSync(() => {
-                                const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                                  selectedSubmission.annotated_images : selectedSubmission.file_images
-                                ).map((image, index) => ({
-                                  src: `data:image/jpeg;base64,${image}`,
-                                  title: `Page ${index + 1}`
-                                }));
-                                setZoomedImages({ 
-                                  images: allImages, 
-                                  title: "Student Answer", 
-                                  initialIndex: idx 
-                                });
-                                setIsModalOpen(true);
+                              const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                                selectedSubmission.annotated_images : selectedSubmission.file_images
+                              ).map((image, index) => ({
+                                src: `data:image/jpeg;base64,${image}`,
+                                title: `Page ${index + 1}`
+                              }));
+                              // Update key first to force Dialog remount, then set state
+                              setModalKey(prev => prev + 1);
+                              setZoomedImages({ 
+                                images: allImages, 
+                                title: "Student Answer", 
+                                initialIndex: idx 
                               });
+                              setIsModalOpen(true);
                             }}
                           >
                             <div className="relative hover:shadow-xl transition-shadow">
