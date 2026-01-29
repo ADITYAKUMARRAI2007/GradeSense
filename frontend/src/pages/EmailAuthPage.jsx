@@ -119,7 +119,7 @@ export default function EmailAuthPage() {
           {/* Form */}
           <form onSubmit={isLogin === "setPassword" ? handleSetPassword : handleSubmit} className="space-y-4">
             {/* Name (only for registration) */}
-            {!isLogin && (
+            {!isLogin && isLogin !== "setPassword" && (
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                   Full Name
