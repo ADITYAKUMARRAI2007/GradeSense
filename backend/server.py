@@ -1053,11 +1053,6 @@ async def set_password_for_google_account(request: SetPasswordRequest):
         "message": "Password set successfully! You can now login with your email and password."
     }
 
-        "role": request.role,
-        "picture": None,
-        "token": access_token
-    }
-
 @api_router.post("/auth/login")
 async def login_user(request: LoginRequest, response: Response):
     """Login with email and password (JWT-based auth)"""
