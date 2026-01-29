@@ -4948,34 +4948,15 @@ Return your response in this exact JSON format:
       "question_number": 1,
       "obtained_marks": 8.5,
       "ai_feedback": "Detailed feedback with: 1) What was done well, 2) What was missing/incorrect, 3) How to improve",
-      "what_done_well": "Brief summary of correct elements",
-      "areas_to_improve": "Specific improvement suggestions",
-      "page_number": 1,
-      "y_position": 150,
       "sub_scores": [
-        {{
-          "sub_id": "a",
-          "obtained_marks": 3,
-          "ai_feedback": "Feedback for part a",
-          "page_number": 1,
-          "y_position": 200
-        }},
-        {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b", "page_number": 1, "y_position": 400}}
+        {{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Feedback for part a"}},
+        {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b"}}
       ],
       "confidence": 0.95
     }}
   ],
   "grading_notes": "Any overall observations about the paper"
 }}
-
-### CRITICAL - LOCATION TRACKING:
-For EACH question and sub-question, you MUST provide:
-- **page_number**: Which page (1-indexed) the answer is on (1, 2, 3, etc.)
-- **y_position**: Vertical position on the page (0=top, 1000=bottom) where the answer STARTS
-
-This is MANDATORY. Look at each answer and note:
-1. Which page number it appears on
-2. How far down the page it is (0=very top, 500=middle, 1000=bottom)
 
 **CRITICAL - SUB-QUESTION HANDLING:**
 - If a question has sub-parts (like Q32 has parts a and b), you MUST populate the sub_scores array
