@@ -11,7 +11,7 @@ import base64
 
 class ObjectIdGradingTester:
     def __init__(self):
-        self.base_url = "https://gradesense-1.preview.emergentagent.com/api"
+        self.base_url = "https://gradesense-2.preview.emergentagent.com/api"
         self.session_token = None
         self.user_id = None
         self.tests_run = 0
