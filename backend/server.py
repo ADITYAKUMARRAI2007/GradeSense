@@ -1115,11 +1115,6 @@ async def login_user(request: LoginRequest, response: Response):
         "token": access_token,
         "profile_completed": user.get("profile_completed", True)  # Default to True for existing users
     }
-        "name": user["name"],
-        "role": user["role"],
-        "picture": user.get("picture"),
-        "token": access_token
-    }
 
 # ============== ADMIN ROUTES (PROTECTED) ==============
 
