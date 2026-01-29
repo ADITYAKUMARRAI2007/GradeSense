@@ -5498,7 +5498,12 @@ async def generate_annotated_images_with_vision_ocr(
         
         annotated_images = []
         
-        for page_idx, original_image in enumerate(original_images):
+        # Process only first 3 pages with Vision OCR to find question positions
+        # This saves time while still getting accurate positioning for most questions
+        MAX_OCR_PAGES = 3
+        question_positions_map = {}  # question_num -> (page_idx, y_pos, x_pos)
+        
+        for page_idx, original_image in enumerate(original_images[:MAX_OCR_PAGES]):
             try:
                 # Detect text regions with Vision OCR
                 ocr_result = vision_service.detect_text_from_base64(original_image)
@@ -5509,26 +5514,91 @@ async def generate_annotated_images_with_vision_ocr(
                 with Image.open(io.BytesIO(image_data)) as img:
                     img_width, img_height = img.size
                 
-                # Generate annotations based on OCR regions and grading results
-                page_annotations = _generate_ocr_based_annotations(
-                    page_idx=page_idx,
-                    ocr_result=ocr_result,
-                    question_scores=question_scores,
-                    total_pages=len(original_images),
-                    img_width=img_width,
-                    img_height=img_height
-                )
+                # Find question positions on this page
+                words = ocr_result.get("words", [])
+                import re
+                question_patterns = [
+                    r'\bQ\.?\s*(\d+)\b',
+                    r'\bQuestion\s*(\d+)\b',
+                    r'\b(\d+)\s*[\.\)\-:]\s*[a-z]?\b',
+                ]
+                
+                for word in words:
+                    word_text = word.get("text", "")
+                    word_y = word.get("top_left", (0, 0))[1]
+                    word_x = word.get("top_left", (0, 0))[0]
+                    
+                    for pattern in question_patterns:
+                        match = re.search(pattern, word_text, re.IGNORECASE)
+                        if match:
+                            q_num = int(match.group(1))
+                            if q_num <= len(question_scores) and q_num not in question_positions_map:
+                                question_positions_map[q_num] = (page_idx, word_y, word_x)
+                            break
+                            
+            except Exception as e:
+                logger.warning(f"Vision OCR failed for page {page_idx + 1}: {e}")
+        
+        logger.info(f"Found {len(question_positions_map)} question positions via OCR")
+        
+        # Now generate annotated images using detected positions
+        annotated_images = []
+        for page_idx, original_image in enumerate(original_images):
+            try:
+                image_data = base64.b64decode(original_image)
+                with Image.open(io.BytesIO(image_data)) as img:
+                    img_width, img_height = img.size
+                
+                page_annotations = []
+                margin_x = 25
+                
+                # Add annotations for questions detected on this page
+                for q_score in question_scores:
+                    q_num = q_score.question_number
+                    if q_num in question_positions_map:
+                        q_page, y_pos, x_pos = question_positions_map[q_num]
+                        if q_page == page_idx:
+                            score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+                            mark_color = "green" if score_pct >= 70 else ("orange" if score_pct >= 40 else "red")
+                            
+                            # Question number
+                            page_annotations.append(Annotation(
+                                annotation_type=AnnotationType.POINT_NUMBER,
+                                x=margin_x, y=y_pos,
+                                text=str(q_num), color="blue", size=24
+                            ))
+                            
+                            # Score
+                            score_text = f"{int(q_score.obtained_marks)}" if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}"
+                            page_annotations.append(Annotation(
+                                annotation_type=AnnotationType.SCORE_CIRCLE,
+                                x=margin_x + 45, y=y_pos,
+                                text=f"{score_text}/{int(q_score.max_marks)}", color=mark_color, size=26
+                            ))
+                            
+                            # Checkmark or X
+                            if score_pct >= 70:
+                                page_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.CHECKMARK,
+                                    x=margin_x + 100, y=y_pos + 30,
+                                    text="", color="green", size=28
+                                ))
+                            elif score_pct < 40:
+                                page_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.CROSS_MARK,
+                                    x=margin_x + 100, y=y_pos + 30,
+                                    text="", color="red", size=28
+                                ))
                 
                 if page_annotations:
-                    # Apply annotations to the image
                     annotated_image = apply_annotations_to_image(original_image, page_annotations)
                     annotated_images.append(annotated_image)
-                    logger.info(f"Page {page_idx + 1}: Applied {len(page_annotations)} OCR-positioned annotations")
+                    logger.info(f"Page {page_idx + 1}: Applied {len(page_annotations)} annotations")
                 else:
                     annotated_images.append(original_image)
                     
             except Exception as e:
-                logger.error(f"Error processing page {page_idx + 1} with Vision OCR: {e}")
+                logger.error(f"Error annotating page {page_idx + 1}: {e}")
                 annotated_images.append(original_image)
         
         return annotated_images
