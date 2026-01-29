@@ -1464,6 +1464,7 @@ export default function ReviewPapers({ user }) {
 
       {/* Multi-Page Continuous Scroll Viewer */}
       <Dialog 
+        key={isModalOpen ? 'open' : 'closed'}
         open={isModalOpen}
         onOpenChange={(open) => {
           console.log('🚪 Dialog onOpenChange called. New state:', open);
