@@ -5446,75 +5446,41 @@ async def generate_annotated_images_with_vision_ocr(
     use_vision_ocr: bool = True
 ) -> List[str]:
     """
-    Generate annotated images using Google Cloud Vision OCR for precise positioning.
+    Generate annotated images using AI-provided page positions.
     
-    This function:
-    1. Uses Vision OCR to detect all text regions with bounding boxes
-    2. Matches AI feedback to detected text regions
-    3. Places annotations at accurate positions based on OCR results
-    
-    Args:
-        original_images: List of base64 encoded original student answer images
-        question_scores: List of QuestionScore objects with grading data
-        use_vision_ocr: If True, use Vision OCR for precise positioning
-        
-    Returns:
-        List of base64 encoded annotated images
+    Uses page_number and y_position from the grading response to place annotations
+    at the correct locations - NO separate Vision OCR call needed.
     """
     try:
-        logger.info(f"Generating annotated images with Vision OCR for {len(original_images)} pages")
+        logger.info(f"Generating annotated images for {len(original_images)} pages using AI positions")
         
-        vision_service = get_vision_service()
-        if not vision_service.is_available():
-            logger.warning("Vision OCR not available, falling back to basic annotations")
-            return generate_annotated_images(original_images, question_scores)
+        # Build position map from question scores (AI provides page_number and y_position)
+        question_positions = {}  # q_num -> (page_idx, y_pos)
         
-        annotated_images = []
+        for q_score in question_scores:
+            q_num = q_score.question_number
+            # Get page_number and y_position from the score data
+            page_num = getattr(q_score, 'page_number', None)
+            y_pos = getattr(q_score, 'y_position', None)
+            
+            if page_num is not None and y_pos is not None:
+                # Convert 1-indexed page to 0-indexed
+                page_idx = max(0, page_num - 1)
+                question_positions[q_num] = (page_idx, y_pos)
         
-        # Process only first 3 pages with Vision OCR to find question positions
-        # This saves time while still getting accurate positioning for most questions
-        MAX_OCR_PAGES = 3
-        question_positions_map = {}  # question_num -> (page_idx, y_pos, x_pos)
+        logger.info(f"AI provided positions for {len(question_positions)} questions")
         
-        for page_idx, original_image in enumerate(original_images[:MAX_OCR_PAGES]):
-            try:
-                # Detect text regions with Vision OCR
-                ocr_result = vision_service.detect_text_from_base64(original_image)
-                logger.info(f"Page {page_idx + 1}: Vision OCR detected {ocr_result.get('total_words', 0)} words")
-                
-                # Get image dimensions
-                image_data = base64.b64decode(original_image)
-                with Image.open(io.BytesIO(image_data)) as img:
-                    img_width, img_height = img.size
-                
-                # Find question positions on this page
-                words = ocr_result.get("words", [])
-                import re
-                question_patterns = [
-                    r'\bQ\.?\s*(\d+)\b',
-                    r'\bQuestion\s*(\d+)\b',
-                    r'\b(\d+)\s*[\.\)\-:]\s*[a-z]?\b',
-                ]
-                
-                for word in words:
-                    word_text = word.get("text", "")
-                    word_y = word.get("top_left", (0, 0))[1]
-                    word_x = word.get("top_left", (0, 0))[0]
-                    
-                    for pattern in question_patterns:
-                        match = re.search(pattern, word_text, re.IGNORECASE)
-                        if match:
-                            q_num = int(match.group(1))
-                            if q_num <= len(question_scores) and q_num not in question_positions_map:
-                                question_positions_map[q_num] = (page_idx, word_y, word_x)
-                            break
-                            
-            except Exception as e:
-                logger.warning(f"Vision OCR failed for page {page_idx + 1}: {e}")
+        # If AI didn't provide positions, estimate based on question distribution
+        if not question_positions:
+            logger.info("No AI positions, using estimated positions")
+            questions_per_page = max(1, len(question_scores) / len(original_images))
+            for idx, q_score in enumerate(question_scores):
+                page_idx = int(idx / questions_per_page)
+                page_idx = min(page_idx, len(original_images) - 1)
+                y_pos = int((idx % questions_per_page) / questions_per_page * 800) + 100
+                question_positions[q_score.question_number] = (page_idx, y_pos)
         
-        logger.info(f"Found {len(question_positions_map)} question positions via OCR")
-        
-        # Now generate annotated images using detected positions
+        # Generate annotated images
         annotated_images = []
         for page_idx, original_image in enumerate(original_images):
             try:
@@ -5525,42 +5491,45 @@ async def generate_annotated_images_with_vision_ocr(
                 page_annotations = []
                 margin_x = 25
                 
-                # Add annotations for questions detected on this page
+                # Add annotations for questions on this page
                 for q_score in question_scores:
                     q_num = q_score.question_number
-                    if q_num in question_positions_map:
-                        q_page, y_pos, x_pos = question_positions_map[q_num]
+                    if q_num in question_positions:
+                        q_page, y_normalized = question_positions[q_num]
                         if q_page == page_idx:
+                            # Convert normalized y (0-1000) to pixel y
+                            y_pos = int(y_normalized / 1000 * img_height)
+                            
                             score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
                             mark_color = "green" if score_pct >= 70 else ("orange" if score_pct >= 40 else "red")
                             
-                            # Question number
+                            # Question number in margin
                             page_annotations.append(Annotation(
                                 annotation_type=AnnotationType.POINT_NUMBER,
                                 x=margin_x, y=y_pos,
                                 text=str(q_num), color="blue", size=24
                             ))
                             
-                            # Score
+                            # Score circle
                             score_text = f"{int(q_score.obtained_marks)}" if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}"
                             page_annotations.append(Annotation(
                                 annotation_type=AnnotationType.SCORE_CIRCLE,
-                                x=margin_x + 45, y=y_pos,
-                                text=f"{score_text}/{int(q_score.max_marks)}", color=mark_color, size=26
+                                x=margin_x + 50, y=y_pos,
+                                text=f"{score_text}/{int(q_score.max_marks)}", color=mark_color, size=28
                             ))
                             
-                            # Checkmark or X
+                            # Checkmark or X based on score
                             if score_pct >= 70:
                                 page_annotations.append(Annotation(
                                     annotation_type=AnnotationType.CHECKMARK,
-                                    x=margin_x + 100, y=y_pos + 30,
-                                    text="", color="green", size=28
+                                    x=margin_x + 120, y=y_pos,
+                                    text="", color="green", size=26
                                 ))
                             elif score_pct < 40:
                                 page_annotations.append(Annotation(
                                     annotation_type=AnnotationType.CROSS_MARK,
-                                    x=margin_x + 100, y=y_pos + 30,
-                                    text="", color="red", size=28
+                                    x=margin_x + 120, y=y_pos,
+                                    text="", color="red", size=26
                                 ))
                 
                 if page_annotations:
@@ -5575,6 +5544,10 @@ async def generate_annotated_images_with_vision_ocr(
                 annotated_images.append(original_image)
         
         return annotated_images
+        
+    except Exception as e:
+        logger.error(f"Error generating annotations: {e}", exc_info=True)
+        return original_images  # Return originals on error
         
     except Exception as e:
         logger.error(f"Error in Vision OCR annotation: {e}", exc_info=True)
