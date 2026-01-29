@@ -83,18 +83,27 @@ export default function AuthCallback() {
         console.error("Error details:", error);
         console.error("Error response:", error.response?.data);
         console.error("Error status:", error.response?.status);
+        console.error("Error code:", error.code);
+        console.error("Error message:", error.message);
         
-        // Better error message handling
+        // Better error message handling with more detail
         let errorMessage = "Authentication failed";
-        if (error.response?.data?.detail) {
+        
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+          errorMessage = "Connection timeout. The server took too long to respond. Please check your internet connection and try again.";
+        } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+          errorMessage = "Network Error. Unable to reach the authentication server. Please check:\n\n1. Your internet connection\n2. If you're behind a firewall or VPN\n3. Browser extensions that might block requests\n\nThen try again.";
+        } else if (error.response?.data?.detail) {
           errorMessage = error.response.data.detail;
         } else if (error.response?.status === 401) {
           errorMessage = "Authentication session expired. Please try logging in again.";
+        } else if (error.response?.status === 504) {
+          errorMessage = "Gateway timeout. The authentication service is slow. Please wait a moment and try again.";
         } else if (error.message) {
-          errorMessage = error.message;
+          errorMessage = `${error.message}\n\nIf this persists, please try:\n1. Clearing your browser cache\n2. Using a different browser\n3. Checking your internet connection`;
         }
         
-        alert(`Authentication failed: ${errorMessage}`);
+        alert(`Authentication failed:\n\n${errorMessage}`);
         navigate("/login", { replace: true });
       }
     };
