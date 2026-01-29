@@ -1401,7 +1401,38 @@ export default function ReviewPapers({ user }) {
                   <ZoomOut className="w-4 h-4" />
                 </Button>
                 <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
-
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(100)}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {zoomedImage && (
+              <img 
+                src={zoomedImage.src}
+                alt={zoomedImage.title}
+                className="mx-auto"
+                style={{ 
+                  width: `${imageZoom}%`,
+                  transition: 'width 0.2s'
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Multi-Page Continuous Scroll Viewer */}
       <Dialog open={!!zoomedImages} onOpenChange={() => setZoomedImages(null)}>
@@ -1455,39 +1486,6 @@ export default function ReviewPapers({ user }) {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImageZoom(100)}
-                >
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
-            {zoomedImage && (
-              <img 
-                src={zoomedImage.src}
-                alt={zoomedImage.title}
-                className="mx-auto"
-                style={{ 
-                  width: `${imageZoom}%`,
-                  transition: 'width 0.2s'
-                }}
-              />
             )}
           </div>
         </DialogContent>
