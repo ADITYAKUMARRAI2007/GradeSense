@@ -1729,7 +1729,7 @@ export default function ReviewPapers({ user }) {
                   <DialogTitle>All Papers Reviewed!</DialogTitle>
                 </div>
                 <DialogDescription>
-                  Great job! You've reviewed all papers for this exam. 
+                  Great job! You&apos;ve reviewed all papers for this exam. 
                   Would you like to publish the results now so students can see their scores?
                 </DialogDescription>
               </DialogHeader>
