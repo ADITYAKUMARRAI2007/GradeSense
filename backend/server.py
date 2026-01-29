@@ -1018,6 +1018,9 @@ async def register_user(request: RegisterRequest, response: Response):
         "user_id": user_id,
         "email": request.email,
         "name": request.name,
+        "role": request.role,
+        "token": token
+    }
 
 
 class SetPasswordRequest(BaseModel):
