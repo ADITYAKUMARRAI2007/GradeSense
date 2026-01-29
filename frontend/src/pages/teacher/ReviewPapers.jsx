@@ -1443,51 +1443,49 @@ export default function ReviewPapers({ user }) {
           }
         }}
       >
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
-          <DialogHeader className="p-4 border-b sticky top-0 bg-white z-20">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                {zoomedImages?.title || "Document"} - All Pages
-                <span className="text-sm text-muted-foreground font-normal">
-                  ({zoomedImages?.images?.length || 0} pages)
-                </span>
-              </DialogTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImageZoom(Math.max(50, imageZoom - 25));
-                  }}
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-                <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImageZoom(Math.min(200, imageZoom + 25));
-                  }}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImageZoom(100);
-                  }}
-                >
-                  Reset
-                </Button>
-              </div>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pr-12 border-b sticky top-0 bg-white z-20">
+            <DialogTitle className="flex items-center gap-2 text-left">
+              {zoomedImages?.title || "Document"} - All Pages
+              <span className="text-sm text-muted-foreground font-normal">
+                ({zoomedImages?.images?.length || 0} pages)
+              </span>
+            </DialogTitle>
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageZoom(Math.max(50, imageZoom - 25));
+                }}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageZoom(Math.min(200, imageZoom + 25));
+                }}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImageZoom(100);
+                }}
+              >
+                Reset
+              </Button>
             </div>
           </DialogHeader>
-          <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+          <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 100px)' }}>
             {zoomedImages?.images && (
               <div className="space-y-6">
                 {zoomedImages.images.map((image, idx) => (
@@ -1498,13 +1496,14 @@ export default function ReviewPapers({ user }) {
                     <img 
                       src={image.src}
                       alt={image.title}
-                      className="mx-auto rounded-lg mt-2"
+                      className="mx-auto rounded-lg mt-2 select-none"
                       style={{ 
                         width: `${imageZoom}%`,
                         maxWidth: '100%',
                         height: 'auto'
                       }}
                       loading="lazy"
+                      draggable={false}
                     />
                   </div>
                 ))}
