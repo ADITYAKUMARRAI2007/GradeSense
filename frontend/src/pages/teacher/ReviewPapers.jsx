@@ -702,6 +702,7 @@ export default function ReviewPapers({ user }) {
                     key={idx} 
                     className="relative cursor-pointer"
                     onClick={(e) => {
+                      console.log('🖱️ Image clicked! Index:', idx);
                       e.preventDefault();
                       e.stopPropagation();
                       // Use flushSync to force immediate synchronous update
@@ -712,12 +713,14 @@ export default function ReviewPapers({ user }) {
                           src: `data:image/jpeg;base64,${image}`,
                           title: `Page ${index + 1}`
                         }));
+                        console.log('📸 Setting images:', allImages.length, 'pages');
                         setZoomedImages({ 
                           images: allImages, 
                           title: "Student Answer", 
                           initialIndex: idx 
                         });
                         setIsModalOpen(true);
+                        console.log('✅ Modal state set to OPEN');
                       });
                     }}
                   >
@@ -1454,11 +1457,15 @@ export default function ReviewPapers({ user }) {
       <Dialog 
         open={isModalOpen}
         onOpenChange={(open) => {
+          console.log('🚪 Dialog onOpenChange called. New state:', open);
           // Use flushSync for immediate close
           flushSync(() => {
             setIsModalOpen(open);
             if (!open) {
               setZoomedImages(null);
+              console.log('❌ Modal CLOSED');
+            } else {
+              console.log('✅ Modal OPENED');
             }
           });
         }}
