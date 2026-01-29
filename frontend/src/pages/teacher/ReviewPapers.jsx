@@ -14,7 +14,6 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/dialog";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import ScrollableImageModal from "../../components/ScrollableImageModal";
 import { toast } from "sonner";
 import { 
   Search, 
@@ -57,11 +56,12 @@ export default function ReviewPapers({ user }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showModelAnswer, setShowModelAnswer] = useState(true);
   const [showQuestionPaper, setShowQuestionPaper] = useState(true);
+  const [showAnnotations, setShowAnnotations] = useState(true); // NEW: Toggle for annotated view
   const [modelAnswerImages, setModelAnswerImages] = useState([]);
   const [questionPaperImages, setQuestionPaperImages] = useState([]);
   const [examQuestions, setExamQuestions] = useState([]);
-  const [modalImages, setModalImages] = useState([]);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState(null);
+  const [zoomedImages, setZoomedImages] = useState(null); // For multi-page continuous scrolling
   
   // Auto-publish dialog state
   const [autoPublishDialogOpen, setAutoPublishDialogOpen] = useState(false);
@@ -70,19 +70,7 @@ export default function ReviewPapers({ user }) {
     show_answer_sheet: true,
     show_question_paper: true
   });
-
-  const openImageModal = useCallback((images) => {
-    const imgArray = Array.isArray(images) ? images : (images ? [images] : []);
-    console.log('Opening modal with', imgArray.length, 'images');
-    setModalImages(imgArray);
-    setIsImageModalOpen(true);
-  }, []);
-
-  const closeImageModal = useCallback(() => {
-    setIsImageModalOpen(false);
-    setModalImages([]);
-  }, []);
-
+  const [imageZoom, setImageZoom] = useState(100);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackQuestion, setFeedbackQuestion] = useState(null);
   const [feedbackCorrections, setFeedbackCorrections] = useState([
@@ -187,14 +175,13 @@ export default function ReviewPapers({ user }) {
       });
       toast.success("Changes saved and approved!");
       
-      setSubmissions(prev => prev.map(s => 
-        s.submission_id === selectedSubmission.submission_id 
-          ? { ...s, status: "teacher_reviewed" }
-          : s
-      ));
+      // Refresh data from backend to get latest state
+      await fetchData();
       
-      // Check if this was the last paper to review
-      checkAndShowPublishDialog();
+      // Check if this was the last paper to review (after data refresh)
+      setTimeout(() => {
+        checkAndShowPublishDialog();
+      }, 300); // Small delay to ensure state is updated
       
     } catch (error) {
       toast.error("Failed to save changes");
@@ -220,18 +207,29 @@ export default function ReviewPapers({ user }) {
       s.teacher_edited === true || s.final_decision === "approved"
     );
     
+    console.log('Auto-publish check:', {
+      exam_id: filters.exam_id,
+      totalSubmissions: examSubmissions.length,
+      allReviewed,
+      shownBefore: !!sessionStorage.getItem(shownKey)
+    });
+    
     if (allReviewed && examSubmissions.length > 0) {
-      // Mark as shown for this session
-      sessionStorage.setItem(shownKey, 'true');
-      
       // Check if already published
       const exam = exams.find(e => e.exam_id === filters.exam_id);
       if (exam && !exam.results_published) {
+        // Mark as shown for this session BEFORE showing dialog
+        sessionStorage.setItem(shownKey, 'true');
+        
         // Show auto-publish dialog
         setTimeout(() => {
           setAutoPublishDialogOpen(true);
         }, 500); // Small delay for better UX
+      } else {
+        console.log('Not showing publish dialog - exam already published or not found');
       }
+    } else {
+      console.log('Not all papers reviewed yet');
     }
   };
 
@@ -344,6 +342,11 @@ export default function ReviewPapers({ user }) {
       const response = await axios.post(`${API}/exams/${filters.exam_id}/bulk-approve`);
       toast.success(response.data.message || "Papers approved successfully");
       await fetchData(); // Refresh all data
+      
+      // Check if all papers are now reviewed and show publish dialog
+      setTimeout(() => {
+        checkAndShowPublishDialog();
+      }, 300); // Small delay to ensure state is updated
     } catch (error) {
       console.error("Bulk approve error:", error);
       const errorMessage = error.response?.data?.detail || error.message || "Failed to bulk approve";
@@ -655,6 +658,20 @@ export default function ReviewPapers({ user }) {
               <div className="flex items-center justify-between sticky top-0 bg-muted/30 py-2 z-10 gap-2 flex-wrap">
                 <span className="text-sm font-medium">Answer Sheet</span>
                 <div className="flex items-center gap-3">
+                  {/* Annotations Toggle - NEW */}
+                  {selectedSubmission.annotated_images?.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="show-annotations-mobile"
+                        checked={showAnnotations}
+                        onCheckedChange={setShowAnnotations}
+                      />
+                      <Label htmlFor="show-annotations-mobile" className="text-xs cursor-pointer flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Annotations
+                      </Label>
+                    </div>
+                  )}
                   {/* Model Answer Toggle */}
                   {modelAnswerImages.length > 0 && (
                     <div className="flex items-center gap-2">
@@ -675,14 +692,36 @@ export default function ReviewPapers({ user }) {
               
               {/* Answer Sheets */}
               <div className="space-y-4">
-                {selectedSubmission.file_images.map((img, idx) => (
-                  <img 
-                    key={idx}
-                    src={`data:image/jpeg;base64,${img}`}
-                    alt={`Page ${idx + 1}`}
-                    className="w-full rounded-lg shadow-md cursor-zoom-in"
-                    onClick={() => openImageModal(selectedSubmission.file_images)}
-                  />
+                {/* Show annotated images if available and toggle is on */}
+                {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                  selectedSubmission.annotated_images : selectedSubmission.file_images
+                ).map((img, idx) => (
+                  <div key={idx} className="relative">
+                    <img 
+                      src={`data:image/jpeg;base64,${img}`}
+                      alt={`Page ${idx + 1}`}
+                      className="w-full rounded-lg shadow-md cursor-zoom-in"
+                      onClick={() => {
+                        // Open all pages in continuous scroll view - instant
+                        const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                          selectedSubmission.annotated_images : selectedSubmission.file_images
+                        ).map((image, index) => ({
+                          src: `data:image/jpeg;base64,${image}`,
+                          title: `Page ${index + 1}`
+                        }));
+                        setZoomedImages({ 
+                          images: allImages, 
+                          title: "Student Answer", 
+                          initialIndex: idx 
+                        });
+                      }}
+                    />
+                    {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
+                      <Badge className="absolute top-2 right-2 bg-green-500 text-white">
+                        With Annotations
+                      </Badge>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -889,6 +928,21 @@ export default function ReviewPapers({ user }) {
                         </div>
                       )}
                       
+                      {/* Annotations Toggle - NEW */}
+                      {selectedSubmission.annotated_images?.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id="show-annotations-desktop"
+                            checked={showAnnotations}
+                            onCheckedChange={setShowAnnotations}
+                          />
+                          <Label htmlFor="show-annotations-desktop" className="text-xs cursor-pointer flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-green-600" />
+                            Annotations
+                          </Label>
+                        </div>
+                      )}
+                      
                       {/* Model Answer Toggle */}
                       {modelAnswerImages.length > 0 && (
                         <div className="flex items-center gap-2">
@@ -915,11 +969,26 @@ export default function ReviewPapers({ user }) {
                         <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student&apos;s Answer</h3>
                       )}
                       <div className="space-y-4">
-                        {selectedSubmission.file_images.map((img, idx) => (
+                        {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                          selectedSubmission.annotated_images : selectedSubmission.file_images
+                        ).map((img, idx) => (
                           <div key={idx} className="relative group">
                             <div 
                               className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                              onClick={() => openImageModal(selectedSubmission.file_images)}
+                              onClick={() => {
+                                // Open all pages in continuous scroll view - instant
+                                const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                                  selectedSubmission.annotated_images : selectedSubmission.file_images
+                                ).map((image, index) => ({
+                                  src: `data:image/jpeg;base64,${image}`,
+                                  title: `Page ${index + 1}`
+                                }));
+                                setZoomedImages({ 
+                                  images: allImages, 
+                                  title: "Student Answer", 
+                                  initialIndex: idx 
+                                });
+                              }}
                             >
                               <img 
                                 src={`data:image/jpeg;base64,${img}`}
@@ -927,6 +996,11 @@ export default function ReviewPapers({ user }) {
                                 className="w-full rounded-lg shadow-md"
                                 style={{ minHeight: '400px', objectFit: 'contain' }}
                               />
+                              {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
+                                <Badge className="absolute top-2 right-2 bg-green-500 text-white">
+                                  With Annotations
+                                </Badge>
+                              )}
                               {/* Zoom Overlay */}
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                                 <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
@@ -949,7 +1023,17 @@ export default function ReviewPapers({ user }) {
                             <div key={idx} className="relative group">
                               <div 
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                                onClick={() => openImageModal(modelAnswerImages)}
+                                onClick={() => {
+                                  const allImages = modelAnswerImages.map((image, index) => ({
+                                    src: `data:image/jpeg;base64,${image}`,
+                                    title: `Page ${index + 1}`
+                                  }));
+                                  setZoomedImages({ 
+                                    images: allImages, 
+                                    title: "Model Answer", 
+                                    initialIndex: idx 
+                                  });
+                                }}
                               >
                                 <img 
                                   src={`data:image/jpeg;base64,${img}`}
@@ -980,7 +1064,17 @@ export default function ReviewPapers({ user }) {
                             <div key={idx} className="relative group">
                               <div 
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                                onClick={() => openImageModal(questionPaperImages)}
+                                onClick={() => {
+                                  const allImages = questionPaperImages.map((image, index) => ({
+                                    src: `data:image/jpeg;base64,${image}`,
+                                    title: `Page ${index + 1}`
+                                  }));
+                                  setZoomedImages({ 
+                                    images: allImages, 
+                                    title: "Question Paper", 
+                                    initialIndex: idx 
+                                  });
+                                }}
                               >
                                 <img 
                                   src={`data:image/jpeg;base64,${img}`}
@@ -1292,12 +1386,136 @@ export default function ReviewPapers({ user }) {
         </div>
       </div>
 
-      {/* Image Zoom Modal - Scrollable */}
-      <ScrollableImageModal
-        isOpen={isImageModalOpen}
-        images={modalImages}
-        onClose={closeImageModal}
-      />
+      {/* Image Zoom Modal */}
+      <Dialog open={!!zoomedImage} onOpenChange={() => setZoomedImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle>{zoomedImage?.title || "Image Viewer"}</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(100)}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {zoomedImage && (
+              <img 
+                src={zoomedImage.src}
+                alt={zoomedImage.title}
+                className="mx-auto"
+                style={{ 
+                  width: `${imageZoom}%`,
+                  transition: 'width 0.2s'
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Multi-Page Continuous Scroll Viewer */}
+      <Dialog open={!!zoomedImages} onOpenChange={(open) => {
+        if (!open) setZoomedImages(null);
+      }}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                {zoomedImages?.title || "Document Viewer"} - All Pages
+                <span className="text-sm text-muted-foreground font-normal">
+                  ({zoomedImages?.images?.length || 0} pages)
+                </span>
+              </DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(100)}
+                >
+                  Reset
+                </Button>
+                {/* Explicit Close Button */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setZoomedImages(null)}
+                  className="ml-2"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {loadingZoom ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="flex flex-col items-center gap-3">
+                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+                  <p className="text-sm text-muted-foreground">Loading pages...</p>
+                </div>
+              </div>
+            ) : zoomedImages && zoomedImages.images ? (
+              <div className="space-y-6">
+                {zoomedImages.images.map((image, idx) => (
+                  <div key={idx} className="relative bg-white p-2 rounded-lg shadow-sm">
+                    <div className="sticky top-2 left-2 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium z-10 inline-block shadow-md">
+                      📄 {image.title}
+                    </div>
+                    <img 
+                      src={image.src}
+                      alt={image.title}
+                      className="mx-auto rounded-lg mt-2"
+                      style={{ 
+                        width: `${imageZoom}%`,
+                        transition: 'width 0.2s ease-in-out',
+                        maxWidth: '100%',
+                        height: 'auto'
+                      }}
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* AI Feedback Dialog */}
       <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
@@ -1530,9 +1748,8 @@ export default function ReviewPapers({ user }) {
     showModelAnswer, 
     showQuestionPaper,
     examQuestions,
-    isImageModalOpen,
-    openImageModal,
-    closeImageModal,
+    imageZoom,
+    zoomedImage,
     feedbackDialogOpen,
     feedbackQuestion,
     feedbackCorrections,
