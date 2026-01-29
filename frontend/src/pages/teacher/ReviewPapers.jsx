@@ -1064,7 +1064,17 @@ export default function ReviewPapers({ user }) {
                             <div key={idx} className="relative group">
                               <div 
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                                onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Question Paper - Page ${idx + 1}` })}
+                                onClick={() => {
+                                  const allImages = questionPaperImages.map((image, index) => ({
+                                    src: `data:image/jpeg;base64,${image}`,
+                                    title: `Page ${index + 1}`
+                                  }));
+                                  setZoomedImages({ 
+                                    images: allImages, 
+                                    title: "Question Paper", 
+                                    initialIndex: idx 
+                                  });
+                                }}
                               >
                                 <img 
                                   src={`data:image/jpeg;base64,${img}`}
