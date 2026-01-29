@@ -1019,7 +1019,7 @@ async def register_user(request: RegisterRequest, response: Response):
         "email": request.email,
         "name": request.name,
         "role": request.role,
-        "token": token
+        "token": access_token
     }
 
 
