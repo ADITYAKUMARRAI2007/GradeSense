@@ -1401,6 +1401,65 @@ export default function ReviewPapers({ user }) {
                   <ZoomOut className="w-4 h-4" />
                 </Button>
                 <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+
+
+      {/* Multi-Page Continuous Scroll Viewer */}
+      <Dialog open={!!zoomedImages} onOpenChange={() => setZoomedImages(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle>{zoomedImages?.title || "Document Viewer"} - All Pages</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.max(50, imageZoom - 25))}
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[60px] text-center">{imageZoom}%</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(Math.min(200, imageZoom + 25))}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImageZoom(100)}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {zoomedImages && (
+              <div className="space-y-6">
+                {zoomedImages.images.map((image, idx) => (
+                  <div key={idx} className="relative">
+                    <div className="sticky top-0 bg-blue-100 text-blue-800 px-3 py-1 rounded-t-lg text-sm font-medium z-10 inline-block">
+                      {image.title}
+                    </div>
+                    <img 
+                      src={image.src}
+                      alt={image.title}
+                      className="mx-auto rounded-lg shadow-lg border-2 border-gray-200"
+                      style={{ 
+                        width: `${imageZoom}%`,
+                        transition: 'width 0.2s'
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
                 <Button
                   size="sm"
                   variant="outline"
