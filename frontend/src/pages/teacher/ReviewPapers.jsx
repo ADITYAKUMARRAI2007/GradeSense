@@ -1435,11 +1435,18 @@ export default function ReviewPapers({ user }) {
       </Dialog>
 
       {/* Multi-Page Continuous Scroll Viewer */}
-      <Dialog open={!!zoomedImages} onOpenChange={() => setZoomedImages(null)}>
+      <Dialog open={!!zoomedImages} onOpenChange={(open) => {
+        if (!open) setZoomedImages(null);
+      }}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
           <DialogHeader className="p-4 border-b">
             <div className="flex items-center justify-between">
-              <DialogTitle>{zoomedImages?.title || "Document Viewer"} - All Pages</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                {zoomedImages?.title || "Document Viewer"} - All Pages
+                <span className="text-sm text-muted-foreground font-normal">
+                  ({zoomedImages?.images?.length || 0} pages)
+                </span>
+              </DialogTitle>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -1463,25 +1470,37 @@ export default function ReviewPapers({ user }) {
                 >
                   Reset
                 </Button>
+                {/* Explicit Close Button */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setZoomedImages(null)}
+                  className="ml-2"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </DialogHeader>
-          <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
-            {zoomedImages && (
+          <div className="overflow-auto p-4 bg-gray-50" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {zoomedImages && zoomedImages.images && (
               <div className="space-y-6">
                 {zoomedImages.images.map((image, idx) => (
-                  <div key={idx} className="relative">
-                    <div className="sticky top-0 bg-blue-100 text-blue-800 px-3 py-1 rounded-t-lg text-sm font-medium z-10 inline-block">
-                      {image.title}
+                  <div key={idx} className="relative bg-white p-2 rounded-lg shadow-sm">
+                    <div className="sticky top-2 left-2 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium z-10 inline-block shadow-md">
+                      📄 {image.title}
                     </div>
                     <img 
                       src={image.src}
                       alt={image.title}
-                      className="mx-auto rounded-lg shadow-lg border-2 border-gray-200"
+                      className="mx-auto rounded-lg mt-2"
                       style={{ 
                         width: `${imageZoom}%`,
-                        transition: 'width 0.2s'
+                        transition: 'width 0.2s ease-in-out',
+                        maxWidth: '100%',
+                        height: 'auto'
                       }}
+                      loading="lazy"
                     />
                   </div>
                 ))}
