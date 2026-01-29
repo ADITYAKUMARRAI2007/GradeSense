@@ -1848,7 +1848,8 @@ async def check_profile_completion(user: User = Depends(get_current_user)):
     
     # If profile_completed is None (existing user), treat as completed
     # If it's explicitly False (new user), they need to complete setup
-    if profile_completed is None:
+    # SPECIAL CASE: If user has name, email, and role, they're an existing user - always return True
+    if profile_completed is None or (user.name and user.email):
         profile_completed = True
     
     return {
