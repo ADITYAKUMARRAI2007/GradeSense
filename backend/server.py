@@ -451,6 +451,8 @@ class QuestionScore(BaseModel):
     question_text: Optional[str] = None  # The question text
     status: str = "graded"  # graded, not_attempted, not_found, error
     annotations: List[AnnotationData] = []  # Annotations for this question
+    page_number: Optional[int] = None  # Which page (1-indexed) the answer is on
+    y_position: Optional[int] = None  # Vertical position (0-1000) on the page
 
 class Submission(BaseModel):
     model_config = ConfigDict(extra="ignore")
