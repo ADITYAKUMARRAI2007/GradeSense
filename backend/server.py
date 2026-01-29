@@ -2161,10 +2161,17 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     job_doc = {
         "job_id": job_id,
         "exam_id": exam_id,
+        "teacher_id": user.user_id,
         "status": "processing",
         "progress": 0,
         "total_papers": len(submissions),
+        "processed_papers": 0,
+        "successful": 0,
+        "failed": 0,
+        "submissions": [],
+        "errors": [],
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "task_ids": tasks_created
     }
     
