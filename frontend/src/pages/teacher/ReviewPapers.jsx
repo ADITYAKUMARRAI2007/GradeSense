@@ -701,20 +701,24 @@ export default function ReviewPapers({ user }) {
                   <div 
                     key={idx} 
                     className="relative cursor-pointer"
-                    onClick={() => {
-                      // Open all pages in continuous scroll view - with explicit open state
-                      const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                        selectedSubmission.annotated_images : selectedSubmission.file_images
-                      ).map((image, index) => ({
-                        src: `data:image/jpeg;base64,${image}`,
-                        title: `Page ${index + 1}`
-                      }));
-                      setZoomedImages({ 
-                        images: allImages, 
-                        title: "Student Answer", 
-                        initialIndex: idx 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // Use flushSync to force immediate synchronous update
+                      flushSync(() => {
+                        const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                          selectedSubmission.annotated_images : selectedSubmission.file_images
+                        ).map((image, index) => ({
+                          src: `data:image/jpeg;base64,${image}`,
+                          title: `Page ${index + 1}`
+                        }));
+                        setZoomedImages({ 
+                          images: allImages, 
+                          title: "Student Answer", 
+                          initialIndex: idx 
+                        });
+                        setIsModalOpen(true);
                       });
-                      setIsModalOpen(true); // Explicit open
                     }}
                   >
                     <img 
