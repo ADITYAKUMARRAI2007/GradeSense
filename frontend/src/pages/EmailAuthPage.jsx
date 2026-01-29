@@ -223,18 +223,55 @@ export default function EmailAuthPage() {
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+              {loading 
+                ? "Please wait..." 
+                : isLogin === "setPassword" 
+                ? "Set Password" 
+                : isLogin 
+                ? "Sign In" 
+                : "Create Account"}
             </Button>
           </form>
 
-          {/* Toggle Login/Register */}
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              {isLogin ? (
+          {/* Toggle Login/Register/SetPassword */}
+          <div className="mt-6 text-center space-y-2">
+            {isLogin === "setPassword" ? (
+              <button
+                type="button"
+                onClick={() => setIsLogin(true)}
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Back to Sign In
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-sm text-gray-600 hover:text-gray-900 block w-full"
+                >
+                  {isLogin ? (
+                    <>
+                      Don&apos;t have an account? <span className="text-blue-600 font-semibold">Sign Up</span>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account? <span className="text-blue-600 font-semibold">Sign In</span>
+                    </>
+                  )}
+                </button>
+                
+                {isLogin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsLogin("setPassword")}
+                    className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                  >
+                    Have a Google account? Set a password here
+                  </button>
+                )}
+              </>
+            )}
                 <>
                   Don't have an account?{" "}
                   <span className="font-semibold text-blue-600">Sign up</span>
