@@ -183,7 +183,7 @@ export default function EmailAuthPage() {
             </div>
 
             {/* Role (only for registration) */}
-            {!isLogin && (
+            {!isLogin && isLogin !== "setPassword" && (
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   I am a...
