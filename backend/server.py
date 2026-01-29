@@ -41,6 +41,7 @@ from annotation_utils import (
     apply_annotations_to_image,
     auto_position_annotations_for_question
 )
+from vision_ocr_service import get_vision_service, VisionOCRService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
