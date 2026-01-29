@@ -198,6 +198,21 @@ async def process_grading_job_in_background(
                     obtained_marks = sum(s.obtained_marks for s in scores if s.obtained_marks >= 0)
                     percentage = (obtained_marks / exam.get("total_marks", 100)) * 100 if exam.get("total_marks") else 0
                     
+                    # Generate annotated images using Vision OCR if available
+                    annotated_images = []
+                    if generate_annotated_images_with_vision_ocr:
+                        try:
+                            logger.info(f"[Job {job_id}] Generating annotated images with Vision OCR...")
+                            annotated_images = await generate_annotated_images_with_vision_ocr(
+                                original_images=paper_images,
+                                question_scores=scores,
+                                use_vision_ocr=True
+                            )
+                            logger.info(f"[Job {job_id}] Generated {len(annotated_images)} annotated images")
+                        except Exception as ann_error:
+                            logger.error(f"[Job {job_id}] Annotation generation failed: {ann_error}")
+                            annotated_images = []
+                    
                     # Create submission
                     submission_id = f"sub_{uuid.uuid4().hex[:12]}"
                     submission = {
@@ -208,6 +223,7 @@ async def process_grading_job_in_background(
                         "roll_number": student_id_from_paper,
                         "filename": filename,
                         "file_images": paper_images,  # Store the answer sheet images
+                        "annotated_images": annotated_images,  # Store Vision OCR annotated images
                         "obtained_marks": obtained_marks,
                         "total_marks": exam.get("total_marks", 100),
                         "percentage": round(percentage, 2),
