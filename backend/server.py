@@ -3557,7 +3557,7 @@ Important:
 - Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Use first page only (usually has student info)
         from emergentintegrations.llm.chat import ImageContent
@@ -3869,7 +3869,7 @@ KEY POINTS:
 ---
 
 Be thorough - extract EVERY detail useful for grading."""
-            ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             image_contents = [ImageContent(image_base64=img) for img in chunk_images]
             
@@ -3990,7 +3990,7 @@ Required JSON structure for each question:
   ]
 }
 """
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in question_paper_images]
@@ -4167,7 +4167,7 @@ Required JSON structure:
   ]
 }
 """
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - process ALL pages, no limit
         image_contents = [ImageContent(image_base64=img) for img in model_answer_images]
@@ -4314,7 +4314,7 @@ CRITICAL RULES:
    - Example: "Answer any 4 out of 6 questions (each 10 marks)" → 6 questions marked as optional, required_count=4, effective_marks=40
 
 Return ONLY a JSON array of questions, nothing else."""
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - CHUNK if too many pages
         CHUNK_SIZE = 10  # Process 10 pages at a time to avoid timeouts
@@ -5032,7 +5032,7 @@ Your measure of success: When the same paper graded by you and by an expert teac
             api_key=api_key,
             session_id=f"grading_{content_hash}_{chunk_idx}",
             system_message=master_system_prompt
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
 
         # Prepare images based on grading mode
         chunk_all_images = []
@@ -7430,7 +7430,7 @@ Only return the JSON array, no other text."""
                 api_key=llm_key,
                 session_id=f"misconceptions_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert at analyzing student misconceptions and learning patterns."
-            ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -7779,7 +7779,7 @@ Keep response concise (under 200 words). Format as JSON:
                 api_key=llm_key,
                 session_id=f"student_analysis_{uuid.uuid4().hex[:8]}",
                 system_message="You are an expert educational analyst providing personalized student guidance."
-            ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             user_message = UserMessage(text=analysis_prompt)
             ai_response = await chat.send_message(user_message)
@@ -7903,7 +7903,7 @@ Only return the JSON array."""
             api_key=llm_key,
             session_id=f"review_packet_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert educator creating practice questions to help students improve."
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         user_message = UserMessage(text=generation_prompt)
         ai_response = await chat.send_message(user_message)
@@ -7990,7 +7990,7 @@ Only return the JSON object."""
             api_key=llm_key,
             session_id=f"infer_topics_{uuid.uuid4().hex[:8]}",
             system_message="You are an expert at analyzing exam questions and categorizing them by topic."
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         user_message = UserMessage(text=inference_prompt)
         ai_response = await chat.send_message(user_message)
@@ -8544,7 +8544,7 @@ Respond in JSON format:
                 api_key=os.environ.get("EMERGENT_LLM_KEY"),
                 session_id=f"error_group_{uuid.uuid4().hex[:8]}",
                 system_message="You are an educational data analyst. Categorize student errors precisely."
-            ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             user_message = UserMessage(text=prompt)
             response = await chat.send_message(user_message)
@@ -8943,7 +8943,7 @@ CRITICAL: You MUST respond in valid JSON format matching one of these types:
 - {"type": "chart", "chart_type": "bar|line|pie|histogram", "title": "...", "data": [...], "x_label": "...", "y_label": "...", "description": "..."}
 
 Always use actual data from the context provided. Be specific with student names and scores."""
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0.3)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0.3)
         
         user_msg = UserMessage(text=prompt)
         
@@ -9484,7 +9484,7 @@ If the query is unclear or impossible to answer, return:
             api_key=os.environ.get("EMERGENT_LLM_KEY"),
             session_id=f"nl_query_{uuid.uuid4().hex[:8]}",
             system_message="You are a precise data analyst. Return ONLY valid JSON, no markdown formatting."
-        ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         user_message = UserMessage(text=prompt)
         response = await chat.send_message(user_message)
@@ -9870,7 +9870,7 @@ Return JSON:
                 api_key=api_key,
                 session_id=f"regrade_{submission['submission_id']}_{question_number}",
                 system_message="You are an expert grader. Re-grade this specific question based on teacher's guidance."
-            ).with_model("openai", "gpt-4.1-mini").with_params(temperature=0)
+            ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
             
             image_objs = [ImageContent(image_base64=img) for img in student_images[:10]]
             user_msg = UserMessage(text=enhanced_prompt, file_contents=image_objs)
