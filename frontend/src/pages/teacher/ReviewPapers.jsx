@@ -975,7 +975,20 @@ export default function ReviewPapers({ user }) {
                           <div key={idx} className="relative group">
                             <div 
                               className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
-                              onClick={() => setZoomedImage({ src: `data:image/jpeg;base64,${img}`, title: `Student Answer - Page ${idx + 1}` })}
+                              onClick={() => {
+                                // Open all pages in continuous scroll view
+                                const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                                  selectedSubmission.annotated_images : selectedSubmission.file_images
+                                ).map((image, index) => ({
+                                  src: `data:image/jpeg;base64,${image}`,
+                                  title: `Page ${index + 1}`
+                                }));
+                                setZoomedImages({ 
+                                  images: allImages, 
+                                  title: "Student Answer", 
+                                  initialIndex: idx 
+                                });
+                              }}
                             >
                               <img 
                                 src={`data:image/jpeg;base64,${img}`}
