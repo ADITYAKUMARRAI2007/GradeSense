@@ -37,10 +37,19 @@ export default function EmailAuthPage() {
 
       toast.success(isLogin ? "Login successful!" : "Account created successfully!");
       
-      // Redirect based on role
-      const redirectPath = response.data.role === "teacher" 
-        ? "/teacher/dashboard" 
-        : "/student/dashboard";
+      // Redirect based on role and profile completion
+      const profileCompleted = response.data.profile_completed !== false; // Default to true if not specified
+      
+      let redirectPath;
+      if (!profileCompleted) {
+        // New users who haven't completed profile
+        redirectPath = "/profile-setup";
+      } else {
+        // Existing users or users with completed profiles
+        redirectPath = response.data.role === "teacher" 
+          ? "/teacher/dashboard" 
+          : "/student/dashboard";
+      }
       
       // Reload to update auth context
       window.location.href = redirectPath;
