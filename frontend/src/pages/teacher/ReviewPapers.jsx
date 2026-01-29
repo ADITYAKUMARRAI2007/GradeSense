@@ -1700,7 +1700,8 @@ export default function ReviewPapers({ user }) {
     feedbackDialogOpen,
     feedbackQuestion,
     feedbackCorrections,
-    submittingFeedback
+    submittingFeedback,
+    applyToAllPapers
   ]);
 
   return (
