@@ -1463,20 +1463,17 @@ export default function ReviewPapers({ user }) {
 
       {/* Multi-Page Continuous Scroll Viewer */}
       <Dialog 
-        key={isModalOpen ? 'open' : 'closed'}
+        key={modalKey}
         open={isModalOpen}
         onOpenChange={(open) => {
           console.log('🚪 Dialog onOpenChange called. New state:', open);
-          // Use flushSync for immediate close
-          flushSync(() => {
-            setIsModalOpen(open);
-            if (!open) {
-              setZoomedImages(null);
-              console.log('❌ Modal CLOSED');
-            } else {
-              console.log('✅ Modal OPENED');
-            }
-          });
+          setIsModalOpen(open);
+          if (!open) {
+            setZoomedImages(null);
+            console.log('❌ Modal CLOSED');
+          } else {
+            console.log('✅ Modal OPENED');
+          }
         }}
       >
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
