@@ -6423,9 +6423,13 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     model_answer_text=model_answer_text
                 )
                 
-                # Generate annotated images with grading marks
-                logger.info(f"Generating annotated images for {student_name}")
-                annotated_images = generate_annotated_images(images, scores)
+                # Generate annotated images with grading marks using Vision OCR
+                logger.info(f"Generating annotated images for {student_name} using Vision OCR")
+                try:
+                    annotated_images = await generate_annotated_images_with_vision_ocr(images, scores, use_vision_ocr=True)
+                except Exception as ann_error:
+                    logger.warning(f"Vision OCR annotation failed, falling back to basic: {ann_error}")
+                    annotated_images = generate_annotated_images(images, scores)
                 
                 total_score = sum(s.obtained_marks for s in scores)
                 percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
