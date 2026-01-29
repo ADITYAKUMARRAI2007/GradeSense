@@ -243,6 +243,14 @@ def apply_annotations_to_image(
             
             elif ann.annotation_type == AnnotationType.POINT_NUMBER:
                 draw_circle_with_text(draw, ann.x, ann.y, ann.text, "black", ann.size // 2, font)
+            
+            elif ann.annotation_type == AnnotationType.CROSS_MARK:
+                # Draw a red X mark
+                draw_cross_mark(draw, ann.x, ann.y, ann.size, ann.text, font)
+            
+            elif ann.annotation_type == AnnotationType.ERROR_UNDERLINE:
+                # Draw a red underline
+                draw_error_underline(draw, ann.x, ann.y, ann.size, ann.text, font)
         
         # Convert back to base64 with optimized quality for faster processing
         buffered = io.BytesIO()
