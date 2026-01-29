@@ -273,7 +273,8 @@ async def process_grading_task(task_data):
         get_exam_model_answer_images=get_exam_model_answer_images,
         get_exam_model_answer_text=get_exam_model_answer_text,
         grade_with_ai=grade_with_ai,
-        create_notification=create_notification
+        create_notification=create_notification,
+        generate_annotated_images_with_vision_ocr=generate_annotated_images_with_vision_ocr
     )
 
 
