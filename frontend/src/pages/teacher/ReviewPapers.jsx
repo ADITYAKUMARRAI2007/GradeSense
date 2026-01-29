@@ -702,22 +702,18 @@ export default function ReviewPapers({ user }) {
                       alt={`Page ${idx + 1}`}
                       className="w-full rounded-lg shadow-md cursor-zoom-in"
                       onClick={() => {
-                        // Open all pages in continuous scroll view - optimized
-                        setLoadingZoom(true);
-                        setTimeout(() => {
-                          const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                            selectedSubmission.annotated_images : selectedSubmission.file_images
-                          ).map((image, index) => ({
-                            src: `data:image/jpeg;base64,${image}`,
-                            title: `Page ${index + 1}`
-                          }));
-                          setZoomedImages({ 
-                            images: allImages, 
-                            title: "Student Answer", 
-                            initialIndex: idx 
-                          });
-                          setLoadingZoom(false);
-                        }, 50); // Small delay for smooth transition
+                        // Open all pages in continuous scroll view - instant
+                        const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
+                          selectedSubmission.annotated_images : selectedSubmission.file_images
+                        ).map((image, index) => ({
+                          src: `data:image/jpeg;base64,${image}`,
+                          title: `Page ${index + 1}`
+                        }));
+                        setZoomedImages({ 
+                          images: allImages, 
+                          title: "Student Answer", 
+                          initialIndex: idx 
+                        });
                       }}
                     />
                     {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
