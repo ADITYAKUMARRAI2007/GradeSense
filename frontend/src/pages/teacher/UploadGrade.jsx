@@ -152,11 +152,20 @@ export default function UploadGrade({ user }) {
           console.log('Job completed! Setting results and moving to step 6');
           
           // Set results in the expected format
-          setResults({
+          const resultsData = {
             processed: jobData.successful,
             submissions: jobData.submissions || [],
             errors: jobData.errors || []
-          });
+          };
+          setResults(resultsData);
+          
+          // Force UI update
+          setProcessing(false);
+          setActiveJobId(null);
+          localStorage.removeItem('activeGradingJob');
+          
+          // Move to results step
+          setStep(6);
           
           // Show success/error messages
           if (jobData.errors && jobData.errors.length > 0) {
