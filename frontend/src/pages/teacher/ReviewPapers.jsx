@@ -100,6 +100,15 @@ export default function ReviewPapers({ user }) {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // Debug: Monitor modal state changes
+  useEffect(() => {
+    console.log('🔄 isModalOpen changed to:', isModalOpen);
+  }, [isModalOpen]);
+
+  useEffect(() => {
+    console.log('🔄 zoomedImages changed:', zoomedImages ? `${zoomedImages.images?.length} pages` : 'null');
+  }, [zoomedImages]);
+
   const fetchData = async () => {
     try {
       const [submissionsRes, examsRes, batchesRes] = await Promise.all([
