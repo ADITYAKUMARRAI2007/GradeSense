@@ -5461,6 +5461,18 @@ Return valid JSON only."""
     q_nums_final = [qs.question_number for qs in final_scores]
     if len(q_nums_final) != len(set(q_nums_final)):
         logger.error(f"CRITICAL BUG: Duplicate questions in final_scores!")
+        logger.error(f"Duplicates: {[q for q in q_nums_final if q_nums_final.count(q) > 1]}")
+        
+        # EMERGENCY FIX: Deduplicate final_scores before returning
+        seen_q_nums = set()
+        deduplicated_final_scores = []
+        for qs in final_scores:
+            if qs.question_number not in seen_q_nums:
+                seen_q_nums.add(qs.question_number)
+                deduplicated_final_scores.append(qs)
+        
+        logger.info(f"Deduplication: {len(final_scores)} -> {len(deduplicated_final_scores)} scores")
+        final_scores = deduplicated_final_scores
 
     # Store in Cache and DB
     try:
