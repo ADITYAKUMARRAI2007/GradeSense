@@ -5454,6 +5454,13 @@ Return valid JSON only."""
             annotations=annotations_list
         )
         final_scores.append(qs_obj)
+    
+    # CRITICAL DEBUG: Verify final scores
+    logger.info(f"Final aggregation produced {len(final_scores)} question scores")
+    logger.info(f"Question numbers in final_scores: {[qs.question_number for qs in final_scores]}")
+    q_nums_final = [qs.question_number for qs in final_scores]
+    if len(q_nums_final) != len(set(q_nums_final)):
+        logger.error(f"CRITICAL BUG: Duplicate questions in final_scores!")
 
     # Store in Cache and DB
     try:
