@@ -356,15 +356,31 @@ async def process_grading_job_in_background(
 
 
 async def _update_job_progress(db, job_id: str, processed: int, successful: int, failed: int, submissions: List, errors: List):
-    """Helper to update job progress - submissions already have _id removed"""
+    """Helper to update job progress - stores REFERENCES only, not full data
+    
+    CRITICAL: To handle 50+ papers with many pages, we only store submission IDs and summary data
+    Full submission data is in submissions collection
+    """
+    # Extract only submission_ids and basic info (no large image data)
+    submission_refs = [
+        {
+            "submission_id": sub.get("submission_id"),
+            "student_name": sub.get("student_name"),
+            "obtained_marks": sub.get("obtained_marks"),
+            "total_marks": sub.get("total_marks"),
+            "percentage": sub.get("percentage")
+        }
+        for sub in submissions
+    ]
+    
     await db.grading_jobs.update_one(
         {"job_id": job_id},
         {"$set": {
             "processed_papers": processed,
             "successful": successful,
             "failed": failed,
-            "submissions": submissions,  # Already cleaned of _id
-            "errors": errors,
+            "submission_refs": submission_refs,  # Only references/summary, not full data
+            "errors": errors,  # Error messages are typically small
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
