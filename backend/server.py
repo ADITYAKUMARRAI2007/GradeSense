@@ -5416,6 +5416,17 @@ Return valid JSON only."""
                         ai_feedback="Not attempted/found"
                     ))
         
+        # CRITICAL FIX: For questions with sub-questions, obtained_marks = sum of sub-scores
+        # This prevents double-counting when AI returns both question-level AND sub-question scores
+        if final_sub_scores:
+            # Calculate from sub-scores to avoid double-counting
+            total_sub_marks = sum(s.obtained_marks for s in final_sub_scores)
+            question_obtained_marks = total_sub_marks
+            logger.debug(f"Q{q_num}: Using sum of sub-scores = {total_sub_marks}")
+        else:
+            # No sub-questions, use the question-level score directly
+            question_obtained_marks = best_score_data["obtained_marks"]
+        
         # Extract question-level annotations
         q_annotations = best_score_data.get("annotations", [])
         annotations_list = [AnnotationData(**ann) for ann in q_annotations] if q_annotations else []
@@ -5423,7 +5434,7 @@ Return valid JSON only."""
         qs_obj = QuestionScore(
             question_number=q_num,
             max_marks=q["max_marks"],
-            obtained_marks=min(best_score_data["obtained_marks"], q["max_marks"]),
+            obtained_marks=min(question_obtained_marks, q["max_marks"]),
             ai_feedback=best_score_data["ai_feedback"],
             sub_scores=[s.model_dump() for s in final_sub_scores],
             question_text=q.get("question_text") or q.get("rubric"),
