@@ -873,6 +873,42 @@ export default function UploadGrade({ user }) {
     }
   };
 
+  const handleCancelGrading = async () => {
+    if (!activeJobId) {
+      toast.error("No active grading job found");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to cancel this grading job? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await axios.post(`${API}/grading-jobs/${activeJobId}/cancel`, {}, {
+        withCredentials: true
+      });
+      
+      toast.success("Grading cancelled successfully");
+      
+      // Clear polling
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      
+      // Reset state
+      setProcessing(false);
+      setActiveJobId(null);
+      setProcessingProgress(0);
+      localStorage.removeItem('activeGradingJob');
+      localStorage.removeItem('uploadGradeState');
+      
+    } catch (error) {
+      console.error("Error cancelling grading:", error);
+      toast.error(error.response?.data?.detail || "Failed to cancel grading");
+    }
+  };
+
   const handleStartGrading = async () => {
     if (studentFiles.length === 0 || !examId) return;
     
