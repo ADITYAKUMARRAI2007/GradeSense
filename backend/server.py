@@ -4948,6 +4948,11 @@ You are the GradeSense Grading Engine - an advanced AI system designed to evalua
 - BLANK ANSWERS: Award 0 marks, feedback: "No answer provided."
 - IRRELEVANT CONTENT: Award 0 marks, flag for teacher awareness
 - QUESTION REWRITTEN ONLY: Award 0 marks
+- **CRITICAL**: If a question IS ANSWERED (even poorly), NEVER return -1.0 for obtained_marks
+  - -1.0 means "question not found on these pages"
+  - 0.0 means "question found but answer is wrong/blank"
+  - Always check EVERY page before marking as "not found"
+- **MULTI-PAGE ANSWERS**: Questions may span multiple pages - read ALL pages carefully
 - MULTIPLE ANSWERS PROVIDED: Consider what appears to be final/emphasized answer
 - ANSWER CONTRADICTS ITSELF: Grade based on predominant correct content, note contradiction
 - BORDERLINE SCORES: Flag for teacher review with note
