@@ -1413,14 +1413,25 @@ export default function ManageExams({ user }) {
             ) : (
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-800">{uploadStatus}</p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        This may take a few minutes depending on paper count...
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-800">{uploadStatus}</p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          This may take a few minutes depending on paper count...
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCancelGrading}
+                      className="h-8"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
                   </div>
                 </div>
                 <div className="space-y-2">
