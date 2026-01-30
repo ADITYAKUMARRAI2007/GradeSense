@@ -5373,28 +5373,39 @@ Return valid JSON only."""
         elif best_score_data.get("obtained_marks") == 0 and "blank" in best_score_data.get("ai_feedback", "").lower():
             status = "not_attempted"
             
-        # Handle sub-scores
+        # Handle sub-scores - Use HIGHEST valid score from any chunk
         final_sub_scores = []
         if q.get("sub_questions"):
             current_subs = best_score_data.get("sub_scores", [])
             current_sub_map = {s["sub_id"]: s for s in current_subs}
 
             for sq in q["sub_questions"]:
-                sq_data = current_sub_map.get(sq["sub_id"])
-                if sq_data:
-                    marks = sq_data.get("obtained_marks", -1.0)
-                    if marks < 0:
-                        marks = 0.0
-                    
+                sq_id = sq["sub_id"]
+                best_sq_data = current_sub_map.get(sq_id)
+                best_sq_marks = best_sq_data.get("obtained_marks", -1.0) if best_sq_data else -1.0
+                
+                # Look across ALL chunks for this sub-question's highest score
+                for chunk_result in all_chunk_results:
+                    q_score_in_chunk = next((s for s in chunk_result if s["question_number"] == q_num), None)
+                    if q_score_in_chunk:
+                        chunk_subs = q_score_in_chunk.get("sub_scores", [])
+                        sq_in_chunk = next((s for s in chunk_subs if s["sub_id"] == sq_id), None)
+                        if sq_in_chunk:
+                            sq_marks_in_chunk = sq_in_chunk.get("obtained_marks", -1.0)
+                            if sq_marks_in_chunk > best_sq_marks:
+                                best_sq_data = sq_in_chunk
+                                best_sq_marks = sq_marks_in_chunk
+                
+                if best_sq_data and best_sq_marks >= 0:
                     # Extract annotations for sub-question
-                    sq_annotations = sq_data.get("annotations", [])
+                    sq_annotations = best_sq_data.get("annotations", [])
                     annotations_list = [AnnotationData(**ann) for ann in sq_annotations] if sq_annotations else []
 
                     final_sub_scores.append(SubQuestionScore(
                         sub_id=sq["sub_id"],
                         max_marks=sq["max_marks"],
-                        obtained_marks=min(marks, sq["max_marks"]),
-                        ai_feedback=sq_data.get("ai_feedback", ""),
+                        obtained_marks=min(best_sq_marks, sq["max_marks"]),
+                        ai_feedback=best_sq_data.get("ai_feedback", ""),
                         annotations=annotations_list
                     ))
                 else:
