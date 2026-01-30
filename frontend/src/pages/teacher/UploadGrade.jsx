@@ -143,6 +143,17 @@ export default function UploadGrade({ user }) {
           : 0;
         setProcessingProgress(progress);
         
+        // CRITICAL FIX: If processed equals total but status isn't completed, treat as completed
+        if (jobData.processed_papers >= jobData.total_papers && 
+            jobData.total_papers > 0 && 
+            jobData.status !== 'completed' && 
+            jobData.status !== 'failed' &&
+            jobData.status !== 'cancelled') {
+          console.log('Job appears done (processed >= total) but status is still:', jobData.status);
+          console.log('Treating as completed...');
+          jobData.status = 'completed';
+        }
+        
         // Check if job completed
         if (jobData.status === 'completed') {
           clearInterval(interval);
