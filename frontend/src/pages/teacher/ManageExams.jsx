@@ -263,6 +263,12 @@ export default function ManageExams({ user }) {
           setUploadProgress(0);
           setUploadStatus("");
           return;
+        } else if (job.status === "cancelled") {
+          toast.warning("Grading was cancelled");
+          setUploadingPapers(false);
+          setUploadProgress(0);
+          setUploadStatus("");
+          return;
         }
 
         // Continue polling if still processing
