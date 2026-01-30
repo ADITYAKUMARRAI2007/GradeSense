@@ -5340,7 +5340,10 @@ Return valid JSON only."""
     all_chunk_results = []
     for idx, (start_idx, chunk_imgs) in enumerate(chunks):
         chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
+        logger.info(f"Chunk {idx+1}/{len(chunks)} returned {len(chunk_scores_data)} scores")
         all_chunk_results.append(chunk_scores_data)
+    
+    logger.info(f"Total chunk results collected: {len(all_chunk_results)} chunks with {sum(len(cr) for cr in all_chunk_results)} total score entries")
 
     # Deterministic Aggregation - Use HIGHEST valid score from any chunk
     # CRITICAL FIX: Previous logic used FIRST score, which failed when question appeared in later chunks
