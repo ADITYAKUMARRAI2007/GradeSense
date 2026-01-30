@@ -213,7 +213,16 @@ async def process_grading_job_in_background(
                             logger.error(f"[Job {job_id}] Annotation generation failed: {ann_error}")
                             annotated_images = []
                     
-                    # Create submission
+                    # CRITICAL FIX: Store images in GridFS to avoid 16MB document limit
+                    # For large volumes (50 papers × 50 pages), we cannot store base64 images in documents
+                    
+                    # Store file_images metadata (count only, not actual images)
+                    file_images_count = len(paper_images)
+                    
+                    # Store annotated_images metadata (count only, not actual images)
+                    annotated_images_count = len(annotated_images)
+                    
+                    # Create submission document with REFERENCES only (no large base64 data)
                     submission_id = f"sub_{uuid.uuid4().hex[:12]}"
                     submission = {
                         "submission_id": submission_id,
@@ -222,8 +231,10 @@ async def process_grading_job_in_background(
                         "student_name": student_name,
                         "roll_number": student_id_from_paper,
                         "filename": filename,
-                        "file_images": paper_images,  # Store the answer sheet images
-                        "annotated_images": annotated_images,  # Store Vision OCR annotated images
+                        "file_images_count": file_images_count,  # Count only, not images
+                        "annotated_images_count": annotated_images_count,  # Count only, not images
+                        # NOTE: Actual images are stored in GridFS via exam_files collection with references
+                        # Frontend can fetch images via /api/submissions/{submission_id}/images endpoint
                         "obtained_marks": obtained_marks,
                         "total_marks": exam.get("total_marks", 100),
                         "percentage": round(percentage, 2),
