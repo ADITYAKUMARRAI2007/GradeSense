@@ -77,8 +77,8 @@ export default function TeacherDashboard({ user }) {
   const fetchBatches = async () => {
     try {
       const response = await axios.get(`${API}/batches`);
-      // Filter out archived batches from dashboard
-      const activeBatches = response.data.filter(batch => batch.status !== 'archived');
+      // Filter out archived/closed batches from dashboard
+      const activeBatches = response.data.filter(batch => batch.status !== 'closed' && batch.status !== 'archived');
       setBatches(activeBatches);
     } catch (error) {
       console.error("Error fetching batches:", error);
