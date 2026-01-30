@@ -194,9 +194,21 @@ async def process_grading_job_in_background(
                         model_answer_text=model_answer_text
                     )
                     
+                    # CRITICAL DEBUG: Check for score duplication
+                    logger.info(f"[Job {job_id}] grade_with_ai returned {len(scores)} scores")
+                    logger.info(f"[Job {job_id}] Question numbers in scores: {[s.question_number for s in scores]}")
+                    
+                    # Verify no duplicates
+                    q_nums = [s.question_number for s in scores]
+                    if len(q_nums) != len(set(q_nums)):
+                        logger.error(f"[Job {job_id}] DUPLICATE QUESTION NUMBERS DETECTED!")
+                        logger.error(f"[Job {job_id}] Expected {len(questions_to_grade)} unique, got {len(q_nums)} with {len(q_nums) - len(set(q_nums))} duplicates")
+                    
                     # Calculate total
                     obtained_marks = sum(s.obtained_marks for s in scores if s.obtained_marks >= 0)
                     percentage = (obtained_marks / exam.get("total_marks", 100)) * 100 if exam.get("total_marks") else 0
+                    
+                    logger.info(f"[Job {job_id}] Total: {obtained_marks}/{exam.get('total_marks', 100)} = {percentage:.1f}%")
                     
                     # Generate annotated images using Vision OCR if available
                     annotated_images = []
