@@ -213,17 +213,25 @@ async def process_grading_job_in_background(
                             logger.error(f"[Job {job_id}] Annotation generation failed: {ann_error}")
                             annotated_images = []
                     
-                    # CRITICAL FIX: Store images in GridFS to avoid 16MB document limit
-                    # For large volumes (50 papers × 50 pages), we cannot store base64 images in documents
+                    # CRITICAL FIX: Store images separately to avoid 16MB document limit
+                    # For 50 papers × 50 pages, we need separate storage for images
                     
-                    # Store file_images metadata (count only, not actual images)
-                    file_images_count = len(paper_images)
-                    
-                    # Store annotated_images metadata (count only, not actual images)
-                    annotated_images_count = len(annotated_images)
-                    
-                    # Create submission document with REFERENCES only (no large base64 data)
                     submission_id = f"sub_{uuid.uuid4().hex[:12]}"
+                    
+                    # Store images in separate collection (not embedded in submission)
+                    if paper_images:
+                        await db.submission_images.update_one(
+                            {"submission_id": submission_id},
+                            {"$set": {
+                                "submission_id": submission_id,
+                                "file_images": paper_images,
+                                "annotated_images": annotated_images if annotated_images else [],
+                                "created_at": datetime.now(timezone.utc).isoformat()
+                            }},
+                            upsert=True
+                        )
+                    
+                    # Create submission document with metadata only (no large base64 data)
                     submission = {
                         "submission_id": submission_id,
                         "exam_id": exam_id,
@@ -231,15 +239,14 @@ async def process_grading_job_in_background(
                         "student_name": student_name,
                         "roll_number": student_id_from_paper,
                         "filename": filename,
-                        "file_images_count": file_images_count,  # Count only, not images
-                        "annotated_images_count": annotated_images_count,  # Count only, not images
-                        # NOTE: Actual images are stored in GridFS via exam_files collection with references
-                        # Frontend can fetch images via /api/submissions/{submission_id}/images endpoint
+                        "file_images_count": len(paper_images),
+                        "annotated_images_count": len(annotated_images),
+                        "has_images": True,  # Flag to indicate images exist in separate collection
                         "obtained_marks": obtained_marks,
                         "total_marks": exam.get("total_marks", 100),
                         "percentage": round(percentage, 2),
                         "scores": [s.dict() for s in scores],
-                        "question_scores": [s.dict() for s in scores],  # Add for frontend compatibility
+                        "question_scores": [s.dict() for s in scores],
                         "status": "ai_graded",
                         "submitted_at": datetime.now(timezone.utc).isoformat(),
                         "graded_at": datetime.now(timezone.utc).isoformat()
