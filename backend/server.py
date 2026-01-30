@@ -5333,23 +5333,31 @@ Return valid JSON only."""
         chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
         all_chunk_results.append(chunk_scores_data)
 
-    # Deterministic Aggregation
+    # Deterministic Aggregation - Use HIGHEST valid score from any chunk
+    # CRITICAL FIX: Previous logic used FIRST score, which failed when question appeared in later chunks
     final_scores = []
 
     for q in questions:
         q_num = q["question_number"]
         best_score_data = None
+        best_score_value = -1.0
 
-        # Look for first valid score across chunks
+        # Look for HIGHEST valid score across ALL chunks (not just first)
         for chunk_result in all_chunk_results:
             score_data = next((s for s in chunk_result if s["question_number"] == q_num), None)
             
-            if score_data and score_data.get("obtained_marks", -1.0) >= 0:
-                best_score_data = score_data
-                break # Deterministic: Use first valid score found
+            if score_data:
+                obtained = score_data.get("obtained_marks", -1.0)
+                
+                # Take this score if:
+                # 1. We have no valid score yet (best_score_value < 0) AND this one is valid (>= 0)
+                # 2. OR this score is HIGHER than our current best
+                if (best_score_value < 0 and obtained >= 0) or (obtained > best_score_value):
+                    best_score_data = score_data
+                    best_score_value = obtained
 
-        # If no valid score found, use the last one (error state or not found) or default
-        if not best_score_data:
+        # If no valid score found in any chunk, mark as not found
+        if not best_score_data or best_score_value < 0:
              best_score_data = {
                  "question_number": q_num,
                  "obtained_marks": -1.0,
