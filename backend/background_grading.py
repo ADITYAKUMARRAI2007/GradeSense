@@ -318,6 +318,18 @@ async def process_grading_job_in_background(
             {"$set": {"status": "completed"}}
         )
         
+        # Extract submission references (not full data)
+        submission_refs = [
+            {
+                "submission_id": sub.get("submission_id"),
+                "student_name": sub.get("student_name"),
+                "obtained_marks": sub.get("obtained_marks"),
+                "total_marks": sub.get("total_marks"),
+                "percentage": sub.get("percentage")
+            }
+            for sub in submissions
+        ]
+        
         await db.grading_jobs.update_one(
             {"job_id": job_id},
             {"$set": {
@@ -325,7 +337,7 @@ async def process_grading_job_in_background(
                 "processed_papers": len(files_data),
                 "successful": len(submissions),
                 "failed": len(errors),
-                "submissions": submissions,
+                "submission_refs": submission_refs,  # Only references, not full data
                 "errors": errors,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
                 "completed_at": datetime.now(timezone.utc).isoformat()
