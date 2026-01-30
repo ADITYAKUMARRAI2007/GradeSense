@@ -5321,6 +5321,10 @@ Return valid JSON only."""
                 break
     
     logger.info(f"Processing student paper in {len(chunks)} chunk(s)")
+    
+    # Add detailed logging for debugging
+    logger.info(f"Questions to grade: {[q['question_number'] for q in questions]}")
+    logger.info(f"Total marks possible: {sum(q['max_marks'] for q in questions)}")
 
     # Store aggregated results
     # Use deterministic aggregation: Use the FIRST valid score (>=0) encountered
