@@ -198,13 +198,27 @@ async def process_grading_job_in_background(
                     logger.info(f"[Job {job_id}] grade_with_ai returned {len(scores)} scores")
                     logger.info(f"[Job {job_id}] Question numbers in scores: {[s.question_number for s in scores]}")
                     
-                    # Verify no duplicates
-                    q_nums = [s.question_number for s in scores]
-                    if len(q_nums) != len(set(q_nums)):
-                        logger.error(f"[Job {job_id}] DUPLICATE QUESTION NUMBERS DETECTED!")
-                        logger.error(f"[Job {job_id}] Expected {len(questions_to_grade)} unique, got {len(q_nums)} with {len(q_nums) - len(set(q_nums))} duplicates")
+                    # CRITICAL FIX: Deduplicate scores before calculating total
+                    # Keep only the FIRST occurrence of each question number
+                    seen_questions = set()
+                    deduplicated_scores = []
+                    for s in scores:
+                        if s.question_number not in seen_questions:
+                            seen_questions.add(s.question_number)
+                            deduplicated_scores.append(s)
+                        else:
+                            logger.warning(f"[Job {job_id}] Duplicate Q{s.question_number} found and removed")
                     
-                    # Calculate total
+                    # Log duplication if found
+                    if len(scores) != len(deduplicated_scores):
+                        logger.error(f"[Job {job_id}] DUPLICATE QUESTION NUMBERS DETECTED!")
+                        logger.error(f"[Job {job_id}] Original: {len(scores)} scores, After dedup: {len(deduplicated_scores)} scores")
+                        logger.error(f"[Job {job_id}] Duplicates removed: {len(scores) - len(deduplicated_scores)}")
+                    
+                    # Use deduplicated scores for everything going forward
+                    scores = deduplicated_scores
+                    
+                    # Calculate total from deduplicated scores
                     obtained_marks = sum(s.obtained_marks for s in scores if s.obtained_marks >= 0)
                     percentage = (obtained_marks / exam.get("total_marks", 100)) * 100 if exam.get("total_marks") else 0
                     
