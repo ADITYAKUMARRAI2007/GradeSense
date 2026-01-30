@@ -202,6 +202,35 @@ export default function ManageExams({ user }) {
     }
   };
 
+  const handleCancelGrading = async () => {
+    if (!uploadJobId) {
+      toast.error("No active grading job found");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to cancel this grading job? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await axios.post(`${API}/grading-jobs/${uploadJobId}/cancel`, {}, {
+        withCredentials: true
+      });
+      
+      toast.success("Grading cancelled successfully");
+      
+      // Reset state
+      setUploadingPapers(false);
+      setUploadProgress(0);
+      setUploadStatus("");
+      setUploadJobId(null);
+      
+    } catch (error) {
+      console.error("Error cancelling grading:", error);
+      toast.error(error.response?.data?.detail || "Failed to cancel grading");
+    }
+  };
+
   const pollJobStatus = async (jobId) => {
     const maxAttempts = 300; // 5 minutes max (300 * 1 second)
     let attempts = 0;
