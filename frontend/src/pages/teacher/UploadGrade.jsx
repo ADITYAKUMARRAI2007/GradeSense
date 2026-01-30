@@ -128,7 +128,22 @@ export default function UploadGrade({ user }) {
       clearInterval(pollIntervalRef.current);
     }
     
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 300; // 10 minutes (300 * 2 seconds)
+    
     const interval = setInterval(async () => {
+      pollAttempts++;
+      
+      // SAFETY: Stop polling after 10 minutes
+      if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+        console.error('Polling timeout: exceeded 10 minutes');
+        clearInterval(interval);
+        pollIntervalRef.current = null;
+        toast.error('Grading is taking longer than expected. Please check the Manage Exams page for status.');
+        setProcessing(false);
+        return;
+      }
+      
       try {
         const jobResponse = await axios.get(`${API}/grading-jobs/${job_id}`, {
           withCredentials: true
