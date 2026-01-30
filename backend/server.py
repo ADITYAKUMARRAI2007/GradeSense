@@ -6631,6 +6631,25 @@ async def get_submission(
                         logger.error(f"Error retrieving question paper: {e}")
                         submission["question_paper_images"] = []
 
+        # CRITICAL: Fetch images from separate collection if they exist
+        # This prevents MongoDB 16MB document limit errors with large papers
+        if include_images and submission.get("has_images"):
+            submission_images = await db.submission_images.find_one(
+                {"submission_id": submission_id},
+                {"_id": 0, "file_images": 1, "annotated_images": 1}
+            )
+            if submission_images:
+                submission["file_images"] = submission_images.get("file_images", [])
+                submission["annotated_images"] = submission_images.get("annotated_images", [])
+            else:
+                # Fallback if images not found
+                submission["file_images"] = []
+                submission["annotated_images"] = []
+        elif not include_images:
+            # Ensure these fields don't exist if not requested
+            submission.pop("file_images", None)
+            submission.pop("annotated_images", None)
+        
         return serialize_doc(submission)
 
     except Exception as e:
