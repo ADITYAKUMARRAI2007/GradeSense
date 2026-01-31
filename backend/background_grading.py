@@ -377,10 +377,23 @@ async def process_grading_job_in_background(
                     
                 except asyncio.TimeoutError:
                     logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 10 minutes")
-                    errors.append({
+                    error_details = {
                         "filename": filename,
                         "error": "Processing timeout - exceeded 10 minutes (paper too complex or API slow)"
-                    })
+                    }
+                    errors.append(error_details)
+                    
+                    # Log to file for production debugging
+                    try:
+                        import traceback
+                        with open("/tmp/grading_errors.log", "a") as f:
+                            f.write(f"\n{'='*80}\n")
+                            f.write(f"TIMEOUT at paper {idx + 1}/{len(files_data)}: {filename}\n")
+                            f.write(f"Job: {job_id}\n")
+                            f.write(f"Time: {datetime.now(timezone.utc).isoformat()}\n")
+                            f.write(f"{'='*80}\n")
+                    except:
+                        pass
                 
                 # Explicit memory cleanup
                 import gc
