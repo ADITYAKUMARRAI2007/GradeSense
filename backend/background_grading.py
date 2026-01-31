@@ -15,7 +15,34 @@ logger = logging.getLogger(__name__)
 # Rate limiting configuration
 RATE_LIMIT_DELAY = 0.5  # 500ms delay between API calls
 MAX_RETRIES = 3  # Maximum retry attempts for API calls
+RATE_LIMIT_DELAY = 0.5  # 500ms delay between API calls
+MAX_RETRIES = 3  # Maximum retry attempts for API calls
 RETRY_BACKOFF = 2  # Exponential backoff multiplier
+
+
+async def retry_with_exponential_backoff(func, *args, max_retries=MAX_RETRIES, **kwargs):
+    """
+    Retry function with exponential backoff for handling rate limits and transient failures
+    """
+    for attempt in range(max_retries):
+        try:
+            result = await func(*args, **kwargs)
+            # Add rate limiting delay between successful calls
+            await asyncio.sleep(RATE_LIMIT_DELAY)
+            return result
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            # Check if it's a rate limit or quota error
+            is_rate_limit = any(term in error_msg for term in ['429', 'rate', 'quota', 'limit', 'resource_exhausted'])
+            
+            if attempt < max_retries - 1:  # Not the last attempt
+                wait_time = (RETRY_BACKOFF ** attempt) * 2  # 2s, 4s, 8s
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error(f"All {max_retries} attempts failed: {str(e)}")
+                raise
 
 
 async def process_grading_job_in_background(
