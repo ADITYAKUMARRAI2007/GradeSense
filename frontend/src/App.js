@@ -35,8 +35,14 @@ import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminUsersAdvanced from "./pages/admin/AdminUsersAdvanced";
 import FeedbackBeacon from "./components/FeedbackBeacon";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 export const API = `${BACKEND_URL}/api`;
+
+// Debug logging for environment
+if (!process.env.REACT_APP_BACKEND_URL) {
+  console.warn('⚠️ REACT_APP_BACKEND_URL is not set, using window.location.origin:', window.location.origin);
+}
+console.log('🔗 API URL configured as:', API);
 
 // Configure axios
 axios.defaults.withCredentials = true;
