@@ -12,12 +12,10 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting configuration
-RATE_LIMIT_DELAY = 0.5  # 500ms delay between API calls
-MAX_RETRIES = 3  # Maximum retry attempts for API calls
-RATE_LIMIT_DELAY = 0.5  # 500ms delay between API calls
-MAX_RETRIES = 3  # Maximum retry attempts for API calls
-RETRY_BACKOFF = 2  # Exponential backoff multiplier
+# Rate limiting configuration for large-scale grading (2500+ pages)
+RATE_LIMIT_DELAY = 2.0  # 2 seconds delay between API calls (aggressive for shared key)
+MAX_RETRIES = 5  # Increased retry attempts
+RETRY_BACKOFF = 3  # More aggressive exponential backoff (3s, 9s, 27s)
 
 
 async def retry_with_exponential_backoff(func, *args, max_retries=MAX_RETRIES, **kwargs):
