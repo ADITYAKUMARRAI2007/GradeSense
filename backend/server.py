@@ -5149,6 +5149,7 @@ Below is the complete model answer content. Use this as your grading reference:
 - The images may contain rotated or sideways text - read carefully in all orientations
 - Examine EVERY page and grade ALL questions found
 - Compare student answers against the model answer text above
+{learned_patterns_section}
 
 ## GRADING MODE: {grading_mode.upper()}
 
