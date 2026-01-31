@@ -1,5 +1,6 @@
-# Background grading job processing for handling 30+ papers simultaneously
+# Background grading job processing for handling 2500+ pages simultaneously
 # This module provides asynchronous background processing for paper grading
+# with robust error handling, retry logic, and rate limit management
 
 import asyncio
 import logging
@@ -7,8 +8,14 @@ from datetime import datetime, timezone
 from typing import List, Dict
 import base64
 import uuid
+import time
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting configuration
+RATE_LIMIT_DELAY = 0.5  # 500ms delay between API calls
+MAX_RETRIES = 3  # Maximum retry attempts for API calls
+RETRY_BACKOFF = 2  # Exponential backoff multiplier
 
 
 async def process_grading_job_in_background(
