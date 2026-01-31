@@ -182,7 +182,7 @@ async def process_grading_job_in_background(
                         }
                     
                     logger.info(f"[Job {job_id}] Converting PDF to images...")
-                    paper_images = pdf_to_images(pdf_bytes)
+                    paper_images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
                     
                     if not paper_images:
                         return {

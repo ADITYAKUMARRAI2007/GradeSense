@@ -177,14 +177,14 @@ async def process_single_paper_grading(task_data):
         
         # Get answer paper from GridFS
         ans_bytes = await read_gridfs_file_async(answer_file_ref, use_filename=True)
-        ans_images = pdf_to_images(ans_bytes)
+        ans_images = await asyncio.to_thread(pdf_to_images, ans_bytes)
         
         # Get model answer from GridFS if available
         ma_images = []
         ma_text = ""
         if model_answer_ref:
             ma_bytes = await read_gridfs_file_async(model_answer_ref, use_filename=True)
-            ma_images = pdf_to_images(ma_bytes)
+            ma_images = await asyncio.to_thread(pdf_to_images, ma_bytes)
             # Try to extract text from model answer
             try:
                 ma_text = await get_exam_model_answer_text(exam_id)

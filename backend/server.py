@@ -2738,7 +2738,7 @@ async def upload_more_papers(
                 })
                 continue
             
-            images = pdf_to_images(pdf_bytes)
+            images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
             logger.info(f"[File {idx + 1}/{len(files)}] Extracted {len(images) if images else 0} images from PDF")
             
             if not images:
@@ -6206,7 +6206,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     )
                     continue
                 
-                images = pdf_to_images(pdf_bytes)
+                images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
                 logger.info(f"[File {idx + 1}/{len(files_data)}] Extracted {len(images) if images else 0} images from PDF")
                 
                 if not images:
