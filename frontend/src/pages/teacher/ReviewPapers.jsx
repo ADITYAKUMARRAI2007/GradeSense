@@ -1651,13 +1651,21 @@ export default function ReviewPapers({ user }) {
 
                   <div>
                     <Label className="text-xs">Your Correction / Feedback *</Label>
-                    <Textarea 
-                      value={correction.teacher_correction}
-                      onChange={(e) => updateCorrection(correction.id, 'teacher_correction', e.target.value)}
-                      placeholder="Explain what the AI got wrong and how it should grade this type of answer..."
-                      rows={3}
-                      className="text-sm"
-                    />
+                    <div className="flex gap-2 mt-1">
+                      <Textarea 
+                        value={correction.teacher_correction}
+                        onChange={(e) => updateCorrection(correction.id, 'teacher_correction', e.target.value)}
+                        placeholder="Explain what the AI got wrong and how it should grade this type of answer..."
+                        rows={3}
+                        className="text-sm flex-1"
+                      />
+                      <VoiceInput
+                        onTranscript={(text) => {
+                          const currentValue = correction.teacher_correction || "";
+                          updateCorrection(correction.id, 'teacher_correction', currentValue + (currentValue ? " " : "") + text);
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
