@@ -4719,12 +4719,17 @@ async def grade_with_ai(
     questions: List[dict],
     grading_mode: str,
     total_marks: float,
-    model_answer_text: str = ""  # NEW: Pre-extracted model answer content
+    model_answer_text: str = "",  # NEW: Pre-extracted model answer content
+    teacher_id: str = None,  # NEW: For learning patterns
+    subject_id: str = None,  # NEW: For cross-exam learning
+    exam_id: str = None  # NEW: For pattern matching
 ) -> List[QuestionScore]:
-    """Grade answer paper using GPT-4o-mini with the GradeSense Master Instruction Set.
+    """Grade answer paper using Gemini with GradeSense Master Instruction Set + Teacher's Learned Patterns.
     
     If model_answer_text is provided, uses text-based grading (faster, more reliable).
     Falls back to image-based grading if text is not available.
+    
+    NEW: Automatically applies teacher's past corrections as learned patterns for consistent grading.
     """
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
