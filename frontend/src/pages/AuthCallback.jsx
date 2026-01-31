@@ -37,6 +37,8 @@ export default function AuthCallback() {
         console.log("Preferred role:", preferredRole);
 
         console.log("Calling API:", `${API}/auth/session`);
+        console.log("Full API URL:", API);
+        console.log("API constant check:", typeof API, API === "undefined/api" ? "⚠️ API is undefined!" : "✅ API is defined");
         
         // Exchange session_id for session_token (include preferred_role)
         // Use withCredentials to ensure cookies are sent
