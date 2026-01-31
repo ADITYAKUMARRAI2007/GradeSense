@@ -13,7 +13,7 @@ import time
 logger = logging.getLogger(__name__)
 
 # Rate limiting configuration - OPTIMIZED for dedicated Gemini API key
-RATE_LIMIT_DELAY = 0.1  # Minimal delay for dedicated key (10x faster)
+RATE_LIMIT_DELAY = 0.05  # 50ms delay (even faster for dedicated key)
 MAX_RETRIES = 3  # Standard retry attempts
 RETRY_BACKOFF = 2  # Standard exponential backoff
 
