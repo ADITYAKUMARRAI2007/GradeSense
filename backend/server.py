@@ -9558,20 +9558,25 @@ async def submit_grading_feedback(feedback: FeedbackSubmit, user: User = Depends
                 if qs:
                     student_answer_summary = qs.get("ai_feedback", "")[:200]
             
-            # Get grading mode
-            exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "grading_mode": 1})
+            # Get grading mode and subject
+            exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "grading_mode": 1, "subject_id": 1})
             if exam:
                 grading_mode = exam.get("grading_mode")
+                subject_id = exam.get("subject_id", "unknown")
+            else:
+                subject_id = "unknown"
     
     feedback_doc = {
         "feedback_id": feedback_id,
         "teacher_id": user.user_id,
         "submission_id": feedback.submission_id,
         "exam_id": feedback.exam_id or exam_id,
+        "subject_id": subject_id,  # NEW: For cross-exam learning
         "question_number": feedback.question_number,
         "sub_question_id": feedback.sub_question_id,  # New field
         "feedback_type": feedback.feedback_type,
         "question_text": feedback.question_text,
+        "question_topic": feedback.question_topic,  # NEW: Pattern matching
         "student_answer_summary": student_answer_summary,
         "ai_grade": feedback.ai_grade,
         "ai_feedback": feedback.ai_feedback,
