@@ -47,6 +47,22 @@ from vision_ocr_service import get_vision_service, VisionOCRService
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Helper function to get LLM API Key
+def get_llm_api_key():
+    """
+    Get the Gemini API key from environment variables.
+    Prioritizes 'GEMINI_API_KEY' (user provided), falls back to 'EMERGENT_LLM_KEY' (managed).
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        api_key = os.environ.get("EMERGENT_LLM_KEY")
+
+    if not api_key:
+        logger.error("No LLM API key found (checked GEMINI_API_KEY and EMERGENT_LLM_KEY)")
+        # We don't raise here to allow callers to handle it or fail gracefully later
+
+    return api_key
+
 # Helper function for MongoDB serialization
 def serialize_doc(doc):
     """Convert MongoDB document to JSON-safe dict"""
@@ -3533,7 +3549,7 @@ async def extract_student_info_from_paper(file_images: List[str], filename: str)
     """
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = get_llm_api_key()
     if not api_key:
         return (None, None)
     
@@ -3818,7 +3834,7 @@ async def extract_model_answer_content(
     """
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = get_llm_api_key()
     if not api_key:
         logger.error("No API key for model answer content extraction")
         return ""
@@ -3915,7 +3931,7 @@ async def extract_questions_from_question_paper(
     """Extract question text from question paper images using AI with improved sub-question handling"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = get_llm_api_key()
     if not api_key:
         return []
     
@@ -4097,7 +4113,7 @@ async def extract_questions_from_model_answer(
         logger.info(f"Cache hit (memory) for model answer extraction")
         return model_answer_cache[cache_key]
 
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = get_llm_api_key()
     if not api_key:
         return []
     
@@ -4246,9 +4262,9 @@ async def extract_question_structure_from_paper(
     """
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = get_llm_api_key()
     if not api_key:
-        logger.error("EMERGENT_LLM_KEY not configured")
+        logger.error("LLM API Key not configured")
         return []
     
     try:
@@ -4720,14 +4736,11 @@ async def grade_with_ai(
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
-    # TEMPORARY HARDCODE FOR TESTING - Use dedicated Gemini API key
-    # TODO: Remove hardcode once environment variable issue is resolved
-    api_key = "AIzaSyDxVMTnVyCgU_rywmVhoTlY_-hWqt2vrUY"  # HARDCODED FOR PRODUCTION TEST
+    # Get API key from env
+    api_key = get_llm_api_key()
     
     if not api_key:
-        raise HTTPException(status_code=500, detail="AI service not configured")
-    
-    logger.info(f"🔑 Using HARDCODED Gemini API key for production testing")
+        raise HTTPException(status_code=500, detail="AI service not configured (Missing API Key)")
     
     # Apply rotation correction to student images
     logger.info("Applying rotation correction to student images...")
@@ -7286,7 +7299,7 @@ async def get_misconceptions_analysis(
     if misconceptions:
         try:
             from emergentintegrations.llm.chat import LlmChat, UserMessage
-            llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+            llm_key = get_llm_api_key()
             
             analysis_prompt = f"""Analyze these student misconceptions from exam "{exam.get('exam_name', 'Unknown')}":
 
@@ -7632,7 +7645,7 @@ async def get_student_deep_dive(
     if worst_questions:
         try:
             from emergentintegrations.llm.chat import LlmChat, UserMessage
-            llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+            llm_key = get_llm_api_key()
             
             analysis_prompt = f"""Analyze this student's performance and provide specific improvement guidance:
 
@@ -7745,7 +7758,7 @@ async def generate_review_packet(
     # Generate practice questions using AI
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        llm_key = get_llm_api_key()
         
         subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
         subject_name = subject.get("name", "General") if subject else "General"
@@ -7835,7 +7848,7 @@ async def infer_question_topics(
     
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        llm_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        llm_key = get_llm_api_key()
         
         # Build question data
         question_data = []
@@ -8421,7 +8434,7 @@ Respond in JSON format:
 """
             
             chat = LlmChat(
-                api_key=os.environ.get("EMERGENT_LLM_KEY"),
+                api_key=get_llm_api_key(),
                 session_id=f"error_group_{uuid.uuid4().hex[:8]}",
                 system_message="You are an educational data analyst. Categorize student errors precisely."
             ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
@@ -8805,7 +8818,7 @@ Now analyze and respond:"""
         # Call AI
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        api_key = get_llm_api_key()
         if not api_key:
             raise HTTPException(status_code=500, detail="AI service not configured")
         
@@ -9361,7 +9374,7 @@ If the query is unclear or impossible to answer, return:
 """
         
         chat = LlmChat(
-            api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            api_key=get_llm_api_key(),
             session_id=f"nl_query_{uuid.uuid4().hex[:8]}",
             system_message="You are a precise data analyst. Return ONLY valid JSON, no markdown formatting."
         ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
@@ -9750,7 +9763,7 @@ Return JSON:
             # Call AI to re-grade just this question
             from emergentintegrations import LlmChat, UserMessage, ImageContent
             
-            api_key = os.getenv("EMERGENT_LLM_KEY")
+            api_key = get_llm_api_key()
             chat = LlmChat(
                 api_key=api_key,
                 session_id=f"regrade_{submission['submission_id']}_{question_number}",
@@ -9964,7 +9977,7 @@ Award marks based on:
                 from emergentintegrations import LlmChat, UserMessage, ImageContent
                 
                 chat = LlmChat(
-                    api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                    api_key=get_llm_api_key(),
                     provider="gemini",
                     response_format="json_object"
                 ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
@@ -10042,7 +10055,7 @@ Analyze the student's response carefully and apply the grading criteria the teac
                 from emergentintegrations import LlmChat, UserMessage, ImageContent
                 
                 chat = LlmChat(
-                    api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                    api_key=get_llm_api_key(),
                     provider="gemini",
                     response_format="json_object"
                 ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
@@ -10232,7 +10245,7 @@ Re-grade this student's answer based on the teacher's guidance above.
                     from emergentintegrations import LlmChat, UserMessage, ImageContent
                     
                     chat = LlmChat(
-                        api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                        api_key=get_llm_api_key(),
                         provider="gemini",
                         response_format="json_object"
                     ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
@@ -10464,7 +10477,7 @@ Award marks based on:
                         from emergentintegrations import LlmChat, UserMessage, ImageContent
                         
                         chat = LlmChat(
-                            api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                            api_key=get_llm_api_key(),
                             provider="gemini",
                             response_format="json_object"
                         ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
@@ -10524,7 +10537,7 @@ Analyze the student's response carefully and apply the grading criteria the teac
                         from emergentintegrations import LlmChat, UserMessage, ImageContent
                         
                         chat = LlmChat(
-                            api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                            api_key=get_llm_api_key(),
                             provider="gemini",
                             response_format="json_object"
                         ).with_model("gemini-2.5-flash").with_params(temperature=0.3)
