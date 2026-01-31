@@ -35,6 +35,7 @@ from file_utils import (
     extract_file_id_from_url,
     get_files_from_drive_folder
 )
+from concurrency import conversion_semaphore
 from annotation_utils import (
     Annotation,
     AnnotationType,
@@ -2083,7 +2084,8 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     # Detect file type from GridFS metadata
     ma_file_info = await fs.find_one({"filename": ma_file_ref})
     ma_file_type = ma_file_info.get("contentType", "application/pdf").split('/')[-1] if ma_file_info else "pdf"
-    ma_images = await asyncio.to_thread(convert_to_images, ma_bytes, ma_file_type)
+    async with conversion_semaphore:
+        ma_images = await asyncio.to_thread(convert_to_images, ma_bytes, ma_file_type)
     
     # Store model answer in GridFS with images
     await db.exam_files.update_one(
@@ -2110,7 +2112,8 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
         # Detect file type from GridFS metadata
         ans_file_info = await fs.find_one({"filename": submission["answer_file_ref"]})
         ans_file_type = ans_file_info.get("contentType", "application/pdf").split('/')[-1] if ans_file_info else "pdf"
-        ans_images = await asyncio.to_thread(convert_to_images, ans_bytes, ans_file_type)
+        async with conversion_semaphore:
+            ans_images = await asyncio.to_thread(convert_to_images, ans_bytes, ans_file_type)
         
         # Store answer paper with GridFS reference
         await db.exam_files.update_one(
@@ -2738,7 +2741,8 @@ async def upload_more_papers(
                 })
                 continue
             
-            images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
+            async with conversion_semaphore:
+                images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
             logger.info(f"[File {idx + 1}/{len(files)}] Extracted {len(images) if images else 0} images from PDF")
             
             if not images:
@@ -5837,7 +5841,8 @@ async def upload_model_answer(
             # Process each extracted file
             for filename, extracted_bytes, extracted_type in extracted_files:
                 try:
-                    file_images = await asyncio.to_thread(convert_to_images, extracted_bytes, extracted_type)
+                    async with conversion_semaphore:
+                        file_images = await asyncio.to_thread(convert_to_images, extracted_bytes, extracted_type)
                     all_images.extend(file_images)
                     logger.info(f"Processed {filename}: {len(file_images)} images")
                 except Exception as e:
@@ -5852,7 +5857,8 @@ async def upload_model_answer(
     else:
         # Convert single file to images
         try:
-            all_images = await asyncio.to_thread(convert_to_images, file_bytes, file_type)
+            async with conversion_semaphore:
+                all_images = await asyncio.to_thread(convert_to_images, file_bytes, file_type)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
     
@@ -6021,7 +6027,8 @@ async def upload_question_paper(
             # Process each extracted file
             for filename, extracted_bytes, extracted_type in extracted_files:
                 try:
-                    file_images = await asyncio.to_thread(convert_to_images, extracted_bytes, extracted_type)
+                    async with conversion_semaphore:
+                        file_images = await asyncio.to_thread(convert_to_images, extracted_bytes, extracted_type)
                     all_images.extend(file_images)
                     logger.info(f"Processed {filename}: {len(file_images)} images")
                 except Exception as e:
@@ -6036,7 +6043,8 @@ async def upload_question_paper(
     else:
         # Convert single file to images
         try:
-            all_images = await asyncio.to_thread(convert_to_images, file_bytes, file_type)
+            async with conversion_semaphore:
+                all_images = await asyncio.to_thread(convert_to_images, file_bytes, file_type)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
     
@@ -6206,7 +6214,8 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     )
                     continue
                 
-                images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
+                async with conversion_semaphore:
+                    images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
                 logger.info(f"[File {idx + 1}/{len(files_data)}] Extracted {len(images) if images else 0} images from PDF")
                 
                 if not images:
