@@ -4684,6 +4684,35 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         logger.error(f"Auto-extraction error for {exam_id}: {e}")
         return {"success": False, "message": f"Error during extraction: {str(e)}"}
 
+async def fetch_teacher_learning_patterns(teacher_id: str, subject_id: str, exam_id: str = None):
+    """
+    Fetch past teacher corrections to apply as learned patterns
+    Returns list of relevant corrections for this teacher + subject
+    """
+    try:
+        query = {
+            "teacher_id": teacher_id,
+            "subject_id": subject_id,
+            "$or": [
+                {"apply_to_all": True},  # Patterns meant to be applied broadly
+                {"exam_id": exam_id} if exam_id else {}
+            ]
+        }
+        
+        # Fetch recent corrections (last 100)
+        corrections = await db.grading_feedback.find(
+            query,
+            {"_id": 0, "question_number": 1, "question_topic": 1, "teacher_correction": 1, 
+             "teacher_expected_grade": 1, "ai_grade": 1, "created_at": 1, "exam_id": 1}
+        ).sort("created_at", -1).limit(100).to_list(100)
+        
+        logger.info(f"Found {len(corrections)} learned patterns for teacher {teacher_id}, subject {subject_id}")
+        return corrections
+    except Exception as e:
+        logger.error(f"Error fetching learning patterns: {e}")
+        return []
+
+
 async def grade_with_ai(
     images: List[str],
     model_answer_images: List[str],
