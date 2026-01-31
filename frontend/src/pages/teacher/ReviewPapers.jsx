@@ -1273,13 +1273,21 @@ export default function ReviewPapers({ user }) {
                                   <Sparkles className="w-3 h-3 text-orange-500" />
                                   Feedback for Part {subScore.sub_id}
                                 </Label>
-                                <Textarea 
-                                  value={subScore.ai_feedback || ""}
-                                  onChange={(e) => updateSubQuestionScore(index, subIndex, "ai_feedback", e.target.value)}
-                                  className="mt-1 text-xs bg-white"
-                                  rows={2}
-                                  placeholder={`AI feedback for part ${subScore.sub_id}...`}
-                                />
+                                <div className="flex gap-2 mt-1">
+                                  <Textarea 
+                                    value={subScore.ai_feedback || ""}
+                                    onChange={(e) => updateSubQuestionScore(index, subIndex, "ai_feedback", e.target.value)}
+                                    className="text-xs bg-white flex-1"
+                                    rows={2}
+                                    placeholder={`AI feedback for part ${subScore.sub_id}...`}
+                                  />
+                                  <VoiceInput
+                                    onTranscript={(text) => {
+                                      const currentValue = subScore.ai_feedback || "";
+                                      updateSubQuestionScore(index, subIndex, "ai_feedback", currentValue + (currentValue ? " " : "") + text);
+                                    }}
+                                  />
+                                </div>
                               </div>
                             </div>
                           );
