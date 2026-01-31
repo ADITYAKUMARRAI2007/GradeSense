@@ -21,26 +21,42 @@ RETRY_BACKOFF = 3  # More aggressive exponential backoff (3s, 9s, 27s)
 async def retry_with_exponential_backoff(func, *args, max_retries=MAX_RETRIES, **kwargs):
     """
     Retry function with exponential backoff for handling rate limits and transient failures
+    Enhanced for large-scale grading (2500+ pages)
     """
+    last_exception = None
+    
     for attempt in range(max_retries):
         try:
             result = await func(*args, **kwargs)
-            # Add rate limiting delay between successful calls
+            
+            # Add rate limiting delay between successful calls (critical for shared API key)
+            if attempt > 0:
+                logger.info(f"✅ Retry attempt {attempt + 1} succeeded after {attempt} failures")
+            
             await asyncio.sleep(RATE_LIMIT_DELAY)
             return result
+            
         except Exception as e:
+            last_exception = e
             error_msg = str(e).lower()
             
             # Check if it's a rate limit or quota error
-            is_rate_limit = any(term in error_msg for term in ['429', 'rate', 'quota', 'limit', 'resource_exhausted'])
+            is_rate_limit = any(term in error_msg for term in ['429', 'rate', 'quota', 'limit', 'resource_exhausted', 'rate_limit_exceeded'])
             
             if attempt < max_retries - 1:  # Not the last attempt
-                wait_time = (RETRY_BACKOFF ** attempt) * 2  # 2s, 4s, 8s
-                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in {wait_time}s...")
+                wait_time = (RETRY_BACKOFF ** attempt) * 3  # 3s, 9s, 27s, 81s, 243s
+                
+                if is_rate_limit:
+                    logger.warning(f"⚠️ Rate limit hit! Attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s before retry...")
+                else:
+                    logger.warning(f"⚠️ API error: {str(e)[:100]}. Attempt {attempt + 1}/{max_retries}. Retrying in {wait_time}s...")
+                
                 await asyncio.sleep(wait_time)
             else:
-                logger.error(f"All {max_retries} attempts failed: {str(e)}")
-                raise
+                logger.error(f"❌ All {max_retries} attempts failed. Last error: {str(e)}")
+                raise last_exception
+    
+    raise last_exception
 
 
 async def process_grading_job_in_background(
