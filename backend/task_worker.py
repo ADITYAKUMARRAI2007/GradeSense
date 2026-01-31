@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
 
 # Import functions from server.py
-from concurrency import conversion_semaphore
+from concurrency import conversion_semaphore, llm_semaphore
 from server import (
     pdf_to_images,
     extract_student_info_from_paper,
@@ -195,14 +195,16 @@ async def process_single_paper_grading(task_data):
                 ma_text = ""
         
         # Use the grade_with_ai function with correct parameters
-        question_scores = await grade_with_ai(
-            images=ans_images,
-            model_answer_images=ma_images,
-            questions=questions,
-            grading_mode=grading_mode,
-            total_marks=total_marks,
-            model_answer_text=ma_text
-        )
+        logger.info(f"Grading paper for student {student_name} (ID: {student_id}) in exam {exam_id}")
+        async with llm_semaphore:
+            question_scores = await grade_with_ai(
+                images=ans_images,
+                model_answer_images=ma_images,
+                questions=questions,
+                grading_mode=grading_mode,
+                total_marks=total_marks,
+                model_answer_text=ma_text
+            )
         
         # Calculate total obtained marks
         total_obtained = sum(q.obtained_marks for q in question_scores)

@@ -5283,19 +5283,19 @@ Return valid JSON only."""
                 
                 logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                 
-                # Add timeout to prevent indefinite hanging (60 seconds)
+                # Add timeout to prevent indefinite hanging (120 seconds)
                 try:
                     ai_resp = await asyncio.wait_for(
                         chunk_chat.send_message(user_msg),
-                        timeout=60.0  # 60 second timeout per attempt
+                        timeout=120.0  # 120 second timeout per attempt
                     )
                 except asyncio.TimeoutError:
-                    logger.error(f"Timeout after 60s grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
+                    logger.error(f"Timeout after 120s grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                     if attempt < max_retries - 1:
                         continue  # Retry
                     else:
                         logger.error(f"Failed chunk {chunk_idx+1} after {max_retries} timeout attempts")
-                        return []  # Skip this chunk
+                        raise TimeoutError(f"AI grading timed out after {max_retries} attempts (120s each)")
 
                 # Robust JSON parsing with multiple strategies
                 import json
