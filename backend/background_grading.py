@@ -154,8 +154,11 @@ async def process_grading_job_in_background(
             filename = file_data["filename"]
             pdf_bytes = file_data["content"]
             
-            logger.info(f"[Job {job_id}] [{idx + 1}/{len(files_data)}] Processing: {filename}")
+            logger.info(f"[Job {job_id}] ========================================")
+            logger.info(f"[Job {job_id}] 📄 PAPER {idx + 1}/{len(files_data)}: {filename}")
             logger.info(f"[Job {job_id}] File size: {len(pdf_bytes) / (1024*1024):.2f}MB")
+            logger.info(f"[Job {job_id}] Progress: {(idx/len(files_data)*100):.1f}% complete")
+            logger.info(f"[Job {job_id}] ========================================")
             
             try:
                 # Add timeout for entire paper processing (5 minutes max per paper)
