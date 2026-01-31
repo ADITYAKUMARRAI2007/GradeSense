@@ -1846,11 +1846,11 @@ export default function UploadGrade({ user }) {
               )}
 
               {processing && (
-                <div className="space-y-2 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                      <span className="font-medium">Processing papers...</span>
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      <span className="font-medium text-blue-900">Processing papers...</span>
                     </div>
                     <Button
                       variant="destructive"
@@ -1859,13 +1859,23 @@ export default function UploadGrade({ user }) {
                       className="h-8"
                     >
                       <X className="w-4 h-4 mr-1" />
-                      Cancel Grading
+                      Cancel
                     </Button>
                   </div>
                   <Progress value={processingProgress} className="h-2" />
-                  <p className="text-sm text-muted-foreground">
-                    {processingProgress < 100 ? `AI is analyzing and grading using ${formData.grading_mode} mode...` : "Almost done!"}
+                  <p className="text-sm text-blue-700">
+                    {processingProgress < 100 ? `AI is analyzing using ${formData.grading_mode} mode...` : "Almost done!"}
                   </p>
+                  
+                  {/* Background grading tip */}
+                  <div className="mt-3 p-3 bg-blue-100 rounded border border-blue-300">
+                    <p className="text-xs text-blue-800 font-medium mb-1">
+                      💡 <strong>Tip:</strong> Grading runs in background!
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      You can navigate away or close this tab. Check "Manage Exams" for status.
+                    </p>
+                  </div>
                 </div>
               )}
 
