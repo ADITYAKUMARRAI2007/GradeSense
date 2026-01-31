@@ -216,10 +216,11 @@ async def process_grading_job_in_background(
                             "filename": filename
                         }
                     
-                    logger.info(f"[Job {job_id}] Grading with AI...")
+                    logger.info(f"[Job {job_id}] Grading with AI (with retry logic)...")
                     
-                    # Grade the paper
-                    scores = await grade_with_ai(
+                    # Grade the paper with retry logic for rate limit handling
+                    scores = await retry_with_exponential_backoff(
+                        grade_with_ai,
                         images=paper_images,
                         model_answer_images=model_answer_imgs,
                         questions=questions_to_grade,
