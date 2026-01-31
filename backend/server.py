@@ -4734,12 +4734,14 @@ async def grade_with_ai(
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
-    # Use dedicated Gemini API key for optimal performance
-    api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
+    # TEMPORARY HARDCODE FOR TESTING - Use dedicated Gemini API key
+    # TODO: Remove hardcode once environment variable issue is resolved
+    api_key = "AIzaSyDxVMTnVyCgU_rywmVhoTlY_-hWqt2vrUY"  # HARDCODED FOR PRODUCTION TEST
+    
     if not api_key:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
-    logger.info(f"🔑 Using {'dedicated' if os.environ.get('GEMINI_API_KEY') else 'shared'} Gemini API key")
+    logger.info(f"🔑 Using HARDCODED Gemini API key for production testing")
     
     # Apply rotation correction to student images
     logger.info("Applying rotation correction to student images...")
