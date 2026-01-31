@@ -5108,6 +5108,24 @@ This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {sta
 - Do NOT guess marks for questions you cannot see.
 """
 
+        # Build learned patterns section
+        learned_patterns_section = ""
+        if learned_patterns:
+            learned_patterns_section = "\n\n## 🧠 YOUR PREVIOUS GRADING GUIDELINES (LEARNED PATTERNS)\n\n"
+            learned_patterns_section += "Based on your past corrections, apply these grading standards:\n\n"
+            for idx, pattern in enumerate(learned_patterns[:10], 1):  # Limit to 10 most recent
+                q_num = pattern.get("question_number", "N/A")
+                topic = pattern.get("question_topic", "similar questions")
+                correction = pattern.get("teacher_correction", "")
+                expected = pattern.get("teacher_expected_grade", "")
+                ai_gave = pattern.get("ai_grade", "")
+                
+                learned_patterns_section += f"{idx}. **Q{q_num} ({topic})**: {correction}\n"
+                if expected and ai_gave:
+                    learned_patterns_section += f"   - You adjusted: AI gave {ai_gave} → You expected {expected}\n"
+            
+            learned_patterns_section += "\n**Apply these learned standards consistently to similar questions in this paper.**\n"
+        
         # TEXT-BASED GRADING PROMPT (preferred - faster, more reliable)
         if use_text_based_grading:
             prompt_text = f"""# GRADING TASK {f'(Part {chunk_idx+1}/{total_chunks})' if total_chunks > 1 else ''}
