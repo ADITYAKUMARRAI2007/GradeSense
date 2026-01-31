@@ -8,10 +8,8 @@ import os
 import sys
 import logging
 from datetime import datetime, timezone
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from dotenv import load_dotenv
-from pymongo import MongoClient
-from gridfs import GridFS
 from bson.objectid import ObjectId
 
 # Add parent directory to path to import from server.py
@@ -48,10 +46,49 @@ DB_NAME = os.environ.get('DB_NAME', 'test_database')
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-# GridFS for reading uploaded files
-sync_client = MongoClient(MONGO_URL)
-sync_db = sync_client[DB_NAME]
-fs = GridFS(sync_db)
+# Async GridFS bucket
+fs_bucket = AsyncIOMotorGridFSBucket(db)
+
+# Helper for async full-file read
+async def read_gridfs_file_async(gridfs_id_or_filename, use_filename=False):
+    """Async GridFS read with chunking for large files"""
+    try:
+        if use_filename:
+            # For filename (legacy single-paper): get latest version ID first
+            # Access fs.files collection explicitly
+            file_doc = await db['fs.files'].find_one(
+                {"filename": gridfs_id_or_filename},
+                sort=[("uploadDate", -1)]
+            )
+            if not file_doc:
+                raise FileNotFoundError(f"File {gridfs_id_or_filename} not found")
+            gridfs_id = file_doc["_id"]
+        else:
+            gridfs_id = ObjectId(gridfs_id_or_filename)
+
+        stream = await fs_bucket.open_download_stream(gridfs_id)
+        chunks = []
+        total_size = 0
+        last_logged_size = 0
+        chunk_size = 8192  # 8KB chunks
+
+        while True:
+            chunk = await stream.read(chunk_size)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total_size += len(chunk)
+
+            # Optional: Yield progress for very large files (>10MB), log every 10MB
+            if total_size - last_logged_size > 10 * 1024 * 1024:
+                logger.info(f"Read {total_size/1024/1024:.1f}MB so far")
+                last_logged_size = total_size
+
+        await stream.close()
+        return b"".join(chunks)
+    except Exception as e:
+        logger.error(f"Async GridFS read failed: {e}")
+        raise
 
 # Import background grading function
 from background_grading import process_grading_job_in_background
@@ -139,16 +176,14 @@ async def process_single_paper_grading(task_data):
         total_marks = exam['total_marks']
         
         # Get answer paper from GridFS
-        ans_file = fs.get_last_version(filename=answer_file_ref)
-        ans_bytes = ans_file.read()
+        ans_bytes = await read_gridfs_file_async(answer_file_ref, use_filename=True)
         ans_images = pdf_to_images(ans_bytes)
         
         # Get model answer from GridFS if available
         ma_images = []
         ma_text = ""
         if model_answer_ref:
-            ma_file = fs.get_last_version(filename=model_answer_ref)
-            ma_bytes = ma_file.read()
+            ma_bytes = await read_gridfs_file_async(model_answer_ref, use_filename=True)
             ma_images = pdf_to_images(ma_bytes)
             # Try to extract text from model answer
             try:
@@ -235,8 +270,7 @@ async def process_grading_task(task_data):
             logger.info(f"Reading {len(file_refs)} files from GridFS...")
             for ref in file_refs:
                 try:
-                    gridfs_id = ObjectId(ref['gridfs_id'])
-                    file_content = fs.get(gridfs_id).read()
+                    file_content = await read_gridfs_file_async(ref['gridfs_id'])
                     files_data.append({
                         "filename": ref['filename'],
                         "content": file_content
