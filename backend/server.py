@@ -4742,6 +4742,13 @@ async def grade_with_ai(
     logger.info("Applying rotation correction to student images...")
     corrected_images = correct_all_images_rotation(images)
     
+    # NEW: Fetch teacher's learned patterns for this subject
+    learned_patterns = []
+    if teacher_id and subject_id:
+        learned_patterns = await fetch_teacher_learning_patterns(teacher_id, subject_id, exam_id)
+        if learned_patterns:
+            logger.info(f"🧠 Applying {len(learned_patterns)} learned patterns from teacher's past corrections")
+    
     # Determine grading mode: text-based (preferred) or image-based (fallback)
     use_text_based_grading = bool(model_answer_text and len(model_answer_text) > 100)
     
