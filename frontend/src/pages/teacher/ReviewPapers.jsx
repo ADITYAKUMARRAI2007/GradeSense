@@ -1299,13 +1299,21 @@ export default function ReviewPapers({ user }) {
                             <Brain className="w-4 h-4" />
                             Overall Feedback for Question {qs.question_number}
                           </Label>
-                          <Textarea 
-                            value={qs.ai_feedback || ""}
-                            onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                            className="text-sm bg-white"
-                            rows={3}
-                            placeholder={`Overall feedback for question ${qs.question_number}...`}
-                          />
+                          <div className="flex gap-2">
+                            <Textarea 
+                              value={qs.ai_feedback || ""}
+                              onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                              className="text-sm bg-white flex-1"
+                              rows={3}
+                              placeholder={`Overall feedback for question ${qs.question_number}...`}
+                            />
+                            <VoiceInput
+                              onTranscript={(text) => {
+                                const currentValue = qs.ai_feedback || "";
+                                updateQuestionScore(index, "ai_feedback", currentValue + (currentValue ? " " : "") + text);
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     ) : (
