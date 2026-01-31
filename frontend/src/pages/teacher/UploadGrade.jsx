@@ -129,14 +129,14 @@ export default function UploadGrade({ user }) {
     }
     
     let pollAttempts = 0;
-    const MAX_POLL_ATTEMPTS = 1200; // 40 minutes (1200 * 2 seconds) - for large batches
+    const MAX_POLL_ATTEMPTS = 3600; // 2 hours (3600 * 2 seconds) - for large batches up to 2500+ pages
     
     const interval = setInterval(async () => {
       pollAttempts++;
       
-      // SAFETY: Stop polling after 40 minutes (for large batches)
+      // SAFETY: Stop polling after 2 hours (for very large batches)
       if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-        console.error('Polling timeout: exceeded 40 minutes');
+        console.error('Polling timeout: exceeded 2 hours. Job may still be processing in background.');
         clearInterval(interval);
         pollIntervalRef.current = null;
         toast.error('Grading is taking longer than expected. Please check the Manage Exams page for status.');
