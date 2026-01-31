@@ -369,7 +369,13 @@ async def process_grading_job_in_background(
                 
                 # Update progress after each paper
                 await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
-                logger.info(f"[Job {job_id}] Progress: {idx + 1}/{len(files_data)} papers, {len(submissions)} successful, {len(errors)} errors")
+                
+                # Log progress at milestones (every 10 papers, 50 papers, 100 papers)
+                progress_milestones = [10, 25, 50, 100, 200, 500, 1000]
+                if (idx + 1) in progress_milestones or (idx + 1) % 100 == 0:
+                    logger.info(f"[Job {job_id}] 🎯 MILESTONE: {idx + 1}/{len(files_data)} papers processed ({len(submissions)} successful, {len(errors)} failed)")
+                else:
+                    logger.info(f"[Job {job_id}] Progress: {idx + 1}/{len(files_data)} papers, {len(submissions)} successful, {len(errors)} errors")
                 
             except Exception as e:
                 logger.error(f"[Job {job_id}] ERROR processing {filename}: {str(e)}", exc_info=True)
