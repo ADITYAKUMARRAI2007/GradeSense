@@ -523,6 +523,7 @@ class FeedbackSubmit(BaseModel):
     ai_feedback: Optional[str] = None
     teacher_expected_grade: Optional[float] = None
     apply_to_all_papers: Optional[bool] = False  # New: Apply to all students
+    question_topic: Optional[str] = None  # NEW: For pattern matching across exams
 
 # ============== FILE HELPER FUNCTIONS ==============
 
