@@ -9,7 +9,7 @@ from typing import List, Dict
 import base64
 import uuid
 import time
-from concurrency import conversion_semaphore
+from concurrency import conversion_semaphore, llm_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -237,19 +237,36 @@ async def process_grading_job_in_background(
                     
                     logger.info(f"[Job {job_id}] Grading with AI (with retry logic + learned patterns)...")
                     
-                    # Grade the paper with retry logic for rate limit handling + teacher's learned patterns
-                    scores = await retry_with_exponential_backoff(
-                        grade_with_ai,
-                        images=paper_images,
-                        model_answer_images=model_answer_imgs,
-                        questions=questions_to_grade,
-                        grading_mode=exam.get("grading_mode", "balanced"),
-                        total_marks=exam.get("total_marks", 100),
-                        model_answer_text=model_answer_text,
-                        teacher_id=teacher_id,  # NEW: For learning patterns
-                        subject_id=exam.get("subject_id"),  # NEW: Cross-exam learning
-                        exam_id=exam_id  # NEW: Pattern matching
-                    )
+                    # Log grading start for this paper
+                    logger.info(f"[Job {job_id}] Grading paper {idx + 1}/{len(files_data)}: {filename}")
+
+                    try:
+                        async with llm_semaphore:
+                            # Grade the paper with retry logic for rate limit handling + teacher's learned patterns
+                            scores = await retry_with_exponential_backoff(
+                                grade_with_ai,
+                                images=paper_images,
+                                model_answer_images=model_answer_imgs,
+                                questions=questions_to_grade,
+                                grading_mode=exam.get("grading_mode", "balanced"),
+                                total_marks=exam.get("total_marks", 100),
+                                model_answer_text=model_answer_text,
+                                teacher_id=teacher_id,  # NEW: For learning patterns
+                                subject_id=exam.get("subject_id"),  # NEW: Cross-exam learning
+                                exam_id=exam_id  # NEW: Pattern matching
+                            )
+                    except (TimeoutError, asyncio.TimeoutError):
+                        logger.error(f"[Job {job_id}] LLM grading timed out for {filename}")
+                        return {
+                            "error": "LLM grading timed out - paper too complex or API slow",
+                            "filename": filename
+                        }
+                    except Exception as e:
+                        logger.error(f"[Job {job_id}] LLM grading error for {filename}: {e}")
+                        return {
+                            "error": f"LLM grading error: {str(e)}",
+                            "filename": filename
+                        }
                     
                     # CRITICAL DEBUG: Check for score duplication
                     logger.info(f"[Job {job_id}] grade_with_ai returned {len(scores)} scores")
