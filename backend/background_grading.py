@@ -9,6 +9,7 @@ from typing import List, Dict
 import base64
 import uuid
 import time
+from concurrency import conversion_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +183,8 @@ async def process_grading_job_in_background(
                         }
                     
                     logger.info(f"[Job {job_id}] Converting PDF to images...")
-                    paper_images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
+                    async with conversion_semaphore:
+                        paper_images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
                     
                     if not paper_images:
                         return {

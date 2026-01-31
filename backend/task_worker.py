@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
 
 # Import functions from server.py
+from concurrency import conversion_semaphore
 from server import (
     pdf_to_images,
     extract_student_info_from_paper,
@@ -177,14 +178,16 @@ async def process_single_paper_grading(task_data):
         
         # Get answer paper from GridFS
         ans_bytes = await read_gridfs_file_async(answer_file_ref, use_filename=True)
-        ans_images = await asyncio.to_thread(pdf_to_images, ans_bytes)
+        async with conversion_semaphore:
+            ans_images = await asyncio.to_thread(pdf_to_images, ans_bytes)
         
         # Get model answer from GridFS if available
         ma_images = []
         ma_text = ""
         if model_answer_ref:
             ma_bytes = await read_gridfs_file_async(model_answer_ref, use_filename=True)
-            ma_images = await asyncio.to_thread(pdf_to_images, ma_bytes)
+            async with conversion_semaphore:
+                ma_images = await asyncio.to_thread(pdf_to_images, ma_bytes)
             # Try to extract text from model answer
             try:
                 ma_text = await get_exam_model_answer_text(exam_id)
