@@ -1342,13 +1342,21 @@ export default function ReviewPapers({ user }) {
                     {/* Teacher Comment - always shown */}
                     <div className="mt-3">
                       <Label className="text-xs lg:text-sm text-muted-foreground">Teacher Comment</Label>
-                      <Textarea 
-                        value={qs.teacher_comment || ""}
-                        onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
-                        placeholder="Add your comments..."
-                        className="mt-1 text-xs lg:text-sm"
-                        rows={2}
-                      />
+                      <div className="flex gap-2 mt-1">
+                        <Textarea 
+                          value={qs.teacher_comment || ""}
+                          onChange={(e) => updateQuestionScore(index, "teacher_comment", e.target.value)}
+                          placeholder="Add your comments..."
+                          className="text-xs lg:text-sm flex-1"
+                          rows={2}
+                        />
+                        <VoiceInput
+                          onTranscript={(text) => {
+                            const currentValue = qs.teacher_comment || "";
+                            updateQuestionScore(index, "teacher_comment", currentValue + (currentValue ? " " : "") + text);
+                          }}
+                        />
+                      </div>
                     </div>
 
                     {/* Footer Actions */}
