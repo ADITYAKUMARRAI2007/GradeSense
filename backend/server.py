@@ -125,34 +125,16 @@ async def cleanup_old_metrics():
         logger.error(f"Error during data cleanup: {e}", exc_info=True)
 
 async def run_background_worker():
-    """Integrated background worker - processes tasks and runs cleanup"""
+    """Integrated background worker - processes tasks"""
     logger.info("🔄 Background worker started")
     logger.info("=" * 60)
-    
-    # Run cleanup on startup (once)
+
+    # Run cleanup once on startup
     await cleanup_old_metrics()
-    
-    # Schedule cleanup to run daily
-    last_cleanup = datetime.now(timezone.utc)
-    
-    # Import worker main loop
+
     try:
-        from task_worker import main as worker_main
-        
-        # Run worker in a loop with periodic cleanup
-        while True:
-            # Check if it's time for daily cleanup (every 24 hours)
-            if (datetime.now(timezone.utc) - last_cleanup).total_seconds() > 86400:  # 24 hours
-                logger.info("🗑️  Running scheduled data cleanup...")
-                await cleanup_old_metrics()
-                last_cleanup = datetime.now(timezone.utc)
-            
-            # Run the worker main loop
-            await worker_main()
-            
-            # Small delay to prevent tight loop
-            await asyncio.sleep(1)
-            
+        from task_worker import worker_loop
+        await worker_loop()  # runs forever, handles polling internally
     except Exception as e:
         logger.error(f"Background worker error: {e}", exc_info=True)
 
