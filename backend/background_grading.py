@@ -216,9 +216,9 @@ async def process_grading_job_in_background(
                             "filename": filename
                         }
                     
-                    logger.info(f"[Job {job_id}] Grading with AI (with retry logic)...")
+                    logger.info(f"[Job {job_id}] Grading with AI (with retry logic + learned patterns)...")
                     
-                    # Grade the paper with retry logic for rate limit handling
+                    # Grade the paper with retry logic for rate limit handling + teacher's learned patterns
                     scores = await retry_with_exponential_backoff(
                         grade_with_ai,
                         images=paper_images,
@@ -226,7 +226,10 @@ async def process_grading_job_in_background(
                         questions=questions_to_grade,
                         grading_mode=exam.get("grading_mode", "balanced"),
                         total_marks=exam.get("total_marks", 100),
-                        model_answer_text=model_answer_text
+                        model_answer_text=model_answer_text,
+                        teacher_id=teacher_id,  # NEW: For learning patterns
+                        subject_id=exam.get("subject_id"),  # NEW: Cross-exam learning
+                        exam_id=exam_id  # NEW: Pattern matching
                     )
                     
                     # CRITICAL DEBUG: Check for score duplication
