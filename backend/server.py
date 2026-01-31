@@ -2083,7 +2083,7 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
     # Detect file type from GridFS metadata
     ma_file_info = await fs.find_one({"filename": ma_file_ref})
     ma_file_type = ma_file_info.get("contentType", "application/pdf").split('/')[-1] if ma_file_info else "pdf"
-    ma_images = convert_to_images(ma_bytes, ma_file_type)
+    ma_images = await asyncio.to_thread(convert_to_images, ma_bytes, ma_file_type)
     
     # Store model answer in GridFS with images
     await db.exam_files.update_one(
@@ -2110,7 +2110,7 @@ async def grade_student_submissions(exam_id: str, user: User = Depends(get_curre
         # Detect file type from GridFS metadata
         ans_file_info = await fs.find_one({"filename": submission["answer_file_ref"]})
         ans_file_type = ans_file_info.get("contentType", "application/pdf").split('/')[-1] if ans_file_info else "pdf"
-        ans_images = convert_to_images(ans_bytes, ans_file_type)
+        ans_images = await asyncio.to_thread(convert_to_images, ans_bytes, ans_file_type)
         
         # Store answer paper with GridFS reference
         await db.exam_files.update_one(
@@ -5837,7 +5837,7 @@ async def upload_model_answer(
             # Process each extracted file
             for filename, extracted_bytes, extracted_type in extracted_files:
                 try:
-                    file_images = convert_to_images(extracted_bytes, extracted_type)
+                    file_images = await asyncio.to_thread(convert_to_images, extracted_bytes, extracted_type)
                     all_images.extend(file_images)
                     logger.info(f"Processed {filename}: {len(file_images)} images")
                 except Exception as e:
@@ -5852,7 +5852,7 @@ async def upload_model_answer(
     else:
         # Convert single file to images
         try:
-            all_images = convert_to_images(file_bytes, file_type)
+            all_images = await asyncio.to_thread(convert_to_images, file_bytes, file_type)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
     
@@ -6021,7 +6021,7 @@ async def upload_question_paper(
             # Process each extracted file
             for filename, extracted_bytes, extracted_type in extracted_files:
                 try:
-                    file_images = convert_to_images(extracted_bytes, extracted_type)
+                    file_images = await asyncio.to_thread(convert_to_images, extracted_bytes, extracted_type)
                     all_images.extend(file_images)
                     logger.info(f"Processed {filename}: {len(file_images)} images")
                 except Exception as e:
@@ -6036,7 +6036,7 @@ async def upload_question_paper(
     else:
         # Convert single file to images
         try:
-            all_images = convert_to_images(file_bytes, file_type)
+            all_images = await asyncio.to_thread(convert_to_images, file_bytes, file_type)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
     
