@@ -395,9 +395,12 @@ async def process_grading_job_in_background(
                     except:
                         pass
                 
-                # Explicit memory cleanup
+                # Explicit memory cleanup after EACH paper (critical for large batches)
                 import gc
                 pdf_bytes = None
+                paper_images = None
+                model_answer_imgs = None
+                scores = None
                 gc.collect()
                 
                 # Update progress after each paper
