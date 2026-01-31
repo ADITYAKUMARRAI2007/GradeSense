@@ -1321,12 +1321,20 @@ export default function ReviewPapers({ user }) {
                       <div className="space-y-2 lg:space-y-3">
                         <div>
                           <Label className="text-xs lg:text-sm text-muted-foreground">AI Feedback</Label>
-                          <Textarea 
-                            value={qs.ai_feedback}
-                            onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
-                            className="mt-1 text-xs lg:text-sm"
-                            rows={2}
-                          />
+                          <div className="flex gap-2 mt-1">
+                            <Textarea 
+                              value={qs.ai_feedback}
+                              onChange={(e) => updateQuestionScore(index, "ai_feedback", e.target.value)}
+                              className="text-xs lg:text-sm flex-1"
+                              rows={2}
+                            />
+                            <VoiceInput
+                              onTranscript={(text) => {
+                                const currentValue = qs.ai_feedback || "";
+                                updateQuestionScore(index, "ai_feedback", currentValue + (currentValue ? " " : "") + text);
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
