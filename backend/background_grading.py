@@ -161,245 +161,253 @@ async def process_grading_job_in_background(
                 logger.info(f"[Job {job_id}] paper_started: {filename}")
                 logger.info(f"[Job {job_id}] 📄 PAPER {idx + 1}/{len(files_data)}: {filename}")
 
-                try:
-                    # Enforce strict per-paper execution time limit using asyncio.wait_for
-                    async def process_single_paper():
-                        # Fetch content inside the timeout block if not present
-                        pdf_bytes = file_data.get("content")
+                # Enforce strict per-paper execution time limit using asyncio.wait_for
+                async def process_single_paper():
+                    # Fetch content inside the timeout block if not present
+                    pdf_bytes = file_data.get("content")
 
-                        if not pdf_bytes:
-                            if "gridfs_id" in file_data and read_gridfs_file:
-                                try:
-                                    logger.info(f"[Job {job_id}] Reading file from GridFS: {file_data['gridfs_id']}")
-                                    pdf_bytes = await read_gridfs_file(file_data['gridfs_id'])
-                                except Exception as e:
-                                    logger.error(f"[Job {job_id}] Failed to read from GridFS: {e}")
-                                    return {
-                                        "error": f"Failed to read file from storage: {e}",
-                                        "filename": filename
-                                    }
-                            else:
-                                logger.error(f"[Job {job_id}] No content and no GridFS ID for {filename}")
+                    if not pdf_bytes:
+                        if "gridfs_id" in file_data and read_gridfs_file:
+                            try:
+                                logger.info(f"[Job {job_id}] Reading file from GridFS: {file_data['gridfs_id']}")
+                                pdf_bytes = await read_gridfs_file(file_data['gridfs_id'])
+                            except Exception as e:
+                                logger.error(f"[Job {job_id}] Failed to read from GridFS: {e}")
                                 return {
-                                    "error": "File content missing and cannot be retrieved",
+                                    "error": f"Failed to read file from storage: {e}",
                                     "filename": filename
                                 }
-
-                        # Ensure we have bytes
-                        if not isinstance(pdf_bytes, bytes):
-                            logger.error(f"[Job {job_id}] ERROR: pdf_bytes is not bytes type, it is {type(pdf_bytes)}")
-                            return {
-                                "error": f"Invalid file data type: {type(pdf_bytes)}",
-                                "filename": filename
-                            }
-
-                        # Check file size
-                        file_size_mb = len(pdf_bytes) / (1024 * 1024)
-                        logger.info(f"[Job {job_id}] File size: {file_size_mb:.2f}MB")
-
-                        if file_size_mb > 30:
-                            return {
-                                "error": f"File too large ({file_size_mb:.1f}MB). Maximum 30MB.",
-                                "filename": filename
-                            }
-
-                        logger.info(f"[Job {job_id}] Converting PDF to images...")
-                        async with conversion_semaphore:
-                            paper_images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
-                        
-                        if not paper_images:
-                            return {
-                                "error": "Failed to extract images from PDF",
-                                "filename": filename
-                            }
-
-                        logger.info(f"[Job {job_id}] Extracted {len(paper_images)} pages")
-
-                        # Extract student info (returns tuple: student_id, student_name)
-                        student_info = await extract_student_info_from_paper(paper_images, filename)
-
-                        # Unpack tuple properly (2 values: id and name only)
-                        if student_info and len(student_info) == 2 and student_info[0] and student_info[1]:
-                            student_id_from_paper, student_name = student_info
-                            logger.info(f"[Job {job_id}] Extracted student info from paper: {student_name} (ID: {student_id_from_paper})")
                         else:
-                            # AI extraction failed, try filename parsing as fallback
-                            logger.warning(f"[Job {job_id}] AI extraction failed, trying filename parsing for {filename}")
-                            student_id_from_filename, student_name_from_filename = parse_student_from_filename(filename)
-
-                            if student_id_from_filename and student_name_from_filename:
-                                student_id_from_paper = student_id_from_filename
-                                student_name = student_name_from_filename
-                                logger.info(f"[Job {job_id}] Extracted from filename: {student_name} (ID: {student_id_from_paper})")
-                            else:
-                                # Both methods failed, use filename as student name
-                                logger.warning(f"[Job {job_id}] All extraction methods failed, using filename as student name")
-                                student_name = filename.replace(".pdf", "").replace(".PDF", "").strip()
-                                student_id_from_paper = f"UNKNOWN_{uuid.uuid4().hex[:8]}"
-                                logger.info(f"[Job {job_id}] Using default: {student_name} (ID: {student_id_from_paper})")
-
-                        student_email = f"{student_id_from_paper}@school.edu"  # Generate placeholder email
-
-                        # Get or create student
-                        result = await get_or_create_student(
-                            student_id=student_id_from_paper,
-                            student_name=student_name,
-                            batch_id=exam["batch_id"],
-                            teacher_id=exam["teacher_id"]
-                        )
-                        student_id, error = result
-
-                        if error:
-                            logger.error(f"[Job {job_id}] Error creating student: {error}")
+                            logger.error(f"[Job {job_id}] No content and no GridFS ID for {filename}")
                             return {
-                                "error": f"Failed to create student: {error}",
+                                "error": "File content missing and cannot be retrieved",
                                 "filename": filename
                             }
 
-                        logger.info(f"[Job {job_id}] Grading with AI (with retry logic + learned patterns)...")
-
-                        # Log grading start for this paper
-                        logger.info(f"[Job {job_id}] Grading paper {idx + 1}/{len(files_data)}: {filename}")
-
-                        try:
-                            async with llm_semaphore:
-                                # Grade the paper with retry logic for rate limit handling + teacher's learned patterns
-                                scores = await retry_with_exponential_backoff(
-                                    grade_with_ai,
-                                    images=paper_images,
-                                    model_answer_images=model_answer_imgs,
-                                    questions=questions_to_grade,
-                                    grading_mode=exam.get("grading_mode", "balanced"),
-                                    total_marks=exam.get("total_marks", 100),
-                                    model_answer_text=model_answer_text,
-                                    teacher_id=teacher_id,  # NEW: For learning patterns
-                                    subject_id=exam.get("subject_id"),  # NEW: Cross-exam learning
-                                    exam_id=exam_id  # NEW: Pattern matching
-                                )
-                        except (TimeoutError, asyncio.TimeoutError):
-                            logger.error(f"[Job {job_id}] LLM grading timed out for {filename}")
-                            return {
-                                "error": "LLM grading timed out - paper too complex or API slow",
-                                "filename": filename
-                            }
-                        except Exception as e:
-                            logger.error(f"[Job {job_id}] LLM grading error for {filename}: {e}")
-                            return {
-                                "error": f"LLM grading error: {str(e)}",
-                                "filename": filename
-                            }
-
-                        # CRITICAL DEBUG: Check for score duplication
-                        logger.info(f"[Job {job_id}] grade_with_ai returned {len(scores)} scores")
-                        # logger.info(f"[Job {job_id}] Question numbers in scores: {[s.question_number for s in scores]}")
-
-                        # CRITICAL FIX: Deduplicate scores before calculating total
-                        # Keep only the FIRST occurrence of each question number
-                        seen_questions = set()
-                        deduplicated_scores = []
-                        for s in scores:
-                            if s.question_number not in seen_questions:
-                                seen_questions.add(s.question_number)
-                                deduplicated_scores.append(s)
-                            else:
-                                logger.warning(f"[Job {job_id}] Duplicate Q{s.question_number} found and removed")
-
-                        # Use deduplicated scores for everything going forward
-                        scores = deduplicated_scores
-
-                        # Calculate total from deduplicated scores
-                        obtained_marks = sum(s.obtained_marks for s in scores if s.obtained_marks >= 0)
-                        percentage = (obtained_marks / exam.get("total_marks", 100)) * 100 if exam.get("total_marks") else 0
-
-                        logger.info(f"[Job {job_id}] Total: {obtained_marks}/{exam.get('total_marks', 100)} = {percentage:.1f}%")
-
-                        # Generate annotated images using Vision OCR if available
-                        annotated_images = []
-                        if generate_annotated_images_with_vision_ocr:
-                            try:
-                                logger.info(f"[Job {job_id}] Generating annotated images with Vision OCR...")
-                                annotated_images = await generate_annotated_images_with_vision_ocr(
-                                    original_images=paper_images,
-                                    question_scores=scores,
-                                    use_vision_ocr=True
-                                )
-                                logger.info(f"[Job {job_id}] Generated {len(annotated_images)} annotated images")
-                            except Exception as ann_error:
-                                logger.error(f"[Job {job_id}] Annotation generation failed: {ann_error}")
-                                annotated_images = []
-
-                        # CRITICAL FIX: Store images separately to avoid 16MB document limit
-                        # For 50 papers × 50 pages, we need separate storage for images
-
-                        submission_id = f"sub_{uuid.uuid4().hex[:12]}"
-
-                        # Store images in separate collection (not embedded in submission)
-                        if paper_images:
-                            await db.submission_images.update_one(
-                                {"submission_id": submission_id},
-                                {"$set": {
-                                    "submission_id": submission_id,
-                                    "file_images": paper_images,
-                                    "annotated_images": annotated_images if annotated_images else [],
-                                    "created_at": datetime.now(timezone.utc).isoformat()
-                                }},
-                                upsert=True
-                            )
-
-                        # Create submission document with metadata only (no large base64 data)
-                        submission = {
-                            "submission_id": submission_id,
-                            "exam_id": exam_id,
-                            "student_id": student_id,
-                            "student_name": student_name,
-                            "roll_number": student_id_from_paper,
-                            "filename": filename,
-                            "file_images_count": len(paper_images),
-                            "annotated_images_count": len(annotated_images),
-                            "has_images": True,  # Flag to indicate images exist in separate collection
-                            "obtained_marks": obtained_marks,
-                            "total_marks": exam.get("total_marks", 100),
-                            "percentage": round(percentage, 2),
-                            "scores": [s.dict() for s in scores],
-                            "question_scores": [s.dict() for s in scores],
-                            "status": "ai_graded",
-                            "submitted_at": datetime.now(timezone.utc).isoformat(),
-                            "graded_at": datetime.now(timezone.utc).isoformat()
+                    # Ensure we have bytes
+                    if not isinstance(pdf_bytes, bytes):
+                        logger.error(f"[Job {job_id}] ERROR: pdf_bytes is not bytes type, it is {type(pdf_bytes)}")
+                        return {
+                            "error": f"Invalid file data type: {type(pdf_bytes)}",
+                            "filename": filename
                         }
 
-                        await db.submissions.insert_one(submission)
+                    # Check file size
+                    file_size_mb = len(pdf_bytes) / (1024 * 1024)
+                    logger.info(f"[Job {job_id}] File size: {file_size_mb:.2f}MB")
 
-                        # Log grading analytics for admin dashboard
+                    if file_size_mb > 30:
+                        return {
+                            "error": f"File too large ({file_size_mb:.1f}MB). Maximum 30MB.",
+                            "filename": filename
+                        }
+
+                    logger.info(f"[Job {job_id}] Converting PDF to images...")
+                    # Explicit logging for thread execution
+                    logger.info(f"[Job {job_id}] Thread Start: pdf_to_images for {filename}")
+                    async with conversion_semaphore:
+                        paper_images = await asyncio.to_thread(pdf_to_images, pdf_bytes)
+                    logger.info(f"[Job {job_id}] Thread End: pdf_to_images for {filename}")
+
+                    if not paper_images:
+                        return {
+                            "error": "Failed to extract images from PDF",
+                            "filename": filename
+                        }
+
+                    logger.info(f"[Job {job_id}] Extracted {len(paper_images)} pages")
+
+                    # Extract student info (returns tuple: student_id, student_name)
+                    student_info = await extract_student_info_from_paper(paper_images, filename)
+
+                    # Unpack tuple properly (2 values: id and name only)
+                    if student_info and len(student_info) == 2 and student_info[0] and student_info[1]:
+                        student_id_from_paper, student_name = student_info
+                        logger.info(f"[Job {job_id}] Extracted student info from paper: {student_name} (ID: {student_id_from_paper})")
+                    else:
+                        # AI extraction failed, try filename parsing as fallback
+                        logger.warning(f"[Job {job_id}] AI extraction failed, trying filename parsing for {filename}")
+                        student_id_from_filename, student_name_from_filename = parse_student_from_filename(filename)
+
+                        if student_id_from_filename and student_name_from_filename:
+                            student_id_from_paper = student_id_from_filename
+                            student_name = student_name_from_filename
+                            logger.info(f"[Job {job_id}] Extracted from filename: {student_name} (ID: {student_id_from_paper})")
+                        else:
+                            # Both methods failed, use filename as student name
+                            logger.warning(f"[Job {job_id}] All extraction methods failed, using filename as student name")
+                            student_name = filename.replace(".pdf", "").replace(".PDF", "").strip()
+                            student_id_from_paper = f"UNKNOWN_{uuid.uuid4().hex[:8]}"
+                            logger.info(f"[Job {job_id}] Using default: {student_name} (ID: {student_id_from_paper})")
+
+                    student_email = f"{student_id_from_paper}@school.edu"  # Generate placeholder email
+
+                    # Get or create student
+                    result = await get_or_create_student(
+                        student_id=student_id_from_paper,
+                        student_name=student_name,
+                        batch_id=exam["batch_id"],
+                        teacher_id=exam["teacher_id"]
+                    )
+                    student_id, error = result
+
+                    if error:
+                        logger.error(f"[Job {job_id}] Error creating student: {error}")
+                        return {
+                            "error": f"Failed to create student: {error}",
+                            "filename": filename
+                        }
+
+                    logger.info(f"[Job {job_id}] Grading with AI (with retry logic + learned patterns)...")
+
+                    # Log grading start for this paper
+                    logger.info(f"[Job {job_id}] Grading paper {idx + 1}/{len(files_data)}: {filename}")
+
+                    try:
+                        async with llm_semaphore:
+                            # Grade the paper with retry logic for rate limit handling + teacher's learned patterns
+                            scores = await retry_with_exponential_backoff(
+                                grade_with_ai,
+                                images=paper_images,
+                                model_answer_images=model_answer_imgs,
+                                questions=questions_to_grade,
+                                grading_mode=exam.get("grading_mode", "balanced"),
+                                total_marks=exam.get("total_marks", 100),
+                                model_answer_text=model_answer_text,
+                                teacher_id=teacher_id,  # NEW: For learning patterns
+                                subject_id=exam.get("subject_id"),  # NEW: Cross-exam learning
+                                exam_id=exam_id  # NEW: Pattern matching
+                            )
+                    except (TimeoutError, asyncio.TimeoutError):
+                        logger.error(f"[Job {job_id}] LLM grading timed out for {filename}")
+                        return {
+                            "error": "LLM grading timed out - paper too complex or API slow",
+                            "filename": filename
+                        }
+                    except Exception as e:
+                        logger.error(f"[Job {job_id}] LLM grading error for {filename}: {e}")
+                        return {
+                            "error": f"LLM grading error: {str(e)}",
+                            "filename": filename
+                        }
+
+                    # CRITICAL DEBUG: Check for score duplication
+                    logger.info(f"[Job {job_id}] grade_with_ai returned {len(scores)} scores")
+                    # logger.info(f"[Job {job_id}] Question numbers in scores: {[s.question_number for s in scores]}")
+
+                    # CRITICAL FIX: Deduplicate scores before calculating total
+                    # Keep only the FIRST occurrence of each question number
+                    seen_questions = set()
+                    deduplicated_scores = []
+                    for s in scores:
+                        if s.question_number not in seen_questions:
+                            seen_questions.add(s.question_number)
+                            deduplicated_scores.append(s)
+                        else:
+                            logger.warning(f"[Job {job_id}] Duplicate Q{s.question_number} found and removed")
+
+                    # Use deduplicated scores for everything going forward
+                    scores = deduplicated_scores
+
+                    # Calculate total from deduplicated scores
+                    obtained_marks = sum(s.obtained_marks for s in scores if s.obtained_marks >= 0)
+                    percentage = (obtained_marks / exam.get("total_marks", 100)) * 100 if exam.get("total_marks") else 0
+
+                    logger.info(f"[Job {job_id}] Total: {obtained_marks}/{exam.get('total_marks', 100)} = {percentage:.1f}%")
+
+                    # Generate annotated images using Vision OCR if available
+                    annotated_images = []
+                    if generate_annotated_images_with_vision_ocr:
                         try:
-                            analytics_entry = {
+                            logger.info(f"[Job {job_id}] Generating annotated images with Vision OCR...")
+                            annotated_images = await generate_annotated_images_with_vision_ocr(
+                                original_images=paper_images,
+                                question_scores=scores,
+                                use_vision_ocr=True
+                            )
+                            logger.info(f"[Job {job_id}] Generated {len(annotated_images)} annotated images")
+                        except Exception as ann_error:
+                            logger.error(f"[Job {job_id}] Annotation generation failed: {ann_error}")
+                            annotated_images = []
+
+                    # CRITICAL FIX: Store images separately to avoid 16MB document limit
+                    # For 50 papers × 50 pages, we need separate storage for images
+
+                    submission_id = f"sub_{uuid.uuid4().hex[:12]}"
+
+                    # Store images in separate collection (not embedded in submission)
+                    if paper_images:
+                        await db.submission_images.update_one(
+                            {"submission_id": submission_id},
+                            {"$set": {
                                 "submission_id": submission_id,
-                                "exam_id": exam_id,
-                                "teacher_id": exam["teacher_id"],
-                                "graded_at": datetime.now(timezone.utc).isoformat(),
-                                "grading_mode": exam.get("grading_mode", "balanced"),
-                                "ai_confidence_score": 0.85,  # Placeholder - could be calculated from AI response
-                                "edited_by_teacher": False,  # Initially not edited
-                                "grade_delta": 0,  # No change from AI grade initially
-                                "grading_duration_seconds": 0,  # Could track actual duration if needed
-                                "estimated_cost": 0.0015,  # Rough estimate: ~$0.0015 per paper (Gemini 2.5 Flash)
-                                "tokens_input": len(str(paper_images)) // 4,  # Rough token estimate
-                                "tokens_output": len(str(scores)) // 4,  # Rough token estimate
-                            }
-                            await db.grading_analytics.insert_one(analytics_entry)
-                            logger.info(f"[Job {job_id}] Logged analytics for {filename}")
-                        except Exception as analytics_error:
-                            logger.error(f"[Job {job_id}] Failed to log analytics: {analytics_error}")
-                            # Don't fail the grading if analytics logging fails
+                                "file_images": paper_images,
+                                "annotated_images": annotated_images if annotated_images else [],
+                                "created_at": datetime.now(timezone.utc).isoformat()
+                            }},
+                            upsert=True
+                        )
 
-                        logger.info(f"[Job {job_id}] ✓ Paper graded: {obtained_marks}/{exam.get('total_marks')} ({percentage:.1f}%)")
+                    # Create submission document with metadata only (no large base64 data)
+                    submission = {
+                        "submission_id": submission_id,
+                        "exam_id": exam_id,
+                        "student_id": student_id,
+                        "student_name": student_name,
+                        "roll_number": student_id_from_paper,
+                        "filename": filename,
+                        "file_images_count": len(paper_images),
+                        "annotated_images_count": len(annotated_images),
+                        "has_images": True,  # Flag to indicate images exist in separate collection
+                        "obtained_marks": obtained_marks,
+                        "total_marks": exam.get("total_marks", 100),
+                        "percentage": round(percentage, 2),
+                        "scores": [s.dict() for s in scores],
+                        "question_scores": [s.dict() for s in scores],
+                        "status": "ai_graded",
+                        "submitted_at": datetime.now(timezone.utc).isoformat(),
+                        "graded_at": datetime.now(timezone.utc).isoformat()
+                    }
 
-                        return {"submission": submission, "filename": filename}
-                    
-                    # === EXECUTE WITH TIMEOUT ===
-                    # This waits for the entire pipeline (read -> convert -> grade -> db)
+                    await db.submissions.insert_one(submission)
+
+                    # Log grading analytics for admin dashboard
+                    try:
+                        analytics_entry = {
+                            "submission_id": submission_id,
+                            "exam_id": exam_id,
+                            "teacher_id": exam["teacher_id"],
+                            "graded_at": datetime.now(timezone.utc).isoformat(),
+                            "grading_mode": exam.get("grading_mode", "balanced"),
+                            "ai_confidence_score": 0.85,  # Placeholder - could be calculated from AI response
+                            "edited_by_teacher": False,  # Initially not edited
+                            "grade_delta": 0,  # No change from AI grade initially
+                            "grading_duration_seconds": 0,  # Could track actual duration if needed
+                            "estimated_cost": 0.0015,  # Rough estimate: ~$0.0015 per paper (Gemini 2.5 Flash)
+                            "tokens_input": len(str(paper_images)) // 4,  # Rough token estimate
+                            "tokens_output": len(str(scores)) // 4,  # Rough token estimate
+                        }
+                        await db.grading_analytics.insert_one(analytics_entry)
+                        logger.info(f"[Job {job_id}] Logged analytics for {filename}")
+                    except Exception as analytics_error:
+                        logger.error(f"[Job {job_id}] Failed to log analytics: {analytics_error}")
+                        # Don't fail the grading if analytics logging fails
+
+                    logger.info(f"[Job {job_id}] ✓ Paper graded: {obtained_marks}/{exam.get('total_marks')} ({percentage:.1f}%)")
+
+                    return {"submission": submission, "filename": filename}
+
+                # === TERMINAL INVARIANT ENFORCEMENT ===
+                # This block guarantees EXACTLY ONE terminal log is emitted
+                terminal_log_emitted = False
+
+                try:
+                    # Execute with STRICT timeout
                     result = await asyncio.wait_for(process_single_paper(), timeout=float(PAPER_TIMEOUT_SECONDS))
 
                     if "error" in result:
+                        logger.error(f"[Job {job_id}] paper_failed: {filename} - {result['error']}")
+                        terminal_log_emitted = True
                         errors.append({"filename": result["filename"], "error": result["error"]})
                     else:
                         # Store the full submission but without MongoDB _id
@@ -409,9 +417,11 @@ async def process_grading_job_in_background(
                             del submission_data["_id"]
                         submissions.append(submission_data)
                         logger.info(f"[Job {job_id}] paper_completed: {filename}")
+                        terminal_log_emitted = True
 
                 except asyncio.TimeoutError:
-                    logger.error(f"[Job {job_id}] paper_failed_timeout: {filename} (exceeded {PAPER_TIMEOUT_SECONDS}s)")
+                    logger.error(f"[Job {job_id}] paper_timeout: {filename} (exceeded {PAPER_TIMEOUT_SECONDS}s)")
+                    terminal_log_emitted = True
                     error_details = {
                         "filename": filename,
                         "error": f"Processing timeout - exceeded {PAPER_TIMEOUT_SECONDS}s (paper too complex or API slow)"
@@ -430,17 +440,30 @@ async def process_grading_job_in_background(
                         pass
 
                 except Exception as e:
-                    logger.error(f"[Job {job_id}] ERROR processing {filename}: {str(e)}", exc_info=True)
+                    logger.error(f"[Job {job_id}] paper_failed: {filename} - Exception: {str(e)}", exc_info=True)
+                    terminal_log_emitted = True
                     errors.append({
                         "filename": filename,
                         "error": f"Processing error: {str(e)[:200]}"
                     })
                     # We continue to the next paper (finally block updates progress)
 
+                finally:
+                    # Enforce the invariant if somehow missed (should catch programming errors)
+                    if not terminal_log_emitted:
+                        logger.error(f"[Job {job_id}] paper_failed: {filename} - CRITICAL INVARIANT VIOLATION (No terminal log)")
+                        errors.append({
+                            "filename": filename,
+                            "error": "System error: Processing finished without terminal status"
+                        })
+
                 # Explicit memory cleanup after EACH paper (critical for large batches)
                 import gc
                 # Clear large variables
                 gc.collect()
+
+                # Update progress after each paper
+                await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
 
                 # Update progress after each paper
                 await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
