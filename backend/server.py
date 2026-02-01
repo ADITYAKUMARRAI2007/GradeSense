@@ -3584,7 +3584,16 @@ Important:
             file_contents=[first_page_image]
         )
         
-        response = await chat.send_message(user_message)
+        import asyncio
+        try:
+            response = await asyncio.wait_for(
+                chat.send_message(user_message),
+                timeout=120.0
+            )
+        except asyncio.TimeoutError:
+            logger.error("Timeout extracting student info")
+            return (None, None)
+
         response_text = response.strip()
         
         # Parse JSON response
@@ -3905,7 +3914,7 @@ Extract complete answers for ALL questions visible on these pages."""
                     response = await ai_call_with_timeout(
                         chat, 
                         user_message, 
-                        timeout_seconds=90,
+                        timeout_seconds=120,
                         operation_name=f"Model answer extraction attempt {attempt+1}"
                     )
                     if response:
@@ -5367,9 +5376,9 @@ Return valid JSON only."""
                 if attempt < max_retries - 1:
                     continue  # Will retry with exponential backoff at loop start
                 else:
-                    # Return empty on final failure - aggregation will handle as "not found"
-                    logger.error(f"Failed to grade chunk {chunk_idx+1} after retries. Using fallback.")
-                    return []
+                    # Raise on final failure so the paper is marked as failed
+                    logger.error(f"Failed to grade chunk {chunk_idx+1} after retries. Raising error.")
+                    raise e
 
         return []
 
