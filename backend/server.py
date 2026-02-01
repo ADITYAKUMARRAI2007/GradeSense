@@ -89,7 +89,7 @@ def get_version_info():
     return {
         "git_commit": git_commit,
         "build_time": build_time,
-        "env": env
+        "environment": env
     }
 
 # Helper function for MongoDB serialization
@@ -239,7 +239,7 @@ app = FastAPI(title="GradeSense API", lifespan=lifespan)
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-@app.get("/version")
+@api_router.get("/version")
 async def get_version():
     """Public version endpoint for deployment verification"""
     return get_version_info()
