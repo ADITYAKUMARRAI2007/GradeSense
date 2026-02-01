@@ -191,6 +191,7 @@ async def lifespan(app: FastAPI):
     
     # Startup: Check system dependencies
     logger.info("🚀 FastAPI app starting up...")
+    logger.info("REGISTERED ROUTES: %s", [r.path for r in app.routes])
     logger.info("🔍 Checking system dependencies...")
     
     # Check if poppler-utils is installed
