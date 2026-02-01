@@ -18,6 +18,9 @@ RATE_LIMIT_DELAY = 0.05  # 50ms delay (even faster for dedicated key)
 MAX_RETRIES = 3  # Standard retry attempts
 RETRY_BACKOFF = 2  # Standard exponential backoff
 
+# Time limit per paper (strict watchdog)
+PAPER_TIMEOUT_SECONDS = 480  # 8 minutes per paper
+
 
 async def retry_with_exponential_backoff(func, *args, max_retries=MAX_RETRIES, **kwargs):
     """
@@ -75,7 +78,8 @@ async def process_grading_job_in_background(
     get_exam_model_answer_text,  # Function reference
     grade_with_ai,  # Function reference
     create_notification,  # Function reference
-    generate_annotated_images_with_vision_ocr=None  # Optional: Vision OCR annotation function
+    generate_annotated_images_with_vision_ocr=None,  # Optional: Vision OCR annotation function
+    read_gridfs_file=None  # Optional: Function to read from GridFS if content is missing
 ):
     """
     Background task to process papers one by one with progress tracking
@@ -153,20 +157,34 @@ async def process_grading_job_in_background(
                     logger.info(f"Job {job_id} was cancelled during processing at paper {idx+1}/{len(files_data)}")
                     return
                 
-                filename = file_data["filename"]
-                pdf_bytes = file_data["content"]
-
-                logger.info(f"[Job {job_id}] ========================================")
+                filename = file_data.get("filename", "unknown.pdf")
+                logger.info(f"[Job {job_id}] paper_started: {filename}")
                 logger.info(f"[Job {job_id}] 📄 PAPER {idx + 1}/{len(files_data)}: {filename}")
-                logger.info(f"[Job {job_id}] File size: {len(pdf_bytes) / (1024*1024):.2f}MB")
-                logger.info(f"[Job {job_id}] Progress: {(idx/len(files_data)*100):.1f}% complete")
-                logger.info(f"[Job {job_id}] ========================================")
 
                 try:
-                    # Add timeout for entire paper processing (5 minutes max per paper)
-                    import asyncio
-                    
+                    # Enforce strict per-paper execution time limit using asyncio.wait_for
                     async def process_single_paper():
+                        # Fetch content inside the timeout block if not present
+                        pdf_bytes = file_data.get("content")
+
+                        if not pdf_bytes:
+                            if "gridfs_id" in file_data and read_gridfs_file:
+                                try:
+                                    logger.info(f"[Job {job_id}] Reading file from GridFS: {file_data['gridfs_id']}")
+                                    pdf_bytes = await read_gridfs_file(file_data['gridfs_id'])
+                                except Exception as e:
+                                    logger.error(f"[Job {job_id}] Failed to read from GridFS: {e}")
+                                    return {
+                                        "error": f"Failed to read file from storage: {e}",
+                                        "filename": filename
+                                    }
+                            else:
+                                logger.error(f"[Job {job_id}] No content and no GridFS ID for {filename}")
+                                return {
+                                    "error": "File content missing and cannot be retrieved",
+                                    "filename": filename
+                                }
+
                         # Ensure we have bytes
                         if not isinstance(pdf_bytes, bytes):
                             logger.error(f"[Job {job_id}] ERROR: pdf_bytes is not bytes type, it is {type(pdf_bytes)}")
@@ -177,6 +195,8 @@ async def process_grading_job_in_background(
 
                         # Check file size
                         file_size_mb = len(pdf_bytes) / (1024 * 1024)
+                        logger.info(f"[Job {job_id}] File size: {file_size_mb:.2f}MB")
+
                         if file_size_mb > 30:
                             return {
                                 "error": f"File too large ({file_size_mb:.1f}MB). Maximum 30MB.",
@@ -271,7 +291,7 @@ async def process_grading_job_in_background(
 
                         # CRITICAL DEBUG: Check for score duplication
                         logger.info(f"[Job {job_id}] grade_with_ai returned {len(scores)} scores")
-                        logger.info(f"[Job {job_id}] Question numbers in scores: {[s.question_number for s in scores]}")
+                        # logger.info(f"[Job {job_id}] Question numbers in scores: {[s.question_number for s in scores]}")
 
                         # CRITICAL FIX: Deduplicate scores before calculating total
                         # Keep only the FIRST occurrence of each question number
@@ -283,12 +303,6 @@ async def process_grading_job_in_background(
                                 deduplicated_scores.append(s)
                             else:
                                 logger.warning(f"[Job {job_id}] Duplicate Q{s.question_number} found and removed")
-
-                        # Log duplication if found
-                        if len(scores) != len(deduplicated_scores):
-                            logger.error(f"[Job {job_id}] DUPLICATE QUESTION NUMBERS DETECTED!")
-                            logger.error(f"[Job {job_id}] Original: {len(scores)} scores, After dedup: {len(deduplicated_scores)} scores")
-                            logger.error(f"[Job {job_id}] Duplicates removed: {len(scores) - len(deduplicated_scores)}")
 
                         # Use deduplicated scores for everything going forward
                         scores = deduplicated_scores
@@ -381,66 +395,64 @@ async def process_grading_job_in_background(
 
                         return {"submission": submission, "filename": filename}
                     
-                    # Process with 10-minute timeout (increased for annotation generation)
-                    try:
-                        result = await asyncio.wait_for(process_single_paper(), timeout=600.0)
+                    # === EXECUTE WITH TIMEOUT ===
+                    # This waits for the entire pipeline (read -> convert -> grade -> db)
+                    result = await asyncio.wait_for(process_single_paper(), timeout=float(PAPER_TIMEOUT_SECONDS))
 
-                        if "error" in result:
-                            errors.append({"filename": result["filename"], "error": result["error"]})
-                        else:
-                            # Store the full submission but without MongoDB _id
-                            submission_data = result["submission"]
-                            # Remove _id if it exists
-                            if "_id" in submission_data:
-                                del submission_data["_id"]
-                            submissions.append(submission_data)
-
-                    except asyncio.TimeoutError:
-                        logger.error(f"[Job {job_id}] ⏱️ TIMEOUT: Paper {filename} exceeded 10 minutes")
-                        error_details = {
-                            "filename": filename,
-                            "error": "Processing timeout - exceeded 10 minutes (paper too complex or API slow)"
-                        }
-                        errors.append(error_details)
-
-                        # Log to file for production debugging
-                        try:
-                            import traceback
-                            with open("/tmp/grading_errors.log", "a") as f:
-                                f.write(f"\n{'='*80}\n")
-                                f.write(f"TIMEOUT at paper {idx + 1}/{len(files_data)}: {filename}\n")
-                                f.write(f"Job: {job_id}\n")
-                                f.write(f"Time: {datetime.now(timezone.utc).isoformat()}\n")
-                                f.write(f"{'='*80}\n")
-                        except:
-                            pass
-                    
-                    # Explicit memory cleanup after EACH paper (critical for large batches)
-                    import gc
-                    pdf_bytes = None
-                    paper_images = None
-                    model_answer_imgs = None
-                    scores = None
-                    gc.collect()
-                    
-                    # Update progress after each paper
-                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
-                    
-                    # Log progress at milestones (every 10 papers, 50 papers, 100 papers)
-                    progress_milestones = [10, 25, 50, 100, 200, 500, 1000]
-                    if (idx + 1) in progress_milestones or (idx + 1) % 100 == 0:
-                        logger.info(f"[Job {job_id}] 🎯 MILESTONE: {idx + 1}/{len(files_data)} papers processed ({len(submissions)} successful, {len(errors)} failed)")
+                    if "error" in result:
+                        errors.append({"filename": result["filename"], "error": result["error"]})
                     else:
-                        logger.info(f"[Job {job_id}] Progress: {idx + 1}/{len(files_data)} papers, {len(submissions)} successful, {len(errors)} errors")
-                    
+                        # Store the full submission but without MongoDB _id
+                        submission_data = result["submission"]
+                        # Remove _id if it exists
+                        if "_id" in submission_data:
+                            del submission_data["_id"]
+                        submissions.append(submission_data)
+                        logger.info(f"[Job {job_id}] paper_completed: {filename}")
+
+                except asyncio.TimeoutError:
+                    logger.error(f"[Job {job_id}] paper_failed_timeout: {filename} (exceeded {PAPER_TIMEOUT_SECONDS}s)")
+                    error_details = {
+                        "filename": filename,
+                        "error": f"Processing timeout - exceeded {PAPER_TIMEOUT_SECONDS}s (paper too complex or API slow)"
+                    }
+                    errors.append(error_details)
+
+                    # Log to file for production debugging
+                    try:
+                        with open("/tmp/grading_errors.log", "a") as f:
+                            f.write(f"\n{'='*80}\n")
+                            f.write(f"TIMEOUT at paper {idx + 1}/{len(files_data)}: {filename}\n")
+                            f.write(f"Job: {job_id}\n")
+                            f.write(f"Time: {datetime.now(timezone.utc).isoformat()}\n")
+                            f.write(f"{'='*80}\n")
+                    except:
+                        pass
+
                 except Exception as e:
                     logger.error(f"[Job {job_id}] ERROR processing {filename}: {str(e)}", exc_info=True)
                     errors.append({
                         "filename": filename,
                         "error": f"Processing error: {str(e)[:200]}"
                     })
-                    await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
-                    continue
+                    # We continue to the next paper (finally block updates progress)
+
+                # Explicit memory cleanup after EACH paper (critical for large batches)
+                import gc
+                # Clear large variables
+                gc.collect()
+
+                # Update progress after each paper
+                await _update_job_progress(db, job_id, idx + 1, len(submissions), len(errors), submissions, errors)
+
+                # Log progress at milestones (every 10 papers, 50 papers, 100 papers)
+                progress_milestones = [10, 25, 50, 100, 200, 500, 1000]
+                if (idx + 1) in progress_milestones or (idx + 1) % 100 == 0:
+                    logger.info(f"[Job {job_id}] 🎯 MILESTONE: {idx + 1}/{len(files_data)} papers processed ({len(submissions)} successful, {len(errors)} failed)")
+                else:
+                    logger.info(f"[Job {job_id}] Progress: {idx + 1}/{len(files_data)} papers, {len(submissions)} successful, {len(errors)} errors")
+
+            # Process failed papers? No, for now we just log them.
 
         except Exception as e:
             logger.error(f"[Job {job_id}] CRITICAL ERROR in job loop: {e}", exc_info=True)

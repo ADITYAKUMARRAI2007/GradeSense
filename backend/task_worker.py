@@ -50,6 +50,10 @@ db = client[DB_NAME]
 # Async GridFS bucket
 fs_bucket = AsyncIOMotorGridFSBucket(db)
 
+# Time limit per paper (strict watchdog)
+PAPER_TIMEOUT_SECONDS = 480  # 8 minutes per paper
+
+
 # Helper for async full-file read
 async def read_gridfs_file_async(gridfs_id_or_filename, use_filename=False):
     """Async GridFS read with chunking for large files"""
@@ -176,85 +180,109 @@ async def process_single_paper_grading(task_data):
         
         total_marks = exam['total_marks']
         
-        # Get answer paper from GridFS
-        ans_bytes = await read_gridfs_file_async(answer_file_ref, use_filename=True)
-        async with conversion_semaphore:
-            ans_images = await asyncio.to_thread(pdf_to_images, ans_bytes)
-        
-        # Get model answer from GridFS if available
-        ma_images = []
-        ma_text = ""
-        if model_answer_ref:
-            ma_bytes = await read_gridfs_file_async(model_answer_ref, use_filename=True)
+        async def _process_logic():
+            # Get answer paper from GridFS
+            ans_bytes = await read_gridfs_file_async(answer_file_ref, use_filename=True)
             async with conversion_semaphore:
-                ma_images = await asyncio.to_thread(pdf_to_images, ma_bytes)
-            # Try to extract text from model answer
-            try:
-                ma_text = await get_exam_model_answer_text(exam_id)
-            except:
-                ma_text = ""
-        
-        # Use the grade_with_ai function with correct parameters
-        logger.info(f"Grading paper for student {student_name} (ID: {student_id}) in exam {exam_id}")
-        async with llm_semaphore:
-            question_scores = await grade_with_ai(
-                images=ans_images,
-                model_answer_images=ma_images,
-                questions=questions,
-                grading_mode=grading_mode,
-                total_marks=total_marks,
-                model_answer_text=ma_text
+                ans_images = await asyncio.to_thread(pdf_to_images, ans_bytes)
+
+            # Get model answer from GridFS if available
+            ma_images = []
+            ma_text = ""
+            if model_answer_ref:
+                ma_bytes = await read_gridfs_file_async(model_answer_ref, use_filename=True)
+                async with conversion_semaphore:
+                    ma_images = await asyncio.to_thread(pdf_to_images, ma_bytes)
+                # Try to extract text from model answer
+                try:
+                    ma_text = await get_exam_model_answer_text(exam_id)
+                except:
+                    ma_text = ""
+
+            # Use the grade_with_ai function with correct parameters
+            logger.info(f"Grading paper for student {student_name} (ID: {student_id}) in exam {exam_id}")
+            async with llm_semaphore:
+                question_scores = await grade_with_ai(
+                    images=ans_images,
+                    model_answer_images=ma_images,
+                    questions=questions,
+                    grading_mode=grading_mode,
+                    total_marks=total_marks,
+                    model_answer_text=ma_text
+                )
+
+            # Calculate total obtained marks
+            total_obtained = sum(q.obtained_marks for q in question_scores)
+            percentage = (total_obtained / total_marks) * 100 if total_marks > 0 else 0
+
+            # Create paper document
+            paper_id = f"paper_{uuid.uuid4().hex[:12]}"
+            paper_doc = {
+                "paper_id": paper_id,
+                "exam_id": exam_id,
+                "student_id": student_id,
+                "student_name": student_name,
+                "question_scores": [q.dict() for q in question_scores],
+                "total_marks": total_marks,
+                "obtained_marks": total_obtained,
+                "percentage": round(percentage, 2),
+                "status": "graded",
+                "graded_at": datetime.now(timezone.utc).isoformat()
+            }
+
+            await db.papers.insert_one(paper_doc)
+
+            # Update submission status
+            await db.student_submissions.update_one(
+                {"exam_id": exam_id, "student_id": student_id},
+                {"$set": {"status": "graded", "graded_at": datetime.now(timezone.utc).isoformat()}}
             )
+
+            # Update exam progress
+            total_students = exam.get('total_students', 0)
+            graded_count = await db.papers.count_documents({"exam_id": exam_id})
+
+            update_data = {
+                "graded_count": graded_count,
+                "progress": (graded_count / total_students) * 100 if total_students > 0 else 0
+            }
+
+            # If all graded, mark exam as completed
+            if graded_count >= total_students:
+                update_data["status"] = "completed"
+
+            await db.exams.update_one(
+                {"exam_id": exam_id},
+                {"$set": update_data}
+            )
+
+            logger.info(f"✓ Successfully graded paper for {student_name}: {total_obtained}/{total_marks} ({percentage:.1f}%)")
         
-        # Calculate total obtained marks
-        total_obtained = sum(q.obtained_marks for q in question_scores)
-        percentage = (total_obtained / total_marks) * 100 if total_marks > 0 else 0
+        # Log start
+        logger.info(f"paper_started: {student_name}")
         
-        # Create paper document
-        paper_id = f"paper_{uuid.uuid4().hex[:12]}"
-        paper_doc = {
-            "paper_id": paper_id,
-            "exam_id": exam_id,
-            "student_id": student_id,
-            "student_name": student_name,
-            "question_scores": [q.dict() for q in question_scores],
-            "total_marks": total_marks,
-            "obtained_marks": total_obtained,
-            "percentage": round(percentage, 2),
-            "status": "graded",
-            "graded_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        await db.papers.insert_one(paper_doc)
-        
-        # Update submission status
-        await db.student_submissions.update_one(
-            {"exam_id": exam_id, "student_id": student_id},
-            {"$set": {"status": "graded", "graded_at": datetime.now(timezone.utc).isoformat()}}
-        )
-        
-        # Update exam progress
-        total_students = exam.get('total_students', 0)
-        graded_count = await db.papers.count_documents({"exam_id": exam_id})
-        
-        update_data = {
-            "graded_count": graded_count,
-            "progress": (graded_count / total_students) * 100 if total_students > 0 else 0
-        }
-        
-        # If all graded, mark exam as completed
-        if graded_count >= total_students:
-            update_data["status"] = "completed"
-        
-        await db.exams.update_one(
-            {"exam_id": exam_id},
-            {"$set": update_data}
-        )
-        
-        logger.info(f"✓ Successfully graded paper for {student_name}: {total_obtained}/{total_marks} ({percentage:.1f}%)")
-        
+        # Execute with timeout
+        try:
+            await asyncio.wait_for(_process_logic(), timeout=float(PAPER_TIMEOUT_SECONDS))
+            logger.info(f"paper_completed: {student_name}")
+        except asyncio.TimeoutError:
+            logger.error(f"paper_failed_timeout: {student_name} (exceeded {PAPER_TIMEOUT_SECONDS}s)")
+            raise TimeoutError(f"Grading timed out after {PAPER_TIMEOUT_SECONDS} seconds")
+
     except Exception as e:
         logger.error(f"✗ Error grading paper for {student_name}: {e}", exc_info=True)
+        # Update submission status to failed so UI doesn't hang
+        try:
+            await db.student_submissions.update_one(
+                {"exam_id": exam_id, "student_id": student_id},
+                {"$set": {
+                    "status": "failed",
+                    "error": str(e),
+                    "failed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        except Exception as db_e:
+            logger.error(f"Failed to update submission status to failed: {db_e}")
         raise
 
 
@@ -267,37 +295,36 @@ async def process_grading_task(task_data):
     
     logger.info(f"Processing grading job {job_id} with {len(file_refs)} papers")
     
-    # Check if we're using old format (files_data) or new format (file_refs with GridFS IDs)
+    # NEW FORMAT OPTIMIZATION:
+    # Instead of reading all files into memory here, we pass the references
+    # directly to the background grader, which now supports lazy loading.
+
     files_data = []
+
+    # Check if we're using new format (file_refs with GridFS IDs)
+    using_gridfs_refs = False
     if file_refs and isinstance(file_refs[0], dict):
         if 'gridfs_id' in file_refs[0]:
-            # New format: Read files from GridFS
-            logger.info(f"Reading {len(file_refs)} files from GridFS...")
-            for ref in file_refs:
-                try:
-                    file_content = await read_gridfs_file_async(ref['gridfs_id'])
-                    files_data.append({
-                        "filename": ref['filename'],
-                        "content": file_content
-                    })
-                    logger.info(f"  Read {ref['filename']} from GridFS: {len(file_content)} bytes")
-                except Exception as e:
-                    logger.error(f"Error reading file {ref['filename']} from GridFS: {e}")
-                    raise
-        else:
-            # Old format: files already have content
-            files_data = file_refs
+            using_gridfs_refs = True
+
+    if using_gridfs_refs:
+        logger.info(f"Using lazy GridFS loading for {len(file_refs)} files")
+        # Pass references directly - content will be loaded on-demand
+        # We assume file_refs has {'gridfs_id': '...', 'filename': '...'} structure
+        files_data = file_refs
     else:
+        # Legacy format: content might already be there or we assume direct list
+        logger.info(f"Using legacy file loading for {len(file_refs)} files")
         files_data = file_refs
     
-    logger.info(f"Successfully loaded {len(files_data)} files for processing")
+    logger.info(f"Prepared {len(files_data)} files for processing")
     
     # Get exam data
     exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
     if not exam:
         raise ValueError(f"Exam {exam_id} not found")
     
-    # Call the existing background grading function
+    # Call the background grading function with GridFS reader
     await process_grading_job_in_background(
         job_id=job_id,
         exam_id=exam_id,
@@ -313,7 +340,8 @@ async def process_grading_task(task_data):
         get_exam_model_answer_text=get_exam_model_answer_text,
         grade_with_ai=grade_with_ai,
         create_notification=create_notification,
-        generate_annotated_images_with_vision_ocr=generate_annotated_images_with_vision_ocr
+        generate_annotated_images_with_vision_ocr=generate_annotated_images_with_vision_ocr,
+        read_gridfs_file=read_gridfs_file_async  # Pass the async reader function
     )
 
 
