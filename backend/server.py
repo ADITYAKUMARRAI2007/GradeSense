@@ -4753,7 +4753,8 @@ async def grade_with_ai(
     
     # Apply rotation correction to student images
     logger.info("Applying rotation correction to student images...")
-    corrected_images = correct_all_images_rotation(images)
+    # Offload CPU-bound image processing to a thread to avoid blocking the event loop
+    corrected_images = await asyncio.to_thread(correct_all_images_rotation, images)
     
     # NEW: Fetch teacher's learned patterns for this subject
     learned_patterns = []
