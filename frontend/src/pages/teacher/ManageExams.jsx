@@ -755,7 +755,10 @@ export default function ManageExams({ user }) {
                             <div className="min-w-0">
                               <p className="font-medium truncate">{exam.exam_name}</p>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
-                                <span>{getBatchName(exam.batch_id)} • {getSubjectName(exam.subject_id)}</span>
+                                <span>
+                                  {getBatchName(exam.batch_id)} • {getSubjectName(exam.subject_id)}
+                                  {exam.upsc_paper ? ` • ${exam.upsc_paper}` : ""}
+                                </span>
                                 {exam.results_published ? (
                                   <Badge variant="success" className="bg-green-500 text-white text-[10px] px-1 py-0">
                                     Published
@@ -953,7 +956,7 @@ export default function ManageExams({ user }) {
                 <CardContent className="space-y-6">
                   {/* Basic Info - View Mode */}
                   {!editMode ? (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                       <div className="p-4 bg-blue-50 rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
                           <BookOpen className="w-4 h-4 text-blue-600" />
@@ -968,6 +971,14 @@ export default function ManageExams({ user }) {
                           <span className="text-xs text-orange-600">Subject</span>
                         </div>
                         <p className="font-medium text-sm">{getSubjectName(selectedExam.subject_id)}</p>
+                      </div>
+
+                      <div className="p-4 bg-indigo-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <BookOpen className="w-4 h-4 text-indigo-600" />
+                          <span className="text-xs text-indigo-600">UPSC Paper</span>
+                        </div>
+                        <p className="font-medium text-sm">{selectedExam.upsc_paper || "Not set"}</p>
                       </div>
 
                       <div className="p-4 bg-green-50 rounded-lg">

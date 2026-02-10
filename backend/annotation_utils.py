@@ -3,6 +3,7 @@ Annotation utility for grading papers with visual feedback
 Supports drawing circles, checkmarks, boxes, and text overlays on student answer images
 """
 import io
+import math
 import base64
 import logging
 from PIL import Image, ImageDraw, ImageFont
@@ -19,6 +20,12 @@ class AnnotationType:
     POINT_NUMBER = "point_number"  # Numbered circles (1, 2, 3)
     CROSS_MARK = "cross_mark"  # Red X mark for incorrect answers
     ERROR_UNDERLINE = "error_underline"  # Underline marking an error
+    SCORE_BOX = "score_box"  # Red box with score (e.g., 2/10)
+    MARGIN_NOTE = "margin_note"  # Red handwritten-style margin note
+    MARGIN_BRACKET = "margin_bracket"  # Red bracket in the margin
+    HIGHLIGHT_BOX = "highlight_box"  # Box around a text region
+    COMMENT = "comment"  # Margin comment near anchor
+    CALLOUT_LINE = "callout_line"  # Line/arrow from margin note to text
 
 class Annotation:
     """Represents a single annotation on an image"""
@@ -29,7 +36,9 @@ class Annotation:
         y: int,
         text: str = "",
         color: str = "green",
-        size: int = 30
+        size: int = 30,
+        width: Optional[int] = None,
+        height: Optional[int] = None
     ):
         self.annotation_type = annotation_type
         self.x = x
@@ -37,6 +46,8 @@ class Annotation:
         self.text = text
         self.color = color
         self.size = size
+        self.width = width
+        self.height = height
     
     def to_dict(self) -> Dict:
         """Convert annotation to dictionary for storage"""
@@ -46,7 +57,9 @@ class Annotation:
             "y": self.y,
             "text": self.text,
             "color": self.color,
-            "size": self.size
+            "size": self.size,
+            "width": self.width,
+            "height": self.height
         }
     
     @classmethod
@@ -58,7 +71,9 @@ class Annotation:
             y=data["y"],
             text=data.get("text", ""),
             color=data.get("color", "green"),
-            size=data.get("size", 30)
+            size=data.get("size", 30),
+            width=data.get("width"),
+            height=data.get("height")
         )
 
 
@@ -257,6 +272,101 @@ def draw_error_underline(
             draw.text((x, text_y), text, fill=text_color)
 
 
+def draw_score_box(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    text: str,
+    color: str = "red",
+    font: Optional[ImageFont.FreeTypeFont] = None
+):
+    """Draw a boxed score like a teacher's margin total"""
+    box_color = get_color_rgb(color)
+    text_color = box_color
+
+    if font:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+    else:
+        text_width = len(text) * 8
+        text_height = 12
+
+    padding_x = 6
+    padding_y = 4
+    rect = [
+        x,
+        y,
+        x + text_width + padding_x * 2,
+        y + text_height + padding_y * 2
+    ]
+    draw.rectangle(rect, outline=box_color, width=2)
+    draw.text((x + padding_x, y + padding_y), text, fill=text_color, font=font)
+
+
+def draw_margin_note(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    text: str,
+    color: str = "red",
+    font: Optional[ImageFont.FreeTypeFont] = None
+):
+    """Draw a red margin note (simple handwritten-style text)"""
+    note_color = get_color_rgb(color)
+    draw.text((x, y), text, fill=note_color, font=font)
+
+
+def draw_margin_bracket(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    height: int = 60,
+    color: str = "red"
+):
+    """Draw a teacher-style bracket in the margin"""
+    bracket_color = get_color_rgb(color)
+    line_width = 2
+    top = y
+    bottom = y + height
+    draw.line([(x, top), (x, bottom)], fill=bracket_color, width=line_width)
+    draw.line([(x, top), (x + 12, top)], fill=bracket_color, width=line_width)
+    draw.line([(x, bottom), (x + 12, bottom)], fill=bracket_color, width=line_width)
+
+
+def draw_highlight_box(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    color: str = "red"
+):
+    """Draw a rectangular highlight box around a region"""
+    box_color = get_color_rgb(color)
+    rect = [x, y, x + max(2, width), y + max(2, height)]
+    draw.rectangle(rect, outline=box_color, width=2)
+
+
+def draw_callout_line(
+    draw: ImageDraw,
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    color: str = "red"
+):
+    """Draw a callout line with a small arrow head"""
+    line_color = get_color_rgb(color)
+    draw.line([(x1, y1), (x2, y2)], fill=line_color, width=2)
+    # Arrow head
+    arrow_size = 6
+    angle = math.atan2(y2 - y1, x2 - x1)
+    left = (x2 - arrow_size * math.cos(angle - 0.4), y2 - arrow_size * math.sin(angle - 0.4))
+    right = (x2 - arrow_size * math.cos(angle + 0.4), y2 - arrow_size * math.sin(angle + 0.4))
+    draw.polygon([(x2, y2), left, right], fill=line_color)
+
+
 def apply_annotations_to_image(
     image_base64: str,
     annotations: List[Annotation]
@@ -288,13 +398,24 @@ def apply_annotations_to_image(
         draw = ImageDraw.Draw(img)
         
         # Try to load a font (fallback to default if not available)
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
-            font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-        except Exception:
-            logger.warning("Could not load custom font, using default")
-            font = None
-            font_large = None
+        font = None
+        font_large = None
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/Library/Fonts/Arial.ttf",
+            "/System/Library/Fonts/Supplemental/Arial.ttf"
+        ]
+        for path in font_paths:
+            try:
+                font = ImageFont.truetype(path, 16)
+                font_large = ImageFont.truetype(path, 20)
+                break
+            except Exception:
+                continue
+        if not font or not font_large:
+            if not getattr(apply_annotations_to_image, "_font_warned", False):
+                logger.warning("Could not load custom font, using default")
+                apply_annotations_to_image._font_warned = True
         
         # Apply each annotation
         for ann in annotations:
@@ -320,6 +441,26 @@ def apply_annotations_to_image(
             elif ann.annotation_type == AnnotationType.ERROR_UNDERLINE:
                 # Draw a red underline
                 draw_error_underline(draw, ann.x, ann.y, ann.size, ann.text, font)
+
+            elif ann.annotation_type == AnnotationType.SCORE_BOX:
+                draw_score_box(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
+
+            elif ann.annotation_type == AnnotationType.MARGIN_NOTE:
+                draw_margin_note(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
+
+            elif ann.annotation_type == AnnotationType.MARGIN_BRACKET:
+                draw_margin_bracket(draw, ann.x, ann.y, ann.size, ann.color or "red")
+
+            elif ann.annotation_type == AnnotationType.COMMENT:
+                draw_margin_note(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
+
+            elif ann.annotation_type == AnnotationType.HIGHLIGHT_BOX:
+                if ann.width and ann.height:
+                    draw_highlight_box(draw, ann.x, ann.y, ann.width, ann.height, ann.color or "red")
+
+            elif ann.annotation_type == AnnotationType.CALLOUT_LINE:
+                if ann.width is not None and ann.height is not None:
+                    draw_callout_line(draw, ann.x, ann.y, ann.width, ann.height, ann.color or "red")
         
         # Convert back to base64 with optimized quality for faster processing
         buffered = io.BytesIO()

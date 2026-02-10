@@ -34,14 +34,19 @@ export default function LoginPage() {
     checkExistingSession();
   }, [navigate]);
 
-  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+  // Google OAuth login - using credentials from .env
   const handleGoogleLogin = (role) => {
     // Store role preference for after auth
     localStorage.setItem("preferredRole", role);
     
-    // Use window.location.origin directly without path concatenation
-    // The auth callback will handle routing based on role
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(window.location.origin)}`;
+    // Get Google Client ID from environment variable
+    const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+    const REDIRECT_URI = encodeURIComponent(`${window.location.origin}/callback`);
+    const SCOPE = encodeURIComponent("openid profile email");
+    const STATE = encodeURIComponent(JSON.stringify({ role, timestamp: Date.now() }));
+    
+    // Redirect to Google OAuth
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPE}&state=${STATE}&access_type=offline&prompt=consent`;
   };
 
   // Show loading state while checking session
@@ -176,7 +181,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-sm text-muted-foreground mt-8 animate-fade-in stagger-2">
-          Secure authentication powered by Google OAuth
+          Secure authentication powered by Google OAuth 2.0
         </p>
       </div>
     </div>

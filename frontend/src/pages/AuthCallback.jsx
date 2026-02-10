@@ -16,44 +16,46 @@ export default function AuthCallback() {
       try {
         console.log("=== AUTH CALLBACK STARTED ===");
         console.log("Full URL:", window.location.href);
-        console.log("Hash:", window.location.hash);
+        console.log("Search params:", window.location.search);
         
-        // Extract session_id from URL fragment
-        const hash = window.location.hash;
-        const params = new URLSearchParams(hash.substring(1));
-        const sessionId = params.get("session_id");
+        // Extract authorization code and state from URL query parameters (Google OAuth)
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        const state = params.get("state");
+        const error = params.get("error");
 
-        console.log("Extracted session_id:", sessionId);
+        console.log("Extracted code:", code?.substring(0, 20) + "...");
+        console.log("Extracted state:", state);
 
-        if (!sessionId) {
-          console.error("No session_id found in URL");
-          alert("Authentication failed: No session ID received");
+        if (error) {
+          console.error("OAuth error:", error);
+          alert(`Authentication failed: ${error}`);
           navigate("/login", { replace: true });
           return;
         }
 
-        // Get preferred role from localStorage
-        const preferredRole = localStorage.getItem("preferredRole") || "teacher";
-        console.log("Preferred role:", preferredRole);
+        if (!code) {
+          console.error("No authorization code found in URL");
+          alert("Authentication failed: No authorization code received");
+          navigate("/login", { replace: true });
+          return;
+        }
 
-        console.log("Calling API:", `${API}/auth/session`);
-        console.log("Full API URL:", API);
-        console.log("API constant check:", typeof API, API === "undefined/api" ? "⚠️ API is undefined!" : "✅ API is defined");
+        console.log("Calling API:", `${API}/auth/google/callback`);
         
-        // Exchange session_id for session_token (include preferred_role)
-        // Use withCredentials to ensure cookies are sent
-        const response = await axios.post(`${API}/auth/session`, {
-          session_id: sessionId,
-          preferred_role: preferredRole,
+        // Exchange authorization code for session
+        const response = await axios.post(`${API}/auth/google/callback`, {
+          code: code,
+          state: state,
         }, {
           withCredentials: true,
-          timeout: 15000  // 15 second timeout
+          timeout: 15000
         });
 
         console.log("API Response:", response.data);
         const user = response.data;
 
-        // Clear URL fragment and localStorage
+        // Clear URL parameters
         window.history.replaceState(null, "", window.location.pathname);
         localStorage.removeItem("preferredRole");
 

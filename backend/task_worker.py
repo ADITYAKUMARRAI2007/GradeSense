@@ -71,14 +71,25 @@ async def read_gridfs_file_async(gridfs_id_or_filename, use_filename=False):
         else:
             gridfs_id = ObjectId(gridfs_id_or_filename)
 
-        stream = await fs_bucket.open_download_stream(gridfs_id)
+        stream_result = fs_bucket.open_download_stream(gridfs_id)
+        if asyncio.iscoroutine(stream_result):
+            stream = await stream_result
+        else:
+            stream = stream_result
+
+        if stream is None:
+            raise RuntimeError("GridFS download stream is None")
         chunks = []
         total_size = 0
         last_logged_size = 0
         chunk_size = 8192  # 8KB chunks
 
         while True:
-            chunk = await stream.read(chunk_size)
+            read_result = stream.read(chunk_size)
+            if asyncio.iscoroutine(read_result):
+                chunk = await read_result
+            else:
+                chunk = read_result
             if not chunk:
                 break
             chunks.append(chunk)
@@ -89,7 +100,9 @@ async def read_gridfs_file_async(gridfs_id_or_filename, use_filename=False):
                 logger.info(f"Read {total_size/1024/1024:.1f}MB so far")
                 last_logged_size = total_size
 
-        await stream.close()
+        close_result = stream.close()
+        if asyncio.iscoroutine(close_result):
+            await close_result
         return b"".join(chunks)
     except Exception as e:
         logger.error(f"Async GridFS read failed: {e}")

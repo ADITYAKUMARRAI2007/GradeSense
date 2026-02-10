@@ -20,6 +20,7 @@ class QuestionScore(BaseModel):
     obtained_marks: float
     ai_feedback: str
     teacher_comment: Optional[str] = None
+    rubric_preference: Optional[str] = None
     is_reviewed: bool = False
     sub_scores: List[SubQuestionScore] = []  # For sub-question scores
     question_text: Optional[str] = None  # The question text

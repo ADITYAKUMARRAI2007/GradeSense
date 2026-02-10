@@ -4,8 +4,10 @@ Provides precise bounding box detection for handwritten text
 """
 import os
 import io
+import json
 import base64
 import logging
+import urllib.request
 from typing import Dict, List, Optional, Tuple
 from google.cloud import vision
 from google.oauth2 import service_account
@@ -54,6 +56,7 @@ class VisionOCRService:
     def __init__(self):
         """Initialize the Vision API client with service account credentials"""
         self.client = None
+        self.api_key = os.getenv("GOOGLE_VISION_API_KEY")
         self._initialize_client()
     
     def _initialize_client(self):
@@ -74,7 +77,7 @@ class VisionOCRService:
     
     def is_available(self) -> bool:
         """Check if Vision API is available"""
-        return self.client is not None
+        return self.client is not None or bool(self.api_key)
     
     def detect_text_from_base64(
         self, 
@@ -122,38 +125,111 @@ class VisionOCRService:
             - confidence: Average confidence score
             - page_count: Number of pages detected
         """
-        if not self.client:
+        if not self.client and not self.api_key:
             raise RuntimeError("Vision API client not initialized")
         
         try:
-            image = vision.Image(content=image_bytes)
-            
-            # Use DOCUMENT_TEXT_DETECTION for handwriting
-            features = [
-                vision.Feature(type_=vision.Feature.Type.DOCUMENT_TEXT_DETECTION)
-            ]
-            
-            # Build request with optional language hints
-            image_context = vision.ImageContext(
-                language_hints=language_hints or ["en"]
-            )
-            
-            request = vision.AnnotateImageRequest(
-                image=image,
-                features=features,
-                image_context=image_context
-            )
-            
-            response = self.client.annotate_image(request)
-            
-            if response.error.message:
-                raise ValueError(f"Vision API error: {response.error.message}")
-            
-            return self._parse_document_response(response)
+            if self.client:
+                image = vision.Image(content=image_bytes)
+                
+                # Use DOCUMENT_TEXT_DETECTION for handwriting
+                features = [
+                    vision.Feature(type_=vision.Feature.Type.DOCUMENT_TEXT_DETECTION)
+                ]
+                
+                # Build request with optional language hints
+                image_context = vision.ImageContext(
+                    language_hints=language_hints or ["en"]
+                )
+                
+                request = vision.AnnotateImageRequest(
+                    image=image,
+                    features=features,
+                    image_context=image_context
+                )
+                
+                response = self.client.annotate_image(request)
+                
+                if response.error.message:
+                    raise ValueError(f"Vision API error: {response.error.message}")
+                
+                return self._parse_document_response(response)
+
+            return self._annotate_with_api_key(image_bytes, language_hints)
             
         except Exception as e:
             logger.error(f"Error processing image with Vision API: {e}")
             raise
+
+    def _annotate_with_api_key(
+        self,
+        image_bytes: bytes,
+        language_hints: Optional[List[str]] = None
+    ) -> Dict:
+        """Call Vision API using an API key instead of service account."""
+        if not self.api_key:
+            raise RuntimeError("Vision API key not configured")
+
+        request_body = {
+            "requests": [
+                {
+                    "image": {"content": base64.b64encode(image_bytes).decode()},
+                    "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
+                    "imageContext": {"languageHints": language_hints or ["en"]}
+                }
+            ]
+        }
+        url = f"https://vision.googleapis.com/v1/images:annotate?key={self.api_key}"
+        data = json.dumps(request_body).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+
+        return self._parse_document_response_dict(payload)
+
+    def _parse_document_response_dict(self, payload: Dict) -> Dict:
+        """Parse API key JSON response into the same structure as client SDK parsing."""
+        responses = payload.get("responses", [])
+        response = responses[0] if responses else {}
+
+        if response.get("error", {}).get("message"):
+            raise ValueError(f"Vision API error: {response['error']['message']}")
+
+        full_text = response.get("fullTextAnnotation", {}).get("text", "")
+        pages = response.get("fullTextAnnotation", {}).get("pages", [])
+
+        words = []
+        word_confidences = []
+
+        for page in pages:
+            for block in page.get("blocks", []):
+                for paragraph in block.get("paragraphs", []):
+                    for word in paragraph.get("words", []):
+                        symbols = word.get("symbols", [])
+                        word_text = "".join([s.get("text", "") for s in symbols])
+                        confidence = float(word.get("confidence", 0))
+                        vertices = self._vertices_to_dict(word.get("boundingBox", {}).get("vertices", []))
+                        words.append(TextRegion(
+                            text=word_text,
+                            confidence=confidence,
+                            vertices=vertices,
+                            block_type="word"
+                        ))
+                        if confidence > 0:
+                            word_confidences.append(confidence)
+
+        avg_conf = sum(word_confidences) / len(word_confidences) if word_confidences else 0.0
+
+        return {
+            "full_text": full_text,
+            "regions": [],
+            "words": words,
+            "lines": [],
+            "paragraphs": [],
+            "confidence": avg_conf,
+            "page_count": len(pages)
+        }
     
     def _parse_document_response(self, response) -> Dict:
         """

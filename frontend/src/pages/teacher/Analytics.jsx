@@ -414,10 +414,10 @@ export default function Analytics({ user }) {
                       </div>
                     </div>
                     <div className="flex-shrink-0">
-                      {response.result.type === 'chart' && <BarChart3 className="w-5 h-5 text-primary" />}
-                      {response.result.type === 'list' && <ListOrdered className="w-5 h-5 text-primary" />}
-                      {response.result.type === 'number' && <Hash className="w-5 h-5 text-primary" />}
-                      {response.result.type === 'text' && <TrendingUp className="w-5 h-5 text-primary" />}
+                      {response?.result?.type === 'chart' && <BarChart3 className="w-5 h-5 text-primary" />}
+                      {response?.result?.type === 'list' && <ListOrdered className="w-5 h-5 text-primary" />}
+                      {response?.result?.type === 'number' && <Hash className="w-5 h-5 text-primary" />}
+                      {response?.result?.type === 'text' && <TrendingUp className="w-5 h-5 text-primary" />}
                     </div>
                   </div>
                 </CardHeader>

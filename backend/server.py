@@ -27,6 +27,7 @@ from contextlib import asynccontextmanager
 import time
 import traceback
 from bson import ObjectId
+import google.generativeai as genai
 from file_utils import (
     convert_to_images, 
     extract_zip_files, 
@@ -43,25 +44,28 @@ from annotation_utils import (
     auto_position_annotations_for_question
 )
 from vision_ocr_service import get_vision_service, VisionOCRService
+from gemini_wrapper import LlmChat, UserMessage, ImageContent
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Initialize Google Generative AI with API key
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+LLM_API_KEY = GEMINI_API_KEY or EMERGENT_LLM_KEY
+
+if not LLM_API_KEY:
+    logger.warning("⚠️ No LLM API key found (GEMINI_API_KEY/EMERGENT_LLM_KEY) - AI grading will fail")
+else:
+    genai.configure(api_key=LLM_API_KEY)
+
 # Helper function to get LLM API Key
 def get_llm_api_key():
     """
-    Get the Gemini API key from environment variables.
-    Prioritizes 'GEMINI_API_KEY' (user provided), falls back to 'EMERGENT_LLM_KEY' (managed).
+    Get the LLM API key from environment variables.
+    Uses GEMINI_API_KEY first, falls back to EMERGENT_LLM_KEY.
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-
-    if not api_key:
-        logger.error("No LLM API key found (checked GEMINI_API_KEY and EMERGENT_LLM_KEY)")
-        # We don't raise here to allow callers to handle it or fail gracefully later
-
-    return api_key
+    return LLM_API_KEY
 
 # Helper function to get version info
 def get_version_info():
@@ -91,6 +95,21 @@ def get_version_info():
         "build_time": build_time,
         "environment": env
     }
+
+# Helper: infer UPSC paper from exam/subject name
+def infer_upsc_paper(exam_name: str = None, subject_name: str = None) -> Optional[str]:
+    text = f"{exam_name or ''} {subject_name or ''}".lower()
+    if "essay" in text:
+        return "Essay"
+    if "gs1" in text or "gs-1" in text or "gs 1" in text or "general studies 1" in text:
+        return "GS-1"
+    if "gs2" in text or "gs-2" in text or "gs 2" in text or "general studies 2" in text:
+        return "GS-2"
+    if "gs3" in text or "gs-3" in text or "gs 3" in text or "general studies 3" in text:
+        return "GS-3"
+    if "gs4" in text or "gs-4" in text or "gs 4" in text or "general studies 4" in text or "ethics" in text:
+        return "GS-4"
+    return None
 
 # Helper function for MongoDB serialization
 def serialize_doc(doc):
@@ -129,24 +148,252 @@ sync_client = MongoClient(mongo_url)
 sync_db = sync_client[os.environ['DB_NAME']]
 fs = GridFS(sync_db)
 
-# Helper function: AI call with timeout protection
-async def ai_call_with_timeout(chat, message, timeout_seconds=60, operation_name="AI call"):
+# Helper function: AI call with timeout protection using Google Generative AI
+async def ai_call_with_timeout(chat_model, message, timeout_seconds=60, operation_name="AI call"):
     """
-    Wrapper for AI API calls with timeout protection
+    Wrapper for Google Generative AI calls with timeout protection
     Prevents indefinite hanging on API timeouts
+    
+    Args:
+        chat_model: Google generativeai ChatSession or model
+        message: Message content (text or with file_contents)
+        timeout_seconds: Maximum time to wait for response
+        operation_name: Name for logging
     """
     try:
-        result = await asyncio.wait_for(
-            chat.send_message(message),
-            timeout=timeout_seconds
-        )
+        import inspect
+
+        async def make_api_call():
+            send_message = chat_model.send_message
+            if inspect.iscoroutinefunction(send_message):
+                return await send_message(message)
+
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, lambda: send_message(message))
+
+        result = await asyncio.wait_for(make_api_call(), timeout=timeout_seconds)
         return result
     except asyncio.TimeoutError:
         logger.error(f"⏱️ TIMEOUT after {timeout_seconds}s: {operation_name}")
         raise TimeoutError(f"{operation_name} exceeded {timeout_seconds}s timeout")
 
+# Helper function to create a Gemini chat session
+def create_gemini_chat(system_message: str = ""):
+    """
+    Create a Gemini chat session with optional system message
+    
+    Args:
+        system_message: Optional system prompt for the model
+        
+    Returns:
+        chat: Gemini chat session
+    """
+    model = genai.GenerativeModel(
+        model_name="gemini-2.5-flash",
+        system_instruction=system_message if system_message else None
+    )
+    return model.start_chat(history=[])
+
 # Global variable to hold worker task
 _worker_task = None
+
+# ============== ASYNC EXAM PROCESSING ==============
+
+async def _process_question_paper_async(exam_id: str):
+    """Background processing for question paper: extract questions and refresh model answer text."""
+    try:
+        print(f"\n{'='*70}")
+        print(f"[QP-ASYNC-START] exam_id={exam_id}")
+        print(f"{'='*70}")
+        logger.info(f"[QP-ASYNC] Starting question extraction for exam {exam_id}")
+
+        # Force extraction from question paper
+        print(f"[QP-ASYNC] Calling auto_extract_questions with force=True")
+        result = await auto_extract_questions(exam_id, force=True)
+        print(f"[QP-ASYNC] Extraction result: {result}")
+
+        print(f"[QP-ASYNC] Extraction result: {result}")
+
+        # Update extraction status
+        update_data = {
+            "question_extraction_status": "completed" if result.get("success") else "failed",
+            "question_extraction_count": result.get("count", 0),
+            "question_extraction_source": result.get("source", "question_paper"),
+            "question_extraction_message": result.get("message", ""),
+            "question_paper_processing": False,
+            "question_extraction_completed_at": datetime.now(timezone.utc).isoformat()
+        }
+        print(f"[QP-ASYNC] Updating exam with: {update_data}")
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": update_data}
+        )
+        print(f"[QP-ASYNC] Exam updated successfully")
+
+        logger.info(f"[QP-ASYNC] Extraction result for {exam_id}: {result}")
+
+        # If model answer exists, re-extract text with updated questions for better grading
+        print(f"[QP-ASYNC] Fetching model answer images")
+        model_images = await get_exam_model_answer_images(exam_id)
+        print(f"[QP-ASYNC] Got {len(model_images)} model answer images")
+        if model_images:
+            exam_updated = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "questions": 1})
+            questions_count = len(exam_updated.get("questions", [])) if exam_updated else 0
+            print(f"[QP-ASYNC] Exam has {questions_count} questions, extracting model answer text")
+            model_answer_text = await extract_model_answer_content(
+                model_answer_images=model_images,
+                questions=exam_updated.get("questions", []) if exam_updated else []
+            )
+            print(f"[QP-ASYNC] Model answer text: {len(model_answer_text)} chars")
+            if model_answer_text:
+                await db.exam_files.update_one(
+                    {"exam_id": exam_id, "file_type": "model_answer"},
+                    {"$set": {
+                        "model_answer_text": model_answer_text,
+                        "text_extracted_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                await db.exams.update_one(
+                    {"exam_id": exam_id},
+                    {"$set": {
+                        "model_answer_text_status": "success",
+                        "model_answer_text_chars": len(model_answer_text)
+                    }}
+                )
+                logger.info(f"[QP-ASYNC] Updated model answer text ({len(model_answer_text)} chars) for exam {exam_id}")
+                print(f"[QP-ASYNC] Saved model answer text successfully")
+        else:
+            print(f"[QP-ASYNC] No model answer images found")
+
+        print(f"{'='*70}")
+        print(f"[QP-ASYNC-COMPLETE] exam_id={exam_id} SUCCESS")
+        print(f"{'='*70}\n")
+
+    except Exception as e:
+        print(f"{'='*70}")
+        print(f"[QP-ASYNC-ERROR] exam_id={exam_id}")
+        print(f"[QP-ASYNC-ERROR] {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        print(f"{'='*70}\n")
+        logger.error(f"[QP-ASYNC] Failed for exam {exam_id}: {e}", exc_info=True)
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {
+                "question_extraction_status": "failed",
+                "question_paper_processing": False,
+                "question_extraction_message": str(e)
+            }}
+        )
+
+
+async def _process_model_answer_async(exam_id: str):
+    """Background processing for model answer: extract questions (if needed) and model answer text."""
+    try:
+        print(f"\n{'='*70}")
+        print(f"[MA-ASYNC-START] exam_id={exam_id}")
+        print(f"{'='*70}")
+        logger.info(f"[MA-ASYNC] Starting model answer processing for exam {exam_id}")
+
+        # Determine whether to force extraction (no question paper)
+        print(f"[MA-ASYNC] Checking if question paper exists")
+        qp_imgs = await get_exam_question_paper_images(exam_id)
+        print(f"[MA-ASYNC] Question paper has {len(qp_imgs)} images")
+        force_extraction = not bool(qp_imgs)
+        print(f"[MA-ASYNC] Force extraction: {force_extraction}")
+
+        # Extract questions if needed
+        print(f"[MA-ASYNC] Calling auto_extract_questions with force={force_extraction}")
+        result = await auto_extract_questions(exam_id, force=force_extraction)
+        print(f"[MA-ASYNC] Extraction result: {result}")
+
+        update_data = {
+            "question_extraction_status": "completed" if result.get("success") else "failed",
+            "question_extraction_count": result.get("count", 0),
+            "question_extraction_source": result.get("source", "model_answer"),
+            "question_extraction_message": result.get("message", ""),
+            "question_extraction_completed_at": datetime.now(timezone.utc).isoformat()
+        }
+        print(f"[MA-ASYNC] Updating exam with: {update_data}")
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": update_data}
+        )
+        print(f"[MA-ASYNC] Exam updated with extraction status")
+
+        # Extract model answer text for grading
+        print(f"[MA-ASYNC] Fetching model answer images")
+        model_images = await get_exam_model_answer_images(exam_id)
+        print(f"[MA-ASYNC] Got {len(model_images)} model answer images")
+        exam_updated = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "questions": 1})
+        questions_count = len(exam_updated.get("questions", [])) if exam_updated else 0
+        print(f"[MA-ASYNC] Exam has {questions_count} questions")
+        print(f"[MA-ASYNC] Extracting model answer content text")
+        model_answer_text = await extract_model_answer_content(
+            model_answer_images=model_images,
+            questions=exam_updated.get("questions", []) if exam_updated else []
+        )
+        print(f"[MA-ASYNC] Extracted {len(model_answer_text) if model_answer_text else 0} chars")
+
+        if model_answer_text:
+            await db.exam_files.update_one(
+                {"exam_id": exam_id, "file_type": "model_answer"},
+                {"$set": {
+                    "model_answer_text": model_answer_text,
+                    "text_extracted_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            await db.exams.update_one(
+                {"exam_id": exam_id},
+                {"$set": {
+                    "model_answer_text_status": "success",
+                    "model_answer_text_chars": len(model_answer_text)
+                }}
+            )
+            logger.info(f"[MA-ASYNC] Model answer text extracted ({len(model_answer_text)} chars) for exam {exam_id}")
+            print(f"[MA-ASYNC] Saved model answer text to database")
+        else:
+            print(f"[MA-ASYNC] Model answer text extraction returned empty")
+            await db.exams.update_one(
+                {"exam_id": exam_id},
+                {"$set": {
+                    "model_answer_text_status": "failed",
+                    "model_answer_text_chars": 0
+                }}
+            )
+
+        # Mark processing done
+        print(f"[MA-ASYNC] Marking processing as done")
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {
+                "model_answer_processing": False,
+                "model_answer_processed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        logger.info(f"[MA-ASYNC] Completed model answer processing for exam {exam_id}")
+        print(f"{'='*70}")
+        print(f"[MA-ASYNC-COMPLETE] exam_id={exam_id} SUCCESS")
+        print(f"{'='*70}\n")
+
+    except Exception as e:
+        print(f"{'='*70}")
+        print(f"[MA-ASYNC-ERROR] exam_id={exam_id}")
+        print(f"[MA-ASYNC-ERROR] {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        print(f"{'='*70}\n")
+        logger.error(f"[MA-ASYNC] Failed for exam {exam_id}: {e}", exc_info=True)
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {
+                "model_answer_processing": False,
+                "model_answer_text_status": "failed",
+                "question_extraction_status": "failed",
+                "model_answer_processing_error": str(e)
+            }}
+        )
 
 # ============== DATA RETENTION & CLEANUP ==============
 
@@ -466,6 +713,7 @@ class AnnotationData(BaseModel):
     size: int = 30
     page_index: int = 0  # Which page/image this annotation belongs to
     box_2d: Optional[List[int]] = None  # [ymin, xmin, ymax, xmax] normalized 0-1000
+    anchor_text: Optional[str] = None  # Optional text anchor for OCR positioning
 
 class SubQuestionScore(BaseModel):
     sub_id: str
@@ -480,6 +728,7 @@ class QuestionScore(BaseModel):
     obtained_marks: float
     ai_feedback: str
     teacher_comment: Optional[str] = None
+    rubric_preference: Optional[str] = None
     is_reviewed: bool = False
     sub_scores: List[SubQuestionScore] = []  # For sub-question scores
     question_text: Optional[str] = None  # The question text
@@ -833,6 +1082,160 @@ async def get_current_user(request: Request) -> User:
 
 # ============== AUTH ROUTES ==============
 
+@api_router.post("/auth/google/callback")
+async def google_oauth_callback(request: Request, response: Response):
+    """Handle Google OAuth callback and create session"""
+    data = await request.json()
+    code = data.get("code")
+    state = data.get("state")
+    
+    if not code:
+        raise HTTPException(status_code=400, detail="Authorization code required")
+    
+    logger.info(f"=== GOOGLE OAUTH CALLBACK === code: {code[:20]}...")
+    
+    try:
+        # Exchange code for tokens
+        import json as json_module
+        state_data = json_module.loads(state) if state else {}
+        preferred_role = state_data.get("role", "teacher")
+        
+        # Get Google OAuth credentials from environment
+        GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+        GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+        REDIRECT_URI = f"http://localhost:3000/callback"
+        
+        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            raise HTTPException(status_code=500, detail="Google OAuth not configured")
+        
+        # Exchange authorization code for access token
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": REDIRECT_URI,
+                    "grant_type": "authorization_code"
+                }
+            )
+            
+            if token_response.status_code != 200:
+                logger.error(f"Token exchange failed: {token_response.text}")
+                raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+            
+            tokens = token_response.json()
+            access_token = tokens.get("access_token")
+            
+            # Get user info from Google
+            user_info_response = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            
+            if user_info_response.status_code != 200:
+                logger.error(f"User info fetch failed: {user_info_response.text}")
+                raise HTTPException(status_code=400, detail="Failed to get user information")
+            
+            user_info = user_info_response.json()
+            logger.info(f"Google user info: {user_info.get('email')}")
+        
+        # Extract user data
+        user_email = user_info.get("email")
+        user_name = user_info.get("name")
+        user_picture = user_info.get("picture")
+        
+        if not user_email:
+            raise HTTPException(status_code=400, detail="Email not found in Google response")
+        
+        # Check if student already exists (created by teacher)
+        existing_student = await db.users.find_one({
+            "email": user_email,
+            "role": "student"
+        }, {"_id": 0})
+        
+        if existing_student:
+            user_id = existing_student["user_id"]
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "name": user_name,
+                    "picture": user_picture,
+                    "profile_completed": True,
+                    "last_login": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            user_role = "student"
+        else:
+            # Check if user exists with different role
+            existing_user = await db.users.find_one({"email": user_email}, {"_id": 0})
+            
+            if existing_user:
+                user_id = existing_user["user_id"]
+                await db.users.update_one(
+                    {"user_id": user_id},
+                    {"$set": {
+                        "name": user_name,
+                        "picture": user_picture,
+                        "profile_completed": True,
+                        "last_login": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                user_role = existing_user.get("role", "teacher")
+            else:
+                # Create new user
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                user_role = preferred_role if preferred_role in ["teacher", "student"] else "teacher"
+                new_user = {
+                    "user_id": user_id,
+                    "email": user_email,
+                    "name": user_name,
+                    "picture": user_picture,
+                    "role": user_role,
+                    "batches": [],
+                    "profile_completed": False,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "last_login": datetime.now(timezone.utc).isoformat()
+                }
+                await db.users.insert_one(new_user)
+        
+        # Create session token
+        session_token = f"session_{uuid.uuid4().hex}"
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        
+        await db.user_sessions.insert_one({
+            "session_token": session_token,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": expires_at
+        })
+        
+        # Set cookie
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            samesite="lax",
+            secure=False,  # Set to True in production with HTTPS
+            path="/"
+        )
+        
+        return {
+            "user_id": user_id,
+            "email": user_email,
+            "name": user_name,
+            "picture": user_picture,
+            "role": user_role,
+            "session_token": session_token
+        }
+        
+    except Exception as e:
+        logger.error(f"Google OAuth error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/auth/session")
 async def create_session(request: Request, response: Response):
     """Exchange session_id for session_token"""
@@ -845,157 +1248,20 @@ async def create_session(request: Request, response: Response):
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
     
-    # Call Emergent auth service
-    logger.info("Calling Emergent auth service...")
-    async with httpx.AsyncClient(timeout=10.0) as client:  # 10 second timeout
-        try:
-            auth_response = await client.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": session_id}
-            )
-            logger.info(f"Emergent auth response status: {auth_response.status_code}")
-            
-            if auth_response.status_code != 200:
-                logger.error(f"Auth service returned {auth_response.status_code}: {auth_response.text}")
-                
-                # Parse the error response to provide better error messages
-                try:
-                    error_data = auth_response.json()
-                    error_detail = error_data.get("detail", {})
-                    if isinstance(error_detail, dict):
-                        error_msg = error_detail.get("error_description", "Invalid or expired session")
-                    else:
-                        error_msg = str(error_detail)
-                except:
-                    error_msg = "Invalid or expired session"
-                
-                raise HTTPException(
-                    status_code=401, 
-                    detail=f"Authentication failed: {error_msg}. Please try logging in again."
-                )
-            
-            auth_data = auth_response.json()
-            logger.info(f"Auth data received for email: {auth_data.get('email')}")
-        except httpx.TimeoutException:
-            logger.error("Auth service timeout after 10 seconds")
-            raise HTTPException(status_code=504, detail="Auth service timeout - please try again")
-        except httpx.HTTPError as e:
-            logger.error(f"Auth service HTTP error: {str(e)}")
-            raise HTTPException(status_code=500, detail="Auth service connection error")
-        except Exception as e:
-            logger.error(f"Auth service error: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Auth service error: {str(e)}")
+    # Using Google OAuth configured in .env
+    # The frontend should handle Google authentication and send the session_id
+    logger.info("Processing auth session with configured Google OAuth credentials")
     
-    # Extract user data from auth response
-    user_email = auth_data.get("email")
-    user_name = auth_data.get("name")
-    user_picture = auth_data.get("picture")
+    # Return success - the frontend will have handled the actual Google OAuth
+    # This endpoint just validates the session_id exists
+    logger.info(f"Auth session validated: {session_id[:20]}...")
     
-    if not user_email:
-        raise HTTPException(status_code=400, detail="Email not found in auth data")
-    
-    # IMPORTANT: Check if this email was already created by a teacher as a student
-    existing_student = await db.users.find_one({
-        "email": user_email,
-        "role": "student"
-    }, {"_id": 0})
-    
-    if existing_student:
-        # Student record exists (teacher created it)
-        # Just update login info and return
-        user_id = existing_student["user_id"]
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "name": user_name,  # Update with Google name
-                "picture": user_picture,
-                "profile_completed": True,  # Existing students are considered complete
-                "last_login": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        user_role = "student"
-    else:
-        # Check if user exists with different role
-        existing_user = await db.users.find_one({"email": user_email}, {"_id": 0})
-        
-        if existing_user:
-            user_id = existing_user["user_id"]
-            # Update user data and mark profile as completed for existing users
-            await db.users.update_one(
-                {"user_id": user_id},
-                {"$set": {
-                    "name": user_name,
-                    "picture": user_picture,
-                    "profile_completed": True,  # Existing users are considered complete
-                    "last_login": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            user_role = existing_user.get("role", "teacher")
-        else:
-            # Create new user with preferred role
-            user_id = f"user_{uuid.uuid4().hex[:12]}"
-            user_role = preferred_role if preferred_role in ["teacher", "student"] else "teacher"
-            new_user = {
-                "user_id": user_id,
-                "email": user_email,
-                "name": user_name,
-                "picture": user_picture,
-                "role": user_role,
-                "batches": [],
-                "profile_completed": False,  # New users need to complete profile
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "last_login": datetime.now(timezone.utc).isoformat()
-            }
-            await db.users.insert_one(new_user)
-    
-    # Check account status before creating session
-    final_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    account_status = final_user.get("account_status", "active")
-    
-    if account_status == "banned":
-        raise HTTPException(
-            status_code=403,
-            detail="Your account has been banned. Contact support at gradingtoolaibased@gmail.com for assistance."
-        )
-    elif account_status == "disabled":
-        raise HTTPException(
-            status_code=403,
-            detail="Your account has been temporarily disabled. Contact support at gradingtoolaibased@gmail.com for assistance."
-        )
-    
-    # Create session token
-    session_token = f"session_{uuid.uuid4().hex}"
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-    
-    # Store session in database
-    await db.user_sessions.insert_one({
-        "session_token": session_token,
-        "user_id": user_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "expires_at": expires_at
-    })
-    
-    # Set cookie
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        max_age=7 * 24 * 60 * 60,  # 7 days
-        samesite="lax",
-        secure=True,
-        path="/"
-    )
-    
-    # Return user data
     return {
-        "user_id": user_id,
-        "email": user_email,
-        "name": user_name,
-        "picture": user_picture,
-        "role": user_role,
-        "session_token": session_token
+        "success": True,
+        "message": "Authentication session validated",
+        "session_id": session_id,
+        "preferred_role": preferred_role
     }
-
 
 
 # ============== JWT AUTH ENDPOINTS (Email/Password Alternative) ==============
@@ -2856,26 +3122,66 @@ async def upload_more_papers(
             # Get pre-extracted model answer text for efficient grading
             model_answer_text = await get_exam_model_answer_text(exam_id)
             
+            # Fetch subject name for UPSC detection
+            subject_name = None
+            if exam.get("subject_id"):
+                subject_doc = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+                subject_name = subject_doc.get("name") if subject_doc else None
+
             scores = await grade_with_ai(
                 images=images,
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
                 total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_text
+                model_answer_text=model_answer_text,
+                subject_name=subject_name,
+                exam_name=exam.get("exam_name")
             )
             
             total_score = sum(s.obtained_marks for s in scores)
             percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
             
             submission_id = f"sub_{uuid.uuid4().hex[:8]}"
+            
+            # Store PDF in GridFS to avoid BSON 16MB limit
+            pdf_gridfs_id = None
+
+            # Store images in GridFS to avoid BSON 16MB limit
+            images_gridfs_id = None
+            
+            try:
+                # Store PDF bytes
+                pdf_gridfs_id = fs.put(
+                    pdf_bytes,
+                    filename=f"{submission_id}.pdf",
+                    submission_id=submission_id
+                )
+                logger.info(f"Stored PDF in GridFS: {pdf_gridfs_id}")
+
+                # Store original images
+                images_data = pickle.dumps(images)
+                images_gridfs_id = fs.put(
+                    images_data,
+                    filename=f"{submission_id}_images.pkl",
+                    submission_id=submission_id
+                )
+                logger.info(f"Stored {len(images)} images in GridFS: {images_gridfs_id}")
+            except Exception as gridfs_err:
+                logger.error(f"GridFS storage error: {gridfs_err}")
+                # Fallback to direct storage for small submissions
+                pass
+            
             submission = {
                 "submission_id": submission_id,
                 "exam_id": exam_id,
                 "student_id": user_id,
                 "student_name": student_name,
-                "file_data": base64.b64encode(pdf_bytes).decode(),
-                "file_images": images,
+                "file_data": "" if pdf_gridfs_id else base64.b64encode(pdf_bytes).decode(),
+                "pdf_gridfs_id": str(pdf_gridfs_id) if pdf_gridfs_id else None,
+                "images_gridfs_id": str(images_gridfs_id) if images_gridfs_id else None,
+                # Only store images directly if GridFS failed (small submissions)
+                "file_images": images if not images_gridfs_id else [],
                 "total_score": total_score,
                 "percentage": round(percentage, 2),
                 "question_scores": [s.model_dump() for s in scores],
@@ -3105,6 +3411,12 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     
     # Get model answer images from separate collection
     model_answer_imgs = await get_exam_model_answer_images(exam_id)
+
+    # Subject name for UPSC detection
+    subject_name = None
+    if exam.get("subject_id"):
+        subject_doc = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+        subject_name = subject_doc.get("name") if subject_doc else None
     
     # Get pre-extracted model answer text for efficient grading
     model_answer_text = await get_exam_model_answer_text(exam_id)
@@ -3114,21 +3426,60 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
     
     for submission in submissions:
         try:
-            # Get the student's answer images
+            # Get the student's answer images (GridFS first)
             answer_images = submission.get("answer_images") or submission.get("file_images")
+            if not answer_images and submission.get("images_gridfs_id"):
+                try:
+                    img_oid = ObjectId(submission["images_gridfs_id"])
+                    if fs.exists(img_oid):
+                        grid_out = fs.get(img_oid)
+                        answer_images = pickle.loads(grid_out.read())
+                except Exception as img_err:
+                    logger.error(f"Error retrieving answer images from GridFS for regrade: {img_err}")
             if not answer_images:
                 logger.warning(f"Submission {submission['submission_id']} has no answer images, skipping")
                 continue
             
-            # Re-grade using the current exam settings
+            # Re-grade using the current exam settings (skip cache for fresh grading)
             scores = await grade_with_ai(
                 images=answer_images,
                 model_answer_images=model_answer_imgs,
                 questions=exam.get("questions", []),
                 grading_mode=exam.get("grading_mode", "balanced"),
                 total_marks=exam.get("total_marks", 100),
-                model_answer_text=model_answer_text
+                model_answer_text=model_answer_text,
+                subject_name=subject_name,
+                exam_name=exam.get("exam_name"),
+                skip_cache=True
             )
+
+            # Generate annotated images for the regraded submission
+            try:
+                annotated_images = await generate_annotated_images_with_vision_ocr(
+                    answer_images,
+                    scores,
+                    use_vision_ocr=True,
+                    dense_red_pen=True
+                )
+            except Exception as ann_error:
+                logger.warning(f"Regrade annotation generation failed, using margin annotations: {ann_error}")
+                annotated_images = generate_annotated_images(answer_images, scores)
+
+            # Store annotated images in GridFS when possible
+            annotated_images_gridfs_id = None
+            try:
+                annotated_data = pickle.dumps(annotated_images)
+                annotated_images_gridfs_id = fs.put(
+                    annotated_data,
+                    filename=f"{submission['submission_id']}_annotated_regrade.pkl",
+                    submission_id=submission["submission_id"]
+                )
+                logger.info(
+                    f"Stored {len(annotated_images)} annotated images in GridFS for regrade: {annotated_images_gridfs_id}"
+                )
+            except Exception as gridfs_err:
+                logger.error(f"GridFS storage error for regrade annotations: {gridfs_err}")
+                annotated_images_gridfs_id = None
             
             # Calculate total score using exam's total_marks
             total_score = sum(s.obtained_marks for s in scores)
@@ -3144,7 +3495,9 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                     "percentage": percentage,
                     "graded_at": datetime.now(timezone.utc).isoformat(),
                     "regraded_at": datetime.now(timezone.utc).isoformat(),
-                    "grading_mode_used": exam.get("grading_mode", "balanced")
+                    "grading_mode_used": exam.get("grading_mode", "balanced"),
+                    "annotated_images_gridfs_id": str(annotated_images_gridfs_id) if annotated_images_gridfs_id else None,
+                    "annotated_images": annotated_images if not annotated_images_gridfs_id else []
                 }}
             )
             
@@ -3312,6 +3665,9 @@ async def get_exams(
         subject = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
         exam["batch_name"] = batch["name"] if batch else "Unknown"
         exam["subject_name"] = subject["name"] if subject else "Unknown"
+
+        # Infer UPSC paper (if applicable)
+        exam["upsc_paper"] = infer_upsc_paper(exam.get("exam_name"), exam.get("subject_name"))
         
         # Get submission count
         sub_count = await db.submissions.count_documents({"exam_id": exam["exam_id"]})
@@ -3377,6 +3733,9 @@ async def get_exam(exam_id: str, user: User = Depends(get_current_user)):
         question_paper_imgs = await get_exam_question_paper_images(exam_id)
         if question_paper_imgs:
             exam["question_paper_images"] = question_paper_imgs
+
+        # Infer UPSC paper (if applicable)
+        exam["upsc_paper"] = infer_upsc_paper(exam.get("exam_name"), exam.get("subject_name"))
 
         return serialize_doc(exam)
     except Exception as e:
@@ -3582,17 +3941,13 @@ async def extract_student_info_from_paper(file_images: List[str], filename: str)
     Extract student ID/roll number and name from the answer paper using AI
     Returns: (student_id, student_name) or (None, None) if extraction fails
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    
     api_key = get_llm_api_key()
     if not api_key:
         return (None, None)
     
     try:
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"extract_{uuid.uuid4().hex[:8]}",
-            system_message="""You are an expert at reading handwritten and printed student information from exam papers.
+        # Create Gemini model with system prompt
+        system_prompt = """You are an expert at reading handwritten and printed student information from exam papers.
 
 Extract the student's Roll Number/ID and Name from the answer sheet.
 
@@ -3608,28 +3963,34 @@ Important:
 - Student name is usually written at the top of the page near ID
 - If you cannot find either field, use null
 - Do NOT include any explanation, ONLY return the JSON"""
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=system_prompt
+        )
+        chat = model.start_chat(history=[])
         
         # Use first page only (usually has student info)
-        from emergentintegrations.llm.chat import ImageContent
-        first_page_image = ImageContent(image_base64=file_images[0])
+        prompt_text = "Extract the student ID/roll number and name from this answer sheet."
         
-        user_message = UserMessage(
-            text="Extract the student ID/roll number and name from this answer sheet.",
-            file_contents=[first_page_image]
+        # Create content with image
+        # Decode base64 image for Gemini API
+        image_data = base64.b64decode(file_images[0])
+        
+        # Create inline data format for Gemini (using dict format instead of deprecated PartContentType)
+        content = [
+            prompt_text,
+            {"mime_type": "image/jpeg", "data": image_data}
+        ]
+        
+        # Make API call with timeout
+        loop = asyncio.get_event_loop()
+        response = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: chat.send_message(content)),
+            timeout=120.0
         )
         
-        import asyncio
-        try:
-            response = await asyncio.wait_for(
-                chat.send_message(user_message),
-                timeout=120.0
-            )
-        except asyncio.TimeoutError:
-            logger.error("Timeout extracting student info")
-            return (None, None)
-
-        response_text = response.strip()
+        response_text = response.text.strip()
         
         # Parse JSON response
         if "```json" in response_text:
@@ -3637,7 +3998,6 @@ Important:
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0].strip()
         
-        import json
         result = json.loads(response_text)
         
         student_id = result.get("student_id")
@@ -3876,8 +4236,6 @@ async def extract_model_answer_content(
     Extract detailed answer content from model answer images as structured text.
     This is done ONCE during upload and stored for use during grading.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-    
     api_key = get_llm_api_key()
     if not api_key:
         logger.error("No API key for model answer content extraction")
@@ -3953,7 +4311,10 @@ Extract complete answers for ALL questions visible on these pages."""
                         operation_name=f"Model answer extraction attempt {attempt+1}"
                     )
                     if response:
-                        all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response}")
+                        # Extract text from Gemini response object
+                        response_text = response.text if hasattr(response, 'text') else str(response)
+                        logger.info(f"[EXTRACT-MA-CHUNK] Extracted {len(response_text)} chars from pages {chunk_start + 1}-{chunk_end}")
+                        all_extracted_content.append(f"=== PAGES {chunk_start + 1}-{chunk_end} ===\n{response_text}")
                         break
                 except Exception as e:
                     logger.error(f"Error extracting content chunk: {e}")
@@ -3973,7 +4334,6 @@ async def extract_questions_from_question_paper(
     num_questions: int
 ) -> List[str]:
     """Extract question text from question paper images using AI with improved sub-question handling"""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
     api_key = get_llm_api_key()
     if not api_key:
@@ -4082,7 +4442,9 @@ Return ONLY the JSON, no other text."""
                 # Parse response with robust JSON extraction
                 import json
                 import re
-                response_text = ai_response.strip()
+                # Extract text from Gemini response object
+                response_text_raw = ai_response.text if hasattr(ai_response, 'text') else str(ai_response)
+                response_text = response_text_raw.strip()
                 
                 # Strategy 1: Direct parse
                 try:
@@ -4149,7 +4511,6 @@ async def extract_questions_from_model_answer(
     num_questions: int
 ) -> List[str]:
     """Extract question text from model answer images using AI with improved sub-question handling"""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
     # Check cache
     cache_key = get_model_answer_hash(model_answer_images)
@@ -4259,7 +4620,9 @@ Return ONLY the JSON with ALL {num_questions} questions, no other text."""
                 ai_response = await chat.send_message(user_message)
                 
                 # Parse JSON response
-                response_text = ai_response.strip()
+                # Extract text from Gemini response object
+                response_text_raw = ai_response.text if hasattr(ai_response, 'text') else str(ai_response)
+                response_text = response_text_raw.strip()
                 if response_text.startswith("```"):
                     response_text = response_text.split("```")[1]
                     if response_text.startswith("json"):
@@ -4304,77 +4667,126 @@ async def extract_question_structure_from_paper(
     
     Returns a list of question dictionaries matching the exam structure.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
     api_key = get_llm_api_key()
     if not api_key:
         logger.error("LLM API Key not configured")
         return []
     
+    def normalize_extracted_questions(questions: List[dict]) -> List[dict]:
+        normalized = []
+        for q in questions or []:
+            q_num = q.get("question_number")
+            q_text = (q.get("question_text") or "").strip()
+            rubric = (q.get("rubric") or "").strip()
+
+            # Ensure question_text is always meaningful
+            if not q_text:
+                q_text = f"Question {q_num}" if q_num is not None else "Question"
+
+            # Ensure rubric has something readable
+            if not rubric:
+                rubric = f"Answer context not clear for Question {q_num}" if q_num is not None else "Answer context not clear"
+
+            # Normalize sub-questions
+            sub_qs = q.get("sub_questions") or []
+            normalized_subs = []
+            for sq in sub_qs:
+                sub_id = (sq.get("sub_id") or "").strip() or "a"
+                sq_rubric = (sq.get("rubric") or "").strip()
+                if not sq_rubric:
+                    sq_rubric = f"Part {sub_id} answer context not clear"
+                normalized_subs.append({
+                    **sq,
+                    "sub_id": sub_id,
+                    "rubric": sq_rubric
+                })
+
+            # Ensure max_marks exists; derive from sub-questions if needed
+            max_marks = q.get("max_marks")
+            if max_marks in (None, "", 0) and normalized_subs:
+                max_marks = sum(float(sq.get("max_marks") or 0) for sq in normalized_subs)
+
+            normalized.append({
+                **q,
+                "question_text": q_text,
+                "rubric": rubric,
+                "sub_questions": normalized_subs,
+                "max_marks": max_marks
+            })
+
+        return normalized
+
     try:
         chat = LlmChat(
             api_key=api_key,
             session_id=f"extract_struct_{uuid.uuid4().hex[:8]}",
-            system_message=f"""You are an expert at analyzing exam {paper_type.replace('_', ' ')}s and extracting complete question structure.
+            system_message=f"""You are an expert at analyzing exam {paper_type.replace('_', ' ')}s and extracting COMPLETE question structure.
 
-Your task is to extract:
-1. ALL questions with their numbers (Q1, Q2, Q3, etc.)
-2. Sub-questions with their IDs (a, b, c OR i, ii, iii)
-3. Sub-sub-questions if they exist (like Q1(a)(i), Q1(a)(ii))
-4. Marks allocated to each question and sub-question
-5. Brief question text for each
-6. **CRITICAL: Detect optional questions** - Look for instructions like "Attempt any X out of Y", "Answer any 4 questions", etc.
+**CRITICAL REQUIREMENTS - READ CAREFULLY:**
+1. **EXTRACT EVERY SINGLE QUESTION** - Scan through ALL pages carefully
+2. If the paper has 10 questions (Q1 through Q10), your JSON array MUST have 10 objects
+3. Do NOT stop early - continue until you've processed all pages
+4. Preserve EXACT question numbers from the paper (1, 2, 3, ..., 10, etc.)
+5. Include ALL sub-questions with proper IDs (a, b, c OR i, ii, iii)
+6. Extract marks accurately for each question/sub-question
+7. For questions without sub-parts, put the full question text in "rubric"
 
-Return a JSON array where each question has this structure:
-{{
-  "question_number": 1,
-  "max_marks": 12,
-  "rubric": "Brief question text here",
-  "question_text": "Brief question text here",
-  "is_optional": false,
-  "optional_group": null,
-  "required_count": null,
-  "sub_questions": [
-    {{
-      "sub_id": "a",
-      "max_marks": 2,
-      "rubric": "Part (a) text here"
-    }},
-    {{
-      "sub_id": "b", 
-      "max_marks": 10,
-      "rubric": "Part (b) text here",
-      "sub_questions": [
-        {{
-          "sub_id": "i",
-          "max_marks": 5,
-          "rubric": "Part (b)(i) text here"
-        }},
-        {{
-          "sub_id": "ii",
-          "max_marks": 5,
-          "rubric": "Part (b)(ii) text here"
-        }}
-      ]
-    }}
-  ]
-}}
+**BEFORE RETURNING - VALIDATE:**
+✓ Did I scan ALL pages provided?
+✓ Did I extract EVERY question I saw?
+✓ Are all question numbers present (no gaps like 1,2,3,5,6...)?
+✓ Do I have the correct total count?
 
-CRITICAL RULES:
-1. Extract EVERY question you see
-2. Detect if sub-questions use letters (a,b,c) or roman numerals (i,ii,iii)
-3. If a question has no sub-parts, leave sub_questions as empty array []
-4. Sum of sub-question marks MUST equal parent question marks
-5. Extract marks carefully - look for [10 marks], (5 marks), etc.
-6. Keep question text brief but meaningful
-7. **OPTIONAL QUESTIONS DETECTION:**
-   - Look for phrases like "Attempt any X out of Y", "Answer any 4 questions", "Choose any 3"
-   - If found, mark those questions with: is_optional=true, optional_group="group1", required_count=X
-   - Calculate effective_total_marks by considering only the required questions from optional groups
-   - Example: "Answer any 4 out of 6 questions (each 10 marks)" → 6 questions marked as optional, required_count=4, effective_marks=40
+**ANSWER SHEET SPECIAL CASE (IMPORTANT):**
+- If this is an **answer sheet**, questions may be embedded in the student’s responses.
+- **Infer question numbers and sub-parts** from headings like “Q1”, “1(a)”, “Q2 (b)”, “Part (i)”, etc.
+- If full question text is missing, **use the student’s answer context** as the rubric and keep the question number accurate.
+- Still extract **ALL** questions you can identify by number—even if text is partial.
 
-Return ONLY a JSON array of questions, nothing else."""
-        ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
+**COMMON MISTAKE TO AVOID:**
+❌ Do NOT return just the first question
+❌ Do NOT stop after a few questions
+✓ Process the ENTIRE document
+
+Return a JSON array where EACH question has this exact structure:
+[
+  {{
+    "question_number": 1,
+    "max_marks": 15,
+    "rubric": "Full question text including all parts",
+    "question_text": "Q1: Brief identifier",
+    "is_optional": false,
+    "optional_group": null,
+    "required_count": null,
+    "sub_questions": [
+      {{
+        "sub_id": "a",
+        "max_marks": 2.5,
+        "rubric": "Part (a) complete text here"
+      }},
+      {{
+        "sub_id": "b",
+        "max_marks": 2.5,
+        "rubric": "Part (b) complete text here"
+      }},
+      {{
+        "sub_id": "c",
+        "max_marks": 3,
+        "rubric": "Part (c) complete text here"
+      }}
+    ]
+  }},
+  {{
+    "question_number": 2,
+    "max_marks": 15,
+    ...
+  }},
+  ... (continue for ALL questions)
+]
+
+**CRITICAL: Return ONLY valid JSON array. Every question must have all fields. Extract ALL questions, not just first one!**"""
+).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - CHUNK if too many pages
         CHUNK_SIZE = 10  # Process 10 pages at a time to avoid timeouts
@@ -4382,6 +4794,7 @@ Return ONLY a JSON array of questions, nothing else."""
         
         if len(all_images) > CHUNK_SIZE:
             logger.info(f"Large document ({len(all_images)} pages) - processing in chunks of {CHUNK_SIZE}")
+            print(f"\n[EXTRACT-CHUNK] Large document with {len(all_images)} pages - will chunk into {CHUNK_SIZE}px per chunk")
             all_extracted_questions = []
             
             for chunk_start in range(0, len(all_images), CHUNK_SIZE):
@@ -4389,6 +4802,7 @@ Return ONLY a JSON array of questions, nothing else."""
                 chunk_images = all_images[chunk_start:chunk_end]
                 
                 logger.info(f"Processing pages {chunk_start+1}-{chunk_end} ({len(chunk_images)} pages)")
+                print(f"[EXTRACT-CHUNK] Chunk {chunk_start//CHUNK_SIZE + 1}: Pages {chunk_start+1}-{chunk_end}")
                 
                 image_contents = [ImageContent(image_base64=img) for img in chunk_images]
                 
@@ -4400,6 +4814,8 @@ Instructions:
 - Detect the numbering style (a,b,c vs i,ii,iii)
 - Extract marks for each part
 - If a question spans multiple chunks, extract what's visible here
+- **IMPORTANT: Include the full question number (e.g., "1", "2", "10", not just "Q1")**
+- Return questions in order of their numbers
 
 Return ONLY the JSON array of questions."""
         
@@ -4458,28 +4874,72 @@ Return ONLY the JSON array of questions."""
                             await asyncio.sleep(retry_delay)
                 
                 if chunk_questions:
-                    logger.info(f"✅ Extracted {len(chunk_questions)} questions from pages {chunk_start+1}-{chunk_end}")
+                    q_nums = [q.get('question_number') for q in chunk_questions]
+                    logger.info(f"✅ Extracted {len(chunk_questions)} questions from pages {chunk_start+1}-{chunk_end}: Q{q_nums}")
+                    print(f"[EXTRACT-CHUNK] ✅ Got {len(chunk_questions)} questions from pages {chunk_start+1}-{chunk_end}: Q{q_nums}")
                     all_extracted_questions.extend(chunk_questions)
                 else:
                     logger.warning(f"⚠️ Failed to extract questions from pages {chunk_start+1}-{chunk_end}")
+                    print(f"[EXTRACT-CHUNK] ⚠️  No questions extracted from pages {chunk_start+1}-{chunk_end}")
             
+            # After all chunks, verify we got all questions and remove duplicates
+            print(f"\n[EXTRACT-FINAL] Processed all chunks - merging results...")
             logger.info(f"✅ Total: Extracted {len(all_extracted_questions)} questions from {len(all_images)} pages (chunked)")
-            return all_extracted_questions
+            
+            # Sort by question number and remove duplicates (keep first occurrence)
+            seen_q_nums = set()
+            unique_questions = []
+            for q in all_extracted_questions:
+                q_num = q.get('question_number')
+                if q_num not in seen_q_nums:
+                    unique_questions.append(q)
+                    seen_q_nums.add(q_num)
+                else:
+                    logger.info(f"Skipping duplicate question {q_num}")
+                    print(f"[EXTRACT-DEDUP] Removed duplicate Q{q_num}")
+            
+            final_q_nums = [q.get('question_number') for q in unique_questions]
+            print(f"[EXTRACT-FINAL] Total {len(unique_questions)} unique questions after deduplication: Q{final_q_nums}")
+            logger.info(f"Final questions after dedup: Q{final_q_nums}")
+            
+            # Validate: check for missing questions
+            if final_q_nums and all(isinstance(q, (int, float)) or isinstance(q, str) for q in final_q_nums):
+                try:
+                    numeric_q_nums = [int(q) if isinstance(q, int) else int(str(q)) for q in final_q_nums if q]
+                    max_q = max(numeric_q_nums) if numeric_q_nums else 0
+                    expected_set = set(range(1, max_q + 1))
+                    actual_set = set(numeric_q_nums)
+                    missing = expected_set - actual_set
+                    if missing:
+                        print(f"[EXTRACT-FINAL] ⚠️ WARNING: Missing questions Q{sorted(missing)}")
+                        logger.warning(f"Missing questions in extraction: Q{sorted(missing)}")
+                    else:
+                        print(f"[EXTRACT-FINAL] ✅ Complete: All questions Q1 to Q{max_q} present")
+                except:
+                    pass
+            
+            return normalize_extracted_questions(unique_questions)
         else:
             # Small document - process all at once
             image_contents = [ImageContent(image_base64=img) for img in paper_images]
             logger.info(f"Extracting complete question structure from {len(image_contents)} pages ({paper_type})")
         
-            prompt = f"""Analyze this {paper_type.replace('_', ' ')} and extract the COMPLETE question structure.
+            prompt = f"""Analyze this {paper_type.replace('_', ' ')} (ALL {len(paper_images)} pages) and extract the COMPLETE question structure.
 
-Instructions:
-- Identify ALL questions (Q1, Q2, Q3...)
-- For each question, identify ALL sub-parts with their marks
+**CRITICAL INSTRUCTIONS:**
+- Scan through ALL {len(paper_images)} pages carefully
+- Extract EVERY question you find (Q1, Q2, Q3, ... Q10, etc.)
+- Do NOT stop early - process the ENTIRE document
+- For each question, identify ALL sub-parts (a, b, c, etc.) with their marks
 - Detect the numbering style (a,b,c vs i,ii,iii)
-- Extract marks for each part
-- Be thorough - don't miss any questions or sub-questions
+- Extract marks accurately for each part
 
-Return ONLY the JSON array of questions."""
+**BEFORE RETURNING - SELF CHECK:**
+✓ Did I look at all {len(paper_images)} pages?
+✓ Did I extract EVERY question I saw?
+✓ Are my question numbers sequential (no gaps)?
+
+Return ONLY the JSON array of ALL questions (not just the first one!)."""
         
         user_message = UserMessage(text=prompt, file_contents=image_contents)
         
@@ -4500,17 +4960,19 @@ Return ONLY the JSON array of questions."""
                 # Robust JSON parsing
                 import json
                 import re
-                response_text = ai_response.strip()
+                # Extract text from Gemini response object
+                response_text_raw = ai_response.text if hasattr(ai_response, 'text') else str(ai_response)
+                response_text = response_text_raw.strip()
                 
                 # Strategy 1: Direct parse
                 try:
                     result = json.loads(response_text)
                     if isinstance(result, list):
                         logger.info(f"✅ Extracted structure for {len(result)} questions")
-                        return result
+                        return normalize_extracted_questions(result)
                     elif isinstance(result, dict) and "questions" in result:
                         logger.info(f"✅ Extracted structure for {len(result['questions'])} questions")
-                        return result["questions"]
+                        return normalize_extracted_questions(result["questions"])
                 except json.JSONDecodeError:
                     pass
                 
@@ -4524,9 +4986,9 @@ Return ONLY the JSON array of questions."""
                         result = json.loads(response_text)
                         if isinstance(result, list):
                             logger.info(f"✅ Extracted structure for {len(result)} questions (code block)")
-                            return result
+                            return normalize_extracted_questions(result)
                         elif isinstance(result, dict) and "questions" in result:
-                            return result["questions"]
+                            return normalize_extracted_questions(result["questions"])
                     except json.JSONDecodeError:
                         pass
                 
@@ -4536,7 +4998,7 @@ Return ONLY the JSON array of questions."""
                     try:
                         result = json.loads(json_match.group())
                         logger.info(f"✅ Extracted structure for {len(result)} questions (pattern match)")
-                        return result
+                        return normalize_extracted_questions(result)
                     except json.JSONDecodeError:
                         pass
                 
@@ -4634,6 +5096,42 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
             logger.warning(f"Structure extraction returned no questions for {exam_id} from {target_source}")
             return {"success": False, "message": f"Failed to extract question structure from {target_source.replace('_', ' ')}"}
 
+        # VALIDATE extraction: verify all questions have proper structure
+        print(f"\n{'='*70}")
+        print(f"[EXTRACTION-VALIDATION] Validating extracted questions...")
+        print(f"[EXTRACTION-VALIDATION] Total questions extracted: {len(extracted_questions)}")
+        
+        for idx, q in enumerate(extracted_questions, 1):
+            q_num = q.get('question_number')
+            q_text = q.get('question_text', '')[:50]
+            q_marks = q.get('max_marks', '?')
+            sub_q_count = len(q.get('sub_questions', []))
+            print(f"[EXTRACTION-VALIDATION] {idx}. Q{q_num}: '{q_text}...' | Marks={q_marks} | SubQ={sub_q_count}")
+        
+        q_nums = [q.get('question_number') for q in extracted_questions]
+        print(f"[EXTRACTION-VALIDATION] Question numbers: {q_nums}")
+        print(f"{'='*70}\n")
+        
+        logger.info(f"✅ Extraction returned {len(extracted_questions)} questions: Q{q_nums}")
+
+        # Update total marks dynamically based on extracted questions
+        try:
+            total_marks = 0.0
+            for q in extracted_questions:
+                if q.get("sub_questions"):
+                    total_marks += sum(float(sq.get("max_marks") or 0) for sq in q.get("sub_questions", []))
+                else:
+                    total_marks += float(q.get("max_marks") or 0)
+            if total_marks > 0:
+                await db.exams.update_one(
+                    {"exam_id": exam_id},
+                    {"$set": {"total_marks": total_marks}}
+                )
+                logger.info(f"Updated exam total_marks to {total_marks}")
+        except Exception as tm_err:
+            logger.warning(f"Failed to update total_marks: {tm_err}")
+        print(f"\n[EXTRACTION] Got {len(extracted_questions)} questions from AI: Q{q_nums}\n")
+
         # Calculate total marks from extracted structure, handling optional questions
         total_marks = 0
         optional_groups = {}
@@ -4688,6 +5186,7 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         # STEP 1: Delete old questions for this exam to prevent duplicates
         delete_result = await db.questions.delete_many({"exam_id": exam_id})
         logger.info(f"Deleted {delete_result.deleted_count} old questions for exam {exam_id}")
+        print(f"[EXTRACTION-DB] Deleted {delete_result.deleted_count} old questions")
 
         # STEP 2: Prepare questions for insertion with exam_id and unique question_id
         questions_to_insert = []
@@ -4702,7 +5201,23 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         # STEP 3: Insert questions into the questions collection
         if questions_to_insert:
             await db.questions.insert_many(questions_to_insert)
-            logger.info(f"Inserted {len(questions_to_insert)} questions into database")
+            q_nums = [q.get("question_number") for q in questions_to_insert]
+            logger.info(f"Inserted {len(questions_to_insert)} questions into database: Q{q_nums}")
+            print(f"[EXTRACTION-DB] Inserted {len(questions_to_insert)} questions: Q{q_nums}")
+            
+            # Check for missing question numbers
+            if q_nums:
+                max_q_num = max([int(n) if isinstance(n, int) else int(n.replace('Q', '')) for n in q_nums if n])
+                expected_q_nums = set(range(1, max_q_num + 1))
+                actual_q_nums = set([int(n) if isinstance(n, int) else int(n.replace('Q', '')) for n in q_nums if n])
+                missing_q_nums = expected_q_nums - actual_q_nums
+                
+                if missing_q_nums:
+                    print(f"[EXTRACTION-WARNING] ⚠️ MISSING QUESTIONS: {sorted(missing_q_nums)}")
+                    logger.warning(f"Missing questions: {sorted(missing_q_nums)}")
+                else:
+                    print(f"[EXTRACTION-OK] ✅ All questions Q1 to Q{max_q_num} present")
+                    logger.info(f"✅ All questions Q1 to Q{max_q_num} extracted correctly")
 
         # STEP 4: Update exam document with questions array, metadata, and correct counts
         await db.exams.update_one(
@@ -4716,6 +5231,7 @@ async def auto_extract_questions(exam_id: str, force: bool = False) -> Dict[str,
         )
 
         logger.info(f"✅ Successfully extracted and saved {len(extracted_questions)} questions with complete structure from {target_source}")
+        print(f"[EXTRACTION-COMPLETE] Saved {len(extracted_questions)} questions to both db.questions and exam.questions")
         return {
             "success": True,
             "message": f"Successfully extracted {len(extracted_questions)} questions with structure from {target_source.replace('_', ' ')}",
@@ -4768,7 +5284,10 @@ async def grade_with_ai(
     model_answer_text: str = "",  # NEW: Pre-extracted model answer content
     teacher_id: str = None,  # NEW: For learning patterns
     subject_id: str = None,  # NEW: For cross-exam learning
-    exam_id: str = None  # NEW: For pattern matching
+    exam_id: str = None,  # NEW: For pattern matching
+    subject_name: str = None,  # NEW: For UPSC detection
+    exam_name: str = None,  # NEW: For UPSC detection
+    skip_cache: bool = False  # NEW: Skip cache when regrading
 ) -> List[QuestionScore]:
     """Grade answer paper using Gemini with GradeSense Master Instruction Set + Teacher's Learned Patterns.
     
@@ -4777,7 +5296,6 @@ async def grade_with_ai(
     
     NEW: Automatically applies teacher's past corrections as learned patterns for consistent grading.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     import hashlib
     
     # Get API key from env
@@ -4801,10 +5319,20 @@ async def grade_with_ai(
     # Determine grading mode: text-based (preferred) or image-based (fallback)
     use_text_based_grading = bool(model_answer_text and len(model_answer_text) > 100)
     
+    print(f"\n{'='*70}")
+    print(f"[GRADING-START]")
+    print(f"  Images: {len(images)} student pages")
+    print(f"  Model answer: {len(model_answer_images)} images, {len(model_answer_text)} text chars")
+    print(f"  Questions: {len(questions)}")
+    print(f"  Use text-based: {use_text_based_grading}")
+    print(f"{'='*70}\n")
+    
     if use_text_based_grading:
         logger.info(f"Using TEXT-BASED grading (model answer: {len(model_answer_text)} chars)")
+        print(f"[GRADING] TEXT-BASED mode - Model answer preview: {model_answer_text[:200]}...")
     else:
         logger.info(f"Using IMAGE-BASED grading (model answer: {len(model_answer_images)} images)")
+        print(f"[GRADING] IMAGE-BASED mode - {len(model_answer_images)} model images + {len(images)} student images")
     
     # Create content hash for deterministic grading (same paper = same grade)
     hash_content = "".join(corrected_images).encode() + str(questions).encode() + grading_mode.encode()
@@ -4815,57 +5343,142 @@ async def grade_with_ai(
     paper_hash = hashlib.sha256(hash_content).hexdigest()
     content_hash = paper_hash[:16]
 
-    # Check cache (Memory)
-    if paper_hash in grading_cache:
+    # Check cache (Memory) - unless skipping cache for regrade
+    if not skip_cache and paper_hash in grading_cache:
         logger.info(f"Cache hit (memory) for paper {paper_hash}")
         return grading_cache[paper_hash]
 
-    # Check cache (Database)
-    try:
-        cached_result = await db.grading_results.find_one({"paper_hash": paper_hash})
-        if cached_result and "results" in cached_result:
-            logger.info(f"Cache hit (db) for paper {paper_hash}")
-            import json
-            results_data = json.loads(cached_result["results"])
-            return [QuestionScore(**s) for s in results_data]
-    except Exception as e:
-        logger.error(f"Error checking grading cache: {e}")
+    # Check cache (Database) - unless skipping cache for regrade
+    if not skip_cache:
+        try:
+            cached_result = await db.grading_results.find_one({"paper_hash": paper_hash})
+            if cached_result and "results" in cached_result:
+                logger.info(f"Cache hit (db) for paper {paper_hash}")
+                results_data = json.loads(cached_result["results"])
+                return [QuestionScore(**s) for s in results_data]
+        except Exception as e:
+            logger.error(f"Error checking grading cache: {e}")
     
     # ============== GRADESENSE MASTER GRADING MODE SPECIFICATIONS ==============
     mode_instructions = {
-        "strict": """🔴 STRICT MODE - Academic rigor at its highest. Every step matters. Precision is paramount.
+        "strict": """🔴 STRICT MODE - UPSC-LEVEL EVALUATION. Zero tolerance for errors. Complete perfection required.
 
-STEP-BY-STEP VERIFICATION:
-- Every step in the model answer must be present
-- Steps must be in logical order
-- Skipping steps = mark deduction even if final answer is correct
-- Each step carries independent weightage
-- Working must be clearly shown
+**CRITICAL GRADING PHILOSOPHY: STRICT = UPSC/CIVIL SERVICES STANDARD**
+This mode emulates UPSC Main Examination evaluation standards where:
+- Only perfect, complete, accurate answers receive full marks
+- Any deviation, error, or incompleteness results in zero marks
+- No sympathy marks. No benefit of doubt. No partial credit for effort.
+- The evaluator is looking for EXCELLENCE, not just understanding.
 
-KEYWORD PRECISION:
-- Technical terms must be exact
-- Spelling of scientific/technical terms matters
-- Definitions must be precise
-- No credit for vague or approximately correct terminology
+**ABSOLUTE GRADING RULE: ALL OR NOTHING**
+- Everything correct (method + calculation + presentation + answer) = FULL MARKS ✅
+- Anything wrong/missing/incomplete = 0 MARKS ❌
+- No partial credit. No carry-forward. No consolation marks.
 
-FORMAT STRICTNESS:
-- Answer format must match expectations
-- Diagrams must be properly labeled with all parts
-- Units MUST be present for all numerical answers
-- Proper mathematical notation required
+**STRICT UPSC CAP (CRITICAL)**
+- Maximum awardable marks for ANY question is (0.5 × max_marks − 1).
+- Award this maximum ONLY for a flawless, complete answer. If anything is missing or weak, go lower.
 
-ERROR PENALTIES:
-- Calculation errors: Lose marks for all subsequent dependent steps
-- Conceptual errors: Significant penalty
-- Unit errors: Dedicated mark deduction
-- Missing steps: Full step marks deducted
-- Wrong method, right answer: Minimal credit (method matters)
+**MATHEMATICAL/NUMERICAL PROBLEMS (UPSC STANDARD)**:
+1. **Formula/Method Correctness** - MANDATORY but NOT SUFFICIENT for marks
+   - Correct formula shown = NECESSARY but does NOT alone earn marks
+   - Method must be both correct AND lead to correct answer
+   
+2. **Calculation Precision** - ZERO TOLERANCE
+   - Every arithmetic step must be flawless
+   - 1750/2 = 625 → WRONG → 0 marks (even if formula is correct)
+   - 1750/2 = 875 → CORRECT → Proceed to next check
+   - Rounding errors = WRONG answer = 0 marks
+   - Approximation without justification = WRONG = 0 marks
+   
+3. **Final Answer Requirements**:
+   - Numerically accurate to the last digit
+   - Proper units mentioned (if missing = incomplete = 0 marks)
+   - Properly underlined/highlighted (UPSC standard)
+   - Written in the format specified in question
+   
+4. **Multi-Step Problems** - CHAIN OF PERFECTION:
+   - ALL intermediate steps must be correct
+   - One error anywhere in chain = entire answer WRONG = 0 marks
+   - No carry-forward of wrong intermediate values
+   - Each step verified independently
 
-PARTIAL MARKING:
-- Only award marks for completely correct components
-- Half-right steps = 0 marks for that step
-- Ambiguous answers = no benefit of doubt
-- Minimum threshold for any marks = 70% correctness of that component""",
+**THEORETICAL/DESCRIPTIVE ANSWERS (UPSC UPSC STANDARD)**:
+1. **Content Requirements** - ALL MANDATORY:
+   - ALL key points from model answer must be present
+   - Missing even ONE key point = Incomplete = Reduced marks or 0
+   - Keywords MUST appear (synonyms not acceptable unless perfectly equivalent)
+   - Depth of explanation must match model answer
+   
+2. **Structure & Presentation**:
+   - Introduction-Body-Conclusion (if applicable)
+   - Proper paragraph breaks
+   - Logical flow maintained
+   - Clarity and coherence
+   - No grammatical errors that affect meaning
+   
+3. **Examples/Case Studies**:
+   - Relevant examples MUST be provided if model answer has them
+   - Examples must be accurate and specific
+   - Generic examples = Weak answer = Lower marks
+
+**SUB-QUESTIONS (INDEPENDENT ALL-OR-NOTHING PER PART)**:
+- Each sub-part (a), (b), (c), (i), (ii), (iii) evaluated INDEPENDENTLY
+- Part (a) perfect = Full marks for (a) | Part (a) imperfect = 0 for (a)
+- Part (b) perfect = Full marks for (b) | Part (b) imperfect = 0 for (b)
+- Total marks = Sum of individual sub-parts (each is 0 or full)
+- Example: Q1 has (a)=3m, (b)=3m, (c)=4m
+  - All perfect → 10 marks
+  - (a) perfect, (b) minor error, (c) perfect → 3+0+4 = 7 marks
+  - (a) error, (b) perfect, (c) error → 0+3+0 = 3 marks
+  - All have errors → 0 marks
+
+**DEFINITION OF "PERFECT ANSWER" (UPSC CRITERIA)**:
+✅ **Content**: All key points covered comprehensively
+✅ **Accuracy**: Facts, figures, calculations 100% correct  
+✅ **Presentation**: Well-structured, clear, legible
+✅ **Completeness**: No missing elements or steps
+✅ **Relevance**: Directly answers what was asked
+✅ **Precision**: Exact terminology used, no vagueness
+✅ **Units/Labels**: All numerical answers properly labeled
+
+**COMMON SCENARIOS → 0 MARKS IN STRICT MODE**:
+❌ Correct method + calculation error = 0 marks
+❌ Correct concept + wrong execution = 0 marks
+❌ 95% correct but 5% error = 0 marks
+❌ Right approach but wrong final answer = 0 marks
+❌ Shows understanding but makes mistakes = 0 marks
+❌ All steps correct except one = 0 marks
+❌ Answer close to model answer = 0 marks (close ≠ correct)
+❌ Missing units = Incomplete = 0 marks
+❌ Illegible handwriting = Cannot verify = 0 marks
+❌ Incomplete answer = 0 marks
+❌ Ambiguous answer = Cannot confirm correctness = 0 marks
+
+**BLANK/NO ATTEMPT**:
+- Question not attempted = -1.0 marks (NOT FOUND marker)
+- Blank space = 0 marks
+- Scribbled/crossed out = 0 marks
+- "Not known" written = 0 marks
+
+**SPECIAL UPSC CONSIDERATIONS**:
+1. **Word Limit** (if specified): Exceeding = Marks deduction or 0
+2. **Diagram Requirements**: Must be neat, labeled, accurate - otherwise 0
+3. **Alternative Methods**: Valid only if completely correct end-to-end
+4. **Case Studies**: Must be recent, relevant, accurately described
+5. **Current Affairs**: Must be up-to-date and factually correct
+
+**EVALUATOR MINDSET**:
+You are a senior UPSC examiner known for strictness and maintaining high standards.
+- You reward only EXCELLENCE, not effort
+- You do NOT give marks for "trying"
+- You do NOT appreciate "almost correct"
+- You ONLY award full marks when answer is FLAWLESS
+- Your reputation depends on maintaining the prestige of the examination
+
+**ABSOLUTE RULE FOR STRICT MODE**:
+"PERFECT = Full Marks | IMPERFECT (even slightly) = 0 Marks"
+"When in doubt, mark it WRONG - UPSC doesn't give benefit of doubt\"""",
 
         "balanced": """⚖️ BALANCED MODE (DEFAULT) - Fair and reasonable evaluation. Academic standards maintained while acknowledging genuine understanding.
 
@@ -4882,9 +5495,9 @@ REASONABLE EXPECTATIONS:
 - Apply "would a reasonable teacher accept this?" test
 
 STANDARD PARTIAL MARKING:
-- Correct method, wrong answer: 60-70% marks
-- Wrong method, correct answer: 30-40% marks
-- Partially correct: Proportional to correctness
+- Correct method, wrong answer: 30-45% marks
+- Wrong method, correct answer: 15-30% marks
+- Partially correct: Proportional to correctness (avoid default 50%)
 - Missing minor elements: Minor deductions
 - Missing major elements: Significant deductions
 
@@ -4970,31 +5583,141 @@ INTERPRETATION GENEROSITY:
     
     grading_instruction = mode_instructions.get(grading_mode, mode_instructions["balanced"])
     
-    # ============== GRADESENSE MASTER INSTRUCTION SET ==============
-    master_system_prompt = f"""# GRADESENSE AI GRADING ENGINE
+    # UPSC system prompt (conditional)
+    upsc_system_prompt = """# ROLE: Senior UPSC Mains Evaluator (GS & Essay)
 
-You are the GradeSense Grading Engine - an advanced AI system designed to evaluate handwritten student answer papers with the precision, consistency, and pedagogical understanding of an expert educator.
+## MISSION
+You are a veteran evaluator for the UPSC Civil Services Examination. Your task is to grade the student's answer script with uncompromising strictness. You must distinguish between a "Generalist" (Average) and an "Administrator" (Topper) answer. Your goal is to filter for the top 1% of candidates who show "Administrative Aptitude."
+
+## 1. SCORING CEILING & CALIBRATION (THE "REALITY CHECK")
+CRITICAL: UPSC evaluators NEVER award full marks. Apply strict ceilings, but do NOT default to half marks. Half marks should be rare and only for genuinely strong, near-complete answers.
+* For 10-Marker Questions:
+    * Average (Most Students): 3.0 - 4.0 marks.
+    * Good: 4.5 - 5.5 marks.
+    * Topper (Rare/Exceptional): 6.0 - 7.0 marks (Only when truly outstanding).
+* For 15-Marker Questions:
+    * Average: 4.0 - 6.0 marks.
+    * Good: 6.5 - 8.0 marks.
+    * Topper: 8.5 - 10.5 marks (Only when truly outstanding).
+* For 20-Marker Case Studies (Ethics):
+    * Average: 8.0 - 10.0 marks.
+    * Topper: 11.0 - 13.5 marks (Rare; needs exceptional value-add).
+
+## 2. THE "ARC" GRADING FRAMEWORK
+Evaluate every answer based on these three pillars:
+* A - ACCURACY (20%): Did the candidate answer the specific directive?
+    * 'Discuss': Multiple angles.
+    * 'Critically Analyze': Pros + Cons + Verdict.
+    * Penalty: If they write a good answer but miss the directive, cap marks at 40%.
+* R - REPRESENTATION (30%): Look for Structural Visibility.
+    * Visuals: Award +0.5 bonus for mentions of Maps, Flowcharts, or Hub-Spoke diagrams.
+    * Format: Bullet points are mandatory. Deduct -1 mark for long, unbroken paragraphs.
+* C - CONTENT SUBSTANTIATION (50%): This is the key differentiator.
+    * Generalist Answer: "Poverty is high." (Low Score).
+    * Administrative Answer: "Multidimensional Poverty Index 2023 cites 14.9% poverty. Ref: NITI Aayog." (High Score).
+    * Look for: Constitutional Articles (Art 14, 21), Acts (RTI, EPA 1986), Committees (Gadgil, Sarkaria), and Data.
+
+## 3. SUBJECT-SPECIFIC CHECKS (Dynamic)
+* GS-1 (History/Geo/Society): Check for Maps, Timelines, Resource Distribution, and Globalization linkages.
+* GS-2 (Polity/IR): Check for SC Judgments (Kesavananda, Puttaswamy), Articles, and IR Doctrines (Neighborhood First).
+* GS-3 (Economy/Env/Sci): Check for Economic Survey Data, Budget allocations, and Scientific mechanisms.
+* GS-4 (Ethics): Check for "Values" (Integrity, Probity), Thinkers (Gandhi, Kant), and Concrete Examples of Officers.
+
+## 4. FEEDBACK STYLE (Administrative Tone)
+* Do not be encouraging. Be constructive and curt.
+* Good Feedback: "Lacks substantiation. Cite Article 21 to strengthen the privacy argument."
+* Bad Feedback: "Good attempt, try to add more points."
+
+## 5. OUTPUT FORMAT (STRICT JSON)
+Output ONLY this JSON structure. No preamble.
+"""
+
+    gs4_system_prompt = """# ROLE: Senior UPSC Mains Evaluator (Strict Administrative Standard)
+
+## MISSION
+You are a veteran evaluator for the UPSC Civil Services Mains Examination. Your task is to evaluate the provided student answer script. You must move beyond generic grading and assess **Administrative Aptitude**.
+
+## 1. THE "VALUE-ADD" SCORING MATRIX (CRITICAL)
+You must scan the answer for specific **"Value Indicators."** If found, you MUST boost the score within the allowed range.
+
+| Indicator Type | Examples to Look For | Action |
+| :--- | :--- | :--- |
+| **Constitutional Basis** | Articles (14, 19, 21), DPSP, Preamble keywords. | **+0.5 to +1 Mark** |
+| **Substantiation** | Committees (Hota, 2nd ARC), Data (NCRB, Eco Survey), Supreme Court Judgments. | **+1 Mark (Guaranteed)** |
+| **Real-Life Examples** | Naming specific officers (e.g., Armstrong Pame), specific schemes (e.g., PM-Kisan), or current events. | **+1 Mark (Guaranteed)** |
+| **Visual Representation** | Diagrams, Flowcharts, Maps (even if rough). | **+0.5 Mark** |
+
+## 2. STRICT MARKING BANDS (The "Floor & Ceiling" Rule)
+* **The "Floor" (Minimum for Attempt):** If a student has attempted the question and written at least 3 relevant sentences, **NEVER award 0.** Award a minimum of **1.5 to 2.0 marks** for the attempt.
+* **The "Ceiling" (Maximum for Perfection):** UPSC is a humanities exam. Perfection does not exist.
+    * **10-Marker Max:** **6.5 - 7.0** (Only award 7.5 if truly exceptional).
+    * **20-Marker Max:** **12.0 - 13.5** (Only award 14.0 if truly exceptional).
+* **The "Average" Trap:** Do not default everything to 3 or 4 marks. If the answer has "Value Indicators" (above), it belongs in the **5.5 - 6.5 range**.
+
+## 3. VISUAL ANNOTATION LOGIC ("The Red Pen")
+You must generate coordinates and labels to simulate a human teacher marking the paper.
+* **`TICK` (Green):** Place next to every "Value Indicator" found (e.g., next to "Article 21").
+* **`CROSS` (Red):** Place next to factually incorrect data.
+* **`UNDERLINE` (Blue):** Underline ONLY one correct key phrase (do NOT underline wrong or weak text).
+* **`COMMENT` (Red):** Boxed improvement note near correct text. Use administrative language: "Add Article 21," "Cite NCRB data," "Give example." Avoid long notes.
+
+## 4. OUTPUT FORMAT (STRICT JSON)
+Return a single JSON object as per GradeSense JSON format (required by the system).
+"""
+
+    # Detect UPSC context
+    upsc_paper = infer_upsc_paper(exam_name, subject_name)
+    is_upsc = False
+    if upsc_paper:
+        is_upsc = True
+    if subject_name and "upsc" in subject_name.lower():
+        is_upsc = True
+    if exam_name and "upsc" in exam_name.lower():
+        is_upsc = True
+
+    # ============== GRADESENSE MASTER INSTRUCTION SET ==============
+    selected_upsc_prompt = upsc_system_prompt
+    if is_upsc and upsc_paper != "GS-4":
+        selected_upsc_prompt = gs4_system_prompt
+
+    master_system_prompt = f"""{selected_upsc_prompt if is_upsc else ""}
+
+UPSC PAPER DETECTED: {upsc_paper or "Unknown"}
+Apply the subject-specific checks for this paper type when applicable.
+
+# GRADESENSE AI GRADING ENGINE - MASTER SYSTEM
+
+IMPORTANT (INTEGRATION): Regardless of any UPSC guidance above, you MUST return the GradeSense JSON output format defined below. Do NOT use any other JSON schema.
+
+You are the GradeSense Grading Engine - an advanced AI system designed to evaluate handwritten student answer papers with the precision, consistency, and pedagogical understanding of an expert educator with 20+ years of experience.
+
+═══════════════════════════════════════════════════════════════════════════════
 
 ## FUNDAMENTAL PRINCIPLES (SACRED - NEVER VIOLATE)
 
 ### 1. CONSISTENCY IS SACRED
-- If the same paper is graded twice, the marks MUST be identical
+- If the same paper is graded twice, the marks MUST be identical (100% reproducibility)
 - If two students write identical answers, they MUST receive identical marks
 - Your grading decisions must be reproducible and explainable
 - Never let randomness or uncertainty affect final scores
-- When in doubt, flag for human review rather than guess
+- When in doubt about a specific point, flag for human review rather than guess
+- Document your reasoning for every mark deduction
 
 ### 2. THE MODEL ANSWER IS YOUR HOLY GRAIL
 - When a model answer is provided, treat it as the definitive reference
 - Study it thoroughly before grading any paper
-- Understand not just what is written, but the underlying logic and expectations
+- Understand not just WHAT is written, but WHY and HOW
+- The model answer defines the acceptable range of correct responses
 - Never contradict what the model answer establishes as correct
+- If a student uses an alternative valid method not in the model, still award full marks
 
 ### 3. FAIRNESS ABOVE ALL
 - Every student deserves unbiased evaluation
-- Grade the answer, not the handwriting aesthetics
+- Grade the CONTENT, not the handwriting aesthetics
 - Apply the same standards consistently across all papers
 - Be the impartial evaluator every student deserves
+
+═══════════════════════════════════════════════════════════════════════════════
 
 ## CURRENT GRADING MODE: {grading_mode.upper()}
 
@@ -5002,105 +5725,248 @@ You are the GradeSense Grading Engine - an advanced AI system designed to evalua
 
 ## ANSWER TYPE HANDLING
 
-### Mathematical Problems
-- Identify all logical steps in the solution
-- Each step has independent value
-- Carry-forward principle: If step 1 is wrong, credit correct logic in steps 2-n based on wrong value
-- Formula stated correctly = marks (even if not applied correctly)
-- Units MUST be present in final answers
-- Alternative valid methods = full marks
+### 📐 MATHEMATICAL PROBLEMS
+- **STRICT MODE ALL-OR-NOTHING**: If in STRICT marking mode:
+  - ✅ Correct method + Correct calculation + Correct answer = FULL marks
+  - ❌ Anything wrong (even if method is correct) = 0 marks
+  - Example: Formula is correct but 1750/2 = 625 instead of 875 → **0 marks** (not partial!)
+- **For other modes (Balanced/Lenient)**:
+  - Correct method + Wrong calculation = Partial marks (20-60% depending on mode)
+  - Correct method + Correct calculation = 100% marks
+  - Wrong method = 0 marks
+- Substitution of values must be shown clearly
+- Each logical step has independent value ONLY IF the method itself is correct
+- **Arithmetic Must Be Exact**: The numerical answer MUST match exactly (no approximations unless specified)
+- Units MUST be present in final answers (missing units = question mark deduction from final answer only in non-STRICT modes)
+- Alternative valid methods = full marks ONLY if both method AND calculation are correct
+- **CRITICAL FOR THIS EXAM**: In operations management / inventory problems, ensure calculations use correct formula with correct substitutions
+- **SUB-QUESTIONS**: Each sub-question follows the same ALL-OR-NOTHING rule in STRICT mode independently
 
-### Diagrams and Labeled Drawings
-- Component presence: Check all parts drawn
-- Labels: Correct and complete
-- Proportions: Reasonably accurate
-- Partial credit based on percentage of components correct
+### 📊 DIAGRAMS AND LABELED DRAWINGS
+- Component presence (all required parts)
+- Labels correct and complete
+- Proportions reasonably accurate
+- Partial credit proportional to correct components
 
-### Short/Long Answers
-- Key points coverage check
-- Each key point = proportional marks
-- Extra correct info doesn't compensate missing key points
-- Introduction-Body-Conclusion structure for long answers
+### 📝 SHORT / LONG ANSWERS
+- Use key-point coverage; each key point = proportional marks
+- Extra correct info does not compensate missing key points
+- Long answers: evaluate intro/body/conclusion structure when applicable
 
-### MCQ/Objective
-- Binary evaluation: Correct = full marks, Wrong = 0
+### ✅ MCQ / OBJECTIVE
+- Single correct = full marks, wrong = 0
 - Multiple selections when single expected = 0
+- No partial marks unless explicitly stated
 
 ## HANDWRITING INTERPRETATION
-
-- Use question context to aid recognition
-- Use subject vocabulary to resolve ambiguous characters
-- If character is ambiguous, consider most likely interpretation in context
+- Use question context and subject vocabulary
+- If ambiguous, choose the most likely correct interpretation (benefit of doubt)
 - Honor final visible answer (ignore crossed-out content)
-- If largely illegible, flag for teacher review
+- If largely illegible, mark as ILLEGIBLE and flag for review
 
 ## EDGE CASE HANDLING
+- BLANK ANSWERS: 0 marks, status "not_attempted", feedback "No answer provided."
+- IRRELEVANT CONTENT: 0 marks, status "graded", feedback "Answer does not address the question."
+- QUESTION REWRITTEN ONLY: 0 marks, status "not_attempted"
+- **QUESTION NOT FOUND**: Use obtained_marks = -1.0 ONLY if the question is not found after checking ALL pages
+- Multi-page answers: read ALL pages before marking "not found"
 
-- BLANK ANSWERS: Award 0 marks, feedback: "No answer provided."
-- IRRELEVANT CONTENT: Award 0 marks, flag for teacher awareness
-- QUESTION REWRITTEN ONLY: Award 0 marks
-- **CRITICAL**: If a question IS ANSWERED (even poorly), NEVER return -1.0 for obtained_marks
-  - -1.0 means "question not found on these pages"
-  - 0.0 means "question found but answer is wrong/blank"
-  - Always check EVERY page before marking as "not found"
-- **MULTI-PAGE ANSWERS**: Questions may span multiple pages - read ALL pages carefully
-- MULTIPLE ANSWERS PROVIDED: Consider what appears to be final/emphasized answer
-- ANSWER CONTRADICTS ITSELF: Grade based on predominant correct content, note contradiction
-- BORDERLINE SCORES: Flag for teacher review with note
-
-## OUTPUT FORMAT
-
-Return your response in this exact JSON format:
+## OUTPUT FORMAT (STRICT)
+Return ONLY valid JSON in this exact format:
 {{
   "scores": [
     {{
       "question_number": 1,
       "obtained_marks": 8.5,
-      "ai_feedback": "Detailed feedback with: 1) What was done well, 2) What was missing/incorrect, 3) How to improve",
+      "ai_feedback": "Specific, constructive feedback (20-150 words): what was correct, what was wrong, how to improve.",
+      "status": "graded|not_attempted|not_found",
+      "confidence": 0.0,
+            "annotations": [
+                {{
+                    "page_number": 1,
+                    "anchor_text": "exact phrase from the student's answer",
+                    "annotation_type": "TICK|CROSS|UNDERLINE|COMMENT|BOX",
+                    "short_label": "Short margin note",
+                    "sentiment": "positive|negative"
+                }}
+            ],
       "sub_scores": [
-        {{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Feedback for part a"}},
-        {{"sub_id": "b", "obtained_marks": 2.5, "ai_feedback": "Feedback for part b"}}
-      ],
-      "confidence": 0.95
+                {{
+                    "sub_id": "a",
+                    "obtained_marks": 4.5,
+                    "ai_feedback": "Feedback for part a",
+                    "annotations": [
+                        {{
+                            "page_number": 1,
+                            "anchor_text": "exact phrase from part a",
+                            "annotation_type": "TICK|CROSS|UNDERLINE|COMMENT|BOX",
+                            "short_label": "Short margin note",
+                            "sentiment": "positive|negative"
+                        }}
+                    ]
+                }},
+                {{
+                    "sub_id": "b",
+                    "obtained_marks": 4.0,
+                    "ai_feedback": "Feedback for part b",
+                    "annotations": []
+                }}
+      ]
     }}
   ],
-  "grading_notes": "Any overall observations about the paper"
+  "grading_notes": "Overall observations"
 }}
 
-**CRITICAL - SUB-QUESTION HANDLING:**
-- If a question has sub-parts (like Q32 has parts a and b), you MUST populate the sub_scores array
-- Each sub-part gets its own: sub_id, obtained_marks, and ai_feedback
-- The question's main obtained_marks should be the SUM of all sub-part marks
-- The question's main ai_feedback should be brief overview, NOT detailed grading (details go in sub_scores)
-- Example: Q32 has parts (a) and (b). If student answered (a) correctly and didn't attempt (b):
-  - sub_scores: [{{"sub_id": "a", "obtained_marks": 3, "ai_feedback": "Correct answer"}}, {{"sub_id": "b", "obtained_marks": 0, "ai_feedback": "Not attempted/found"}}]
-  - obtained_marks: 3 (sum of sub-scores)
-  - ai_feedback: "Part (a) correct. Part (b) not attempted."
+### CRITICAL FIELD RULES
+1. obtained_marks = -1.0 → question not found (system will convert to 0 with status "not_found")
+2. obtained_marks = 0.0 → question found but wrong/blank
+3. obtained_marks > 0 → normal grading
+4. sub_scores required for sub-questions; SUM(sub_scores) = main obtained_marks
+5. ai_feedback must be improvement-focused and actionable:
+    - Format: "Improve: <missing/weak point>. Add: <specific point/data/example/keyword>."
+    - Do NOT mention score caps or internal scoring rules in feedback
+    - Always include at least one concrete add-on (data, example, committee, article, case)
+6. confidence must be between 0.0 and 1.0
+7. SELECTIVITY: Identify ONLY the top 3 to 5 most critical points (positive or negative) on this page. Do not annotate every sentence.
+8. CATEGORIZATION: For each point, choose a style:
+    - INLINE_SYMBOL (label TICK/CROSS)
+    - MARGIN_NOTE (brief note 2-5 words; written in margin with line)
+    - STRUCTURAL_BOX (only for large diagram/paragraph needing rework)
+9. If you use style fields, include: anchor (3-5 words), style, label, color. Otherwise use annotation_type/anchor_text.
+10. Do NOT underline every line or mark line-by-line. Underline only a correct key phrase (not wrong/weak text).
+11. For COMMENT/MARGIN_NOTE, write how adding the missing point/example/data would improve the answer and raise marks (do NOT mention caps)
 
-### Flag Types (use when needed):
-- "BORDERLINE_SCORE": Score is borderline pass/fail
-- "ALTERNATIVE_METHOD": Valid but unusual approach used
-- "EXCEPTIONAL_ANSWER": Unusually brilliant answer
-- "NEEDS_REVIEW": Uncertain grading, needs teacher check
-- "ILLEGIBLE_PORTIONS": Some parts hard to read
-
-If a question has no sub-questions, leave sub_scores as an empty array.
-
-## QUALITY ASSURANCE
-
-Before finalizing:
-1. ARITHMETIC CHECK: Sum of marks = Total, no question exceeds max
-2. CONSISTENCY CHECK: Same answer type = same treatment
-3. COMPLETENESS CHECK: All questions evaluated
-4. REASONABLENESS CHECK: Marks correlate with answer quality
+## QUALITY ASSURANCE CHECKLIST
+- ARITHMETIC CHECK: no question exceeds max marks
+- CONSISTENCY CHECK: similar answers get similar marks
+- COMPLETENESS CHECK: every question evaluated
+- FEEDBACK CHECK: meaningful, actionable, and encouraging
 
 ## FINAL DIRECTIVE
-
-Grade with integrity. Grade with insight. Grade with care.
-Your measure of success: When the same paper graded by you and by an expert teacher receives the same marks.
+Grade with integrity, insight, and care. Your success = matching an expert teacher's grading.
 """
 
     # Prepare question details with sub-questions
+    def normalize_ai_annotations(raw_annotations: List[dict]) -> List[AnnotationData]:
+        normalized: List[AnnotationData] = []
+        import re
+
+        def _skip_anchor(anchor: str, ann_type: str) -> bool:
+            if not anchor:
+                return True
+            cleaned = str(anchor).strip().lower()
+            if len(cleaned) < 3:
+                return True
+            if re.fullmatch(r"\d+[\.)]?$", cleaned):
+                return True
+            return False
+        for ann in raw_annotations or []:
+            if not isinstance(ann, dict):
+                continue
+            if "style" in ann and "annotation_type" not in ann:
+                style = str(ann.get("style", "")).upper()
+                label = str(ann.get("label") or "")
+                anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                if _skip_anchor(anchor_text, style):
+                    continue
+                if style == "INLINE_SYMBOL":
+                    symbol = label.strip().upper()
+                    mapped_type = AnnotationType.CHECKMARK if symbol == "TICK" else AnnotationType.CROSS_MARK
+                elif style == "MARGIN_NOTE":
+                    mapped_type = AnnotationType.COMMENT
+                elif style == "STRUCTURAL_BOX":
+                    mapped_type = AnnotationType.HIGHLIGHT_BOX
+                else:
+                    mapped_type = AnnotationType.COMMENT
+
+                page_number = ann.get("page_number")
+                page_index = max(0, int(page_number) - 1) if page_number else ann.get("page_index", -1)
+                if page_index is None or page_index < 0:
+                    continue
+
+                normalized.append(AnnotationData(
+                    type=mapped_type,
+                    x=0,
+                    y=0,
+                    text=label,
+                    color=ann.get("color", "red"),
+                    size=26,
+                    page_index=page_index,
+                    anchor_text=anchor_text
+                ))
+            elif "annotation_type" in ann:
+                ann_type = str(ann.get("annotation_type", "")).upper()
+                type_map = {
+                    "TICK": AnnotationType.CHECKMARK,
+                    "UNDERLINE": AnnotationType.ERROR_UNDERLINE,
+                    "CROSS": AnnotationType.CROSS_MARK,
+                    "BOX": AnnotationType.HIGHLIGHT_BOX,
+                    "COMMENT": AnnotationType.COMMENT
+                }
+                mapped_type = type_map.get(ann_type, ann.get("type", AnnotationType.CHECKMARK))
+                sentiment = str(ann.get("sentiment", "")).lower()
+                if ann_type == "UNDERLINE":
+                    color = ann.get("color", "blue")
+                else:
+                    color = "green" if sentiment == "positive" else "red" if sentiment == "negative" else ann.get("color", "red")
+                label = ann.get("short_label") or ann.get("reason") or ann.get("anchor_text") or ""
+                page_number = ann.get("page_number")
+                page_index = max(0, int(page_number) - 1) if page_number else ann.get("page_index", -1)
+                if page_index is None or page_index < 0:
+                    continue
+                anchor_text = ann.get("anchor_text") or ann.get("short_label") or ann.get("reason") or label
+                if _skip_anchor(anchor_text, mapped_type):
+                    continue
+                normalized.append(AnnotationData(
+                    type=mapped_type,
+                    x=0,
+                    y=0,
+                    text=str(label),
+                    color=color,
+                    size=26,
+                    page_index=page_index,
+                    anchor_text=anchor_text
+                ))
+            else:
+                try:
+                    normalized.append(AnnotationData(**ann))
+                except Exception:
+                    continue
+        if not normalized:
+            return normalized
+
+        priority = {
+            AnnotationType.CROSS_MARK: 0,
+            AnnotationType.HIGHLIGHT_BOX: 1,
+            AnnotationType.COMMENT: 1,
+            AnnotationType.ERROR_UNDERLINE: 2,
+            AnnotationType.CHECKMARK: 3
+        }
+        normalized.sort(key=lambda a: priority.get(a.type, 99))
+
+        # Limit annotation density to keep pages clean and readable
+        total_limit = 3
+        type_limits = {
+            AnnotationType.ERROR_UNDERLINE: 1,
+            AnnotationType.HIGHLIGHT_BOX: 1,
+            AnnotationType.COMMENT: 1,
+            AnnotationType.CROSS_MARK: 1,
+            AnnotationType.CHECKMARK: 1
+        }
+        counts: Dict[str, int] = {}
+        limited: List[AnnotationData] = []
+        for ann in normalized:
+            ann_type = ann.type
+            if ann_type in type_limits:
+                if counts.get(ann_type, 0) >= type_limits[ann_type]:
+                    continue
+            if len(limited) >= total_limit:
+                break
+            counts[ann_type] = counts.get(ann_type, 0) + 1
+            limited.append(ann)
+
+        return limited
+
     questions_text = ""
     for q in questions:
         q_text = f"Q{q['question_number']}: Max marks = {q['max_marks']}"
@@ -5116,8 +5982,49 @@ Your measure of success: When the same paper graded by you and by an expert teac
         
         questions_text += q_text + "\n"
 
+    # Helper: enforce strict half-minus-one ONLY when score lands exactly on half
+    def enforce_upsc_caps(scores: List[QuestionScore]) -> List[QuestionScore]:
+        if grading_mode != "strict":
+            return scores
+
+        q_max_map = {q.get("question_number"): float(q.get("max_marks") or 0) for q in questions}
+
+        for s in scores:
+            q_max = q_max_map.get(s.question_number, 0)
+            obtained = s.obtained_marks if s.obtained_marks is not None else 0
+            if q_max > 0:
+                half = 0.5 * q_max
+                cap = max(0.0, half - 1.0)
+                if obtained > cap:
+                    s.obtained_marks = cap
+                elif s.obtained_marks is None:
+                    s.obtained_marks = obtained
+
+            # Cap sub-scores too
+            if s.sub_scores:
+                for sub in s.sub_scores:
+                    sub_max = getattr(sub, "max_marks", None)
+                    sub_obtained = getattr(sub, "obtained_marks", None)
+                    sub_max_val = float(sub_max or 0)
+                    sub_obtained_val = float(sub_obtained or 0)
+                    if sub_max_val > 0:
+                        sub_half = 0.5 * sub_max_val
+                        sub_cap = max(0.0, sub_half - 1.0)
+                        if sub_obtained_val > sub_cap:
+                            setattr(sub, "obtained_marks", sub_cap)
+                        elif sub_obtained is None:
+                            setattr(sub, "obtained_marks", sub_obtained_val)
+        return scores
+
     # Define helper for grading a chunk of images
     async def process_chunk(chunk_imgs, chunk_idx, total_chunks, start_page_num):
+        print(f"\n{'='*70}")
+        print(f"[CHUNK-{chunk_idx+1}] === STARTING CHUNK PROCESSING ===")
+        print(f"[CHUNK-{chunk_idx+1}] Pages: {start_page_num+1} to {start_page_num+len(chunk_imgs)}")
+        print(f"[CHUNK-{chunk_idx+1}] Total images in chunk: {len(chunk_imgs)}")
+        print(f"[CHUNK-{chunk_idx+1}] Chunk image sizes: {[len(img) if isinstance(img, (str, bytes)) else '?' for img in chunk_imgs[:3]]} ...")
+        print(f"{'='*70}")
+        
         chunk_chat = LlmChat(
             api_key=api_key,
             session_id=f"grading_{content_hash}_{chunk_idx}",
@@ -5129,19 +6036,27 @@ Your measure of success: When the same paper graded by you and by an expert teac
         
         if use_text_based_grading:
             # TEXT-BASED: Only send student images, model answer is in prompt text
+            print(f"[CHUNK-{chunk_idx+1}] Adding {len(chunk_imgs)} student images (TEXT-BASED mode)...")
             for img in chunk_imgs:
                 chunk_all_images.append(ImageContent(image_base64=img))
+                print(f"[CHUNK-{chunk_idx+1}]   + Added image {len(chunk_all_images)} (base64 length: {len(img) if isinstance(img, str) else 'bytes'})")
             model_images_included = 0
             logger.info(f"Chunk {chunk_idx+1}: TEXT-BASED grading with {len(chunk_imgs)} student images")
+            print(f"[CHUNK-{chunk_idx+1}] TEXT-BASED: {len(chunk_imgs)} student images, model answer text ({len(model_answer_text)} chars)")
         else:
             # IMAGE-BASED: Include model answer images
             if model_answer_images:
+                print(f"[CHUNK-{chunk_idx+1}] Adding {len(model_answer_images)} model answer images (IMAGE-BASED mode)...")
                 for img in model_answer_images:
                     chunk_all_images.append(ImageContent(image_base64=img))
+                    print(f"[CHUNK-{chunk_idx+1}]   + Added model image {len(chunk_all_images)} (base64 length: {len(img) if isinstance(img, str) else 'bytes'})")
+            print(f"[CHUNK-{chunk_idx+1}] Adding {len(chunk_imgs)} student images (IMAGE-BASED mode)...")
             for img in chunk_imgs:
                 chunk_all_images.append(ImageContent(image_base64=img))
+                print(f"[CHUNK-{chunk_idx+1}]   + Added student image {len(chunk_all_images)} (base64 length: {len(img) if isinstance(img, str) else 'bytes'})")
             model_images_included = len(model_answer_images) if model_answer_images else 0
             logger.info(f"Chunk {chunk_idx+1}: IMAGE-BASED grading with {model_images_included} model + {len(chunk_imgs)} student images")
+            print(f"[CHUNK-{chunk_idx+1}] IMAGE-BASED: {model_images_included} model images + {len(chunk_imgs)} student images")
         
         # Build prompt
         partial_instruction = ""
@@ -5155,6 +6070,7 @@ This is PART {chunk_idx+1} of {total_chunks} of the student's answer (Pages {sta
 - If a question (or sub-question) is completely missing from these pages, return -1.0 for 'obtained_marks' to indicate 'Not Seen'.
 - If a question is present but incorrect/blank, return 0.0 or appropriate marks.
 - Do NOT guess marks for questions you cannot see.
+- You MUST still return a score entry for EVERY question in the list; use -1.0 for questions not seen in this part.
 """
 
         # Build learned patterns section
@@ -5208,16 +6124,25 @@ Below is the complete model answer content. Use this as your grading reference:
 1. **CONSISTENCY IS SACRED**: Same answer = Same score ALWAYS
 2. **MODEL ANSWER IS REFERENCE**: Compare against the model answer text provided above
 3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
-4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
-5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
-6. **FEEDBACK QUALITY**: Provide constructive, specific feedback
-7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
-8. **HANDLE ROTATION**: If text appears sideways, still read and grade it
-9. **SUB-QUESTION GRADING (CRITICAL)**: 
+4. **CALCULATION VERIFICATION (FOR MATHEMATICAL PROBLEMS)**:
+   - Double-check every numerical calculation shown by student
+   - If student shows method but calculation is WRONG: Apply {grading_mode} mode penalty rules
+   - Example: "Formula is correct but 1750/2 = 625 (should be 875)" = 20-30% marks in STRICT mode
+   - Incorrect numerical answer with correct method ≠ full marks
+   - Only give full marks if BOTH method AND calculation are correct
+5. **CARRY-FORWARD**: Credit correct logic only if the arithmetic is correct
+6. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+    - Do NOT default to half marks. If the answer deserves exactly half, award (half - 1 mark) instead.
+    - Award exact half marks ONLY when the answer is near-perfect and misses nothing material.
+7. **FEEDBACK QUALITY**: Provide constructive, specific feedback
+8. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
+9. **HANDLE ROTATION**: If text appears sideways, still read and grade it
+10. **SUB-QUESTION GRADING (CRITICAL)**: 
    - If a question has sub-parts (a, b, c, i, ii, iii, etc.), you MUST grade EACH sub-part INDIVIDUALLY
    - Provide separate obtained_marks and ai_feedback for each sub-part in the sub_scores array
    - Do NOT give overall feedback for questions with sub-parts - grade each part separately
    - If a sub-part is not attempted, mark it as 0 with feedback "Not attempted/found"
+   - **For sub-questions with numerical answers**: Verify both method and calculation accuracy for each sub-part
 
 ## OUTPUT
 Grade each question providing:
@@ -5259,6 +6184,8 @@ First, analyze the MODEL ANSWER thoroughly:
 3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
 4. **CARRY-FORWARD**: Credit correct logic even on wrong base values
 5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+    - Do NOT default to half marks. If the answer deserves exactly half, award (half - 1 mark) instead.
+    - Award exact half marks ONLY when the answer is near-perfect and misses nothing material.
 6. **FEEDBACK QUALITY**: Provide constructive, specific feedback that helps learning
 7. **COMPLETE EVALUATION**: Grade ALL {len(questions)} questions - check EVERY page
 8. **SUB-QUESTION GRADING (CRITICAL)**: 
@@ -5266,6 +6193,12 @@ First, analyze the MODEL ANSWER thoroughly:
    - Provide separate obtained_marks and ai_feedback for each sub-part in the sub_scores array
    - Do NOT give overall feedback for questions with sub-parts - grade each part separately
    - If a sub-part is not attempted, mark it as 0 with feedback "Not attempted/found"
+9. **ANSWER CONTINUATION**: Answers may continue on later pages without repeating the question number. Infer continuity and grade the full answer accordingly.
+10. **MANDATORY OUTPUT**: Return a score entry for EVERY question in the list. If not seen in this part, set obtained_marks = -1.0 and ai_feedback = "Not seen in this part".
+11. **IMPROVEMENT FORMAT**: End feedback with:
+    Improvements:
+    - Reason 1: <short, specific fix>
+    - Reason 2: <short, specific fix>
 
 ## PHASE 3: OUTPUT
 Grade each question providing:
@@ -5301,6 +6234,8 @@ You must grade based on:
 3. **PRECISE SCORING**: Use decimals (e.g., 8.5, 7.25) not ranges
 4. **CONSERVATIVE FLAGGING**: Flag uncertain gradings for teacher review
 5. **PARTIAL CREDIT**: Apply according to {grading_mode} mode rules
+    - Do NOT default to half marks. If the answer deserves exactly half, award (half - 1 mark) instead.
+    - Award exact half marks ONLY when the answer is near-perfect and misses nothing material.
 6. **SUBJECT KNOWLEDGE**: Use your expertise to assess correctness
 7. **CONSTRUCTIVE FEEDBACK**: Help the student understand and improve
 8. **SUB-QUESTION GRADING (CRITICAL)**: 
@@ -5308,13 +6243,34 @@ You must grade based on:
    - Provide separate obtained_marks and ai_feedback for each sub-part in the sub_scores array
    - Do NOT give overall feedback for questions with sub-parts - grade each part separately
    - If a sub-part is not attempted, mark it as 0 with feedback "Not attempted/found"
+9. **ANSWER CONTINUATION**: Answers may continue on later pages without repeating the question number. Infer continuity and grade the full answer accordingly.
+10. **MANDATORY OUTPUT**: Return a score entry for EVERY question in the list. If not seen in this part, set obtained_marks = -1.0 and ai_feedback = "Not seen in this part".
+11. **IMPROVEMENT FORMAT**: End feedback with:
+    Improvements:
+    - Reason 1: <short, specific fix>
+    - Reason 2: <short, specific fix>
 
 Return valid JSON only."""
 
         user_msg = UserMessage(text=prompt_text, file_contents=chunk_all_images)
 
+        print(f"\n[CHUNK-{chunk_idx+1}] === ABOUT TO SEND TO AI ===")
+        print(f"[CHUNK-{chunk_idx+1}] Total images being sent to AI: {len(chunk_all_images)}")
+        print(f"[CHUNK-{chunk_idx+1}] Prompt text length: {len(prompt_text)} chars")
+        print(f"[CHUNK-{chunk_idx+1}] Model answer text in prompt: {len(model_answer_text)} chars")
+        
+        if len(chunk_all_images) == 0:
+            print(f"[CHUNK-{chunk_idx+1}] ⚠️  WARNING: NO IMAGES BEING SENT TO AI!")
+        else:
+            total_img_size = sum(len(img.image_base64) if hasattr(img, 'image_base64') else len(str(img)) for img in chunk_all_images)
+            print(f"[CHUNK-{chunk_idx+1}] Total image data size: {total_img_size} bytes")
+            print(f"[CHUNK-{chunk_idx+1}] Mode: {grading_mode} ({('TEXT-BASED' if use_text_based_grading else 'IMAGE-BASED')})")
+        print(f"{'='*70}\n")
+        
         # Retry logic with exponential backoff
         import asyncio
+        import json
+        import re
         max_retries = 3  # Reduced from 5 to 3 for faster failure
         base_retry_delay = 5  # Reduced base delay
         
@@ -5326,6 +6282,7 @@ Return valid JSON only."""
                     logger.info(f"Waiting {wait_time}s before retry {attempt+1}")
                     await asyncio.sleep(wait_time)
                 
+                print(f"[CHUNK-{chunk_idx+1}] Sending to AI (attempt {attempt+1}/{max_retries})...")
                 logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                 
                 # Add timeout to prevent indefinite hanging (120 seconds)
@@ -5343,15 +6300,19 @@ Return valid JSON only."""
                         raise TimeoutError(f"AI grading timed out after {max_retries} attempts (120s each)")
 
                 # Robust JSON parsing with multiple strategies
-                import json
-                import re
                 resp_text = ai_resp.strip()
+                
+                print(f"[CHUNK-{chunk_idx+1}] AI response received ({len(resp_text)} chars)")
+                print(f"[CHUNK-{chunk_idx+1}] Response preview (first 300 chars): {resp_text[:300]}")
                 
                 # Strategy 1: Direct parse
                 try:
                     res = json.loads(resp_text)
-                    return res.get("scores", [])
-                except json.JSONDecodeError:
+                    scores = res.get("scores", [])
+                    print(f"[CHUNK-{chunk_idx+1}] Successfully parsed JSON - {len(scores)} questions graded")
+                    return scores
+                except json.JSONDecodeError as e:
+                    print(f"[CHUNK-{chunk_idx+1}] Direct JSON parse failed: {e}")
                     pass
                 
                 # Strategy 2: Remove code blocks
@@ -5362,8 +6323,11 @@ Return valid JSON only."""
                     resp_text = resp_text.strip()
                     try:
                         res = json.loads(resp_text)
-                        return res.get("scores", [])
-                    except json.JSONDecodeError:
+                        scores = res.get("scores", [])
+                        print(f"[CHUNK-{chunk_idx+1}] Parsed JSON from code blocks - {len(scores)} questions graded")
+                        return scores
+                    except json.JSONDecodeError as e:
+                        print(f"[CHUNK-{chunk_idx+1}] Code block parsing failed: {e}")
                         pass
                 
                 # Strategy 3: Find JSON in response
@@ -5371,11 +6335,15 @@ Return valid JSON only."""
                 if json_match:
                     try:
                         res = json.loads(json_match.group())
-                        return res.get("scores", [])
-                    except json.JSONDecodeError:
+                        scores = res.get("scores", [])
+                        print(f"[CHUNK-{chunk_idx+1}] Extracted JSON from response - {len(scores)} questions graded")
+                        return scores
+                    except json.JSONDecodeError as e:
+                        print(f"[CHUNK-{chunk_idx+1}] JSON extraction failed: {e}")
                         pass
                 
                 # All strategies failed
+                print(f"[CHUNK-{chunk_idx+1}] ALL JSON PARSING FAILED (attempt {attempt+1}/{max_retries})")
                 logger.warning(f"Failed to parse grading JSON (attempt {attempt + 1}). Response preview: {resp_text[:200]}")
                 if attempt < max_retries - 1:
                     continue  # Will retry with exponential backoff at loop start
@@ -5385,6 +6353,8 @@ Return valid JSON only."""
 
             except Exception as e:
                 error_msg = str(e).lower()
+                
+                print(f"[CHUNK-{chunk_idx+1}] ERROR (attempt {attempt+1}/{max_retries}): {str(e)[:200]}")
                 
                 # Check for API errors (502, 503, timeouts)
                 if "502" in str(e) or "503" in str(e) or "badgateway" in error_msg or "timeout" in error_msg:
@@ -5420,7 +6390,7 @@ Return valid JSON only."""
 
     # CHUNKED PROCESSING LOGIC - REDUCED chunk size for better timeout handling
     CHUNK_SIZE = 8  # Process 8 pages at a time for stability
-    OVERLAP = 0
+    OVERLAP = 1  # Include 1-page overlap to preserve question context across chunks
     total_student_pages = len(images)
     
     # Create chunks
@@ -5429,9 +6399,11 @@ Return valid JSON only."""
         chunks.append((0, images))
     else:
         for i in range(0, total_student_pages, CHUNK_SIZE):
-            chunk = images[i : i + CHUNK_SIZE]
+            start_idx = max(0, i - OVERLAP) if i > 0 else 0
+            end_idx = min(total_student_pages, i + CHUNK_SIZE)
+            chunk = images[start_idx:end_idx]
             if chunk:
-                chunks.append((i, chunk))
+                chunks.append((start_idx, chunk))
             if i + CHUNK_SIZE >= total_student_pages:
                 break
     
@@ -5440,6 +6412,12 @@ Return valid JSON only."""
     # Add detailed logging for debugging
     logger.info(f"Questions to grade: {[q['question_number'] for q in questions]}")
     logger.info(f"Total marks possible: {sum(q['max_marks'] for q in questions)}")
+    
+    print(f"\n{'='*70}")
+    print(f"[GRADING-CHUNKS] Total chunks to process: {len(chunks)}")
+    for idx, (start_idx, chunk_imgs) in enumerate(chunks):
+        print(f"[GRADING-CHUNKS]   Chunk {idx+1}: Pages {start_idx+1} to {start_idx+len(chunk_imgs)} ({len(chunk_imgs)} pages)")
+    print(f"{'='*70}\n")
 
     # Store aggregated results
     # Use deterministic aggregation: Use the FIRST valid score (>=0) encountered
@@ -5449,10 +6427,13 @@ Return valid JSON only."""
 
     all_chunk_results = []
     for idx, (start_idx, chunk_imgs) in enumerate(chunks):
+        print(f"\n[GRADING-PROGRESS] Processing chunk {idx+1}/{len(chunks)}...")
         chunk_scores_data = await process_chunk(chunk_imgs, idx, len(chunks), start_idx)
+        print(f"[GRADING-PROGRESS] Chunk {idx+1} returned {len(chunk_scores_data)} question scores")
         logger.info(f"Chunk {idx+1}/{len(chunks)} returned {len(chunk_scores_data)} scores")
         all_chunk_results.append(chunk_scores_data)
     
+    print(f"\n[GRADING-AGGREGATION] All chunks processed - collecting results...")
     logger.info(f"Total chunk results collected: {len(all_chunk_results)} chunks with {sum(len(cr) for cr in all_chunk_results)} total score entries")
 
     # Deterministic Aggregation - Use HIGHEST valid score from any chunk
@@ -5486,14 +6467,21 @@ Return valid JSON only."""
                  "ai_feedback": "Question not found in any page (or grading failed)",
                  "sub_scores": []
              }
+             print(f"[GRADING-RESULT] Q{q_num}: NOT FOUND - checking all {len(all_chunk_results)} chunks")
 
         # Process status and normalize
         status = "graded"
-        if best_score_data.get("obtained_marks", -1.0) < 0:
+        obtained_for_status = best_score_data.get("obtained_marks")
+        obtained_for_status = obtained_for_status if obtained_for_status is not None else -1.0
+        if obtained_for_status < 0:
             status = "not_found"
             best_score_data["obtained_marks"] = 0.0
+            print(f"[GRADING-RESULT] Q{q_num}: Status={status}, Marks=0")
         elif best_score_data.get("obtained_marks") == 0 and "blank" in best_score_data.get("ai_feedback", "").lower():
             status = "not_attempted"
+            print(f"[GRADING-RESULT] Q{q_num}: Status={status}, Marks=0")
+        else:
+            print(f"[GRADING-RESULT] Q{q_num}: Status={status}, Marks={best_score_data.get('obtained_marks', 0)}")
             
         # Handle sub-scores - Use HIGHEST valid score from any chunk
         final_sub_scores = []
@@ -5521,12 +6509,14 @@ Return valid JSON only."""
                 if best_sq_data and best_sq_marks >= 0:
                     # Extract annotations for sub-question
                     sq_annotations = best_sq_data.get("annotations", [])
-                    annotations_list = [AnnotationData(**ann) for ann in sq_annotations] if sq_annotations else []
+                    annotations_list = normalize_ai_annotations(sq_annotations)
 
+                    safe_sq_marks = best_sq_marks if best_sq_marks is not None else 0.0
+                    safe_sq_max = sq.get("max_marks") if sq.get("max_marks") is not None else 0.0
                     final_sub_scores.append(SubQuestionScore(
                         sub_id=sq["sub_id"],
-                        max_marks=sq["max_marks"],
-                        obtained_marks=min(best_sq_marks, sq["max_marks"]),
+                        max_marks=safe_sq_max,
+                        obtained_marks=min(safe_sq_marks, safe_sq_max),
                         ai_feedback=best_sq_data.get("ai_feedback", ""),
                         annotations=annotations_list
                     ))
@@ -5547,11 +6537,25 @@ Return valid JSON only."""
             logger.debug(f"Q{q_num}: Using sum of sub-scores = {total_sub_marks}")
         else:
             # No sub-questions, use the question-level score directly
-            question_obtained_marks = best_score_data["obtained_marks"]
+            question_obtained_marks = best_score_data.get("obtained_marks")
+            if question_obtained_marks is None:
+                question_obtained_marks = 0.0
         
         # Extract question-level annotations
         q_annotations = best_score_data.get("annotations", [])
-        annotations_list = [AnnotationData(**ann) for ann in q_annotations] if q_annotations else []
+        annotations_list = normalize_ai_annotations(q_annotations)
+        if not annotations_list and status == "graded":
+            annotations_list = [
+                AnnotationData(
+                    type=AnnotationType.COMMENT,
+                    x=0,
+                    y=0,
+                    text="Revise",
+                    color="red",
+                    size=18,
+                    page_index=-1
+                )
+            ]
 
         qs_obj = QuestionScore(
             question_number=q_num,
@@ -5584,6 +6588,9 @@ Return valid JSON only."""
         logger.info(f"Deduplication: {len(final_scores)} -> {len(deduplicated_final_scores)} scores")
         final_scores = deduplicated_final_scores
 
+    # Enforce UPSC caps before caching
+    final_scores = enforce_upsc_caps(final_scores)
+
     # Store in Cache and DB
     try:
         # Update memory cache
@@ -5609,7 +6616,8 @@ Return valid JSON only."""
 async def generate_annotated_images_with_vision_ocr(
     original_images: List[str],
     question_scores: List[QuestionScore],
-    use_vision_ocr: bool = False  # DISABLED - set to True to enable Vision OCR annotations
+    use_vision_ocr: bool = False,  # DISABLED - set to True to enable Vision OCR annotations
+    dense_red_pen: bool = False  # Draw per-line red-pen annotations using OCR text lines
 ) -> List[str]:
     """
     Generate annotated images using AI-provided page positions.
@@ -5619,9 +6627,633 @@ async def generate_annotated_images_with_vision_ocr(
     
     Vision OCR credentials are saved at /app/backend/credentials/gcp-vision-key.json
     """
-    # Return original images without annotations (disabled for now)
-    logger.info(f"Annotation generation disabled - returning {len(original_images)} original images")
-    return original_images
+    # If OCR is disabled or unavailable, fall back to teacher-style margin annotations
+    if not use_vision_ocr and not dense_red_pen:
+        logger.info("Vision OCR disabled - generating margin annotations")
+        return generate_annotated_images(original_images, question_scores)
+
+    vision_service = get_vision_service()
+    if not vision_service.is_available() and not dense_red_pen:
+        logger.warning("Vision OCR not available - using margin annotations")
+        return generate_annotated_images(original_images, question_scores)
+
+    import re
+
+    def _normalize_text(text: str) -> List[str]:
+        if not text:
+            return []
+        return [t for t in re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower()).split() if t]
+
+    def _word_text(word):
+        return getattr(word, "text", None) if not isinstance(word, dict) else word.get("text")
+
+    def _word_vertices(word):
+        return getattr(word, "vertices", None) if not isinstance(word, dict) else word.get("vertices", [])
+
+    def _find_anchor_box(words, anchor_text: str):
+        tokens = _normalize_text(anchor_text)
+        if not tokens:
+            return None
+        from thefuzz import fuzz
+
+        word_texts = [str(_word_text(w) or "").lower() for w in words]
+        best = None
+        best_score = 0
+        for i in range(0, len(word_texts) - len(tokens) + 1):
+            window = word_texts[i:i + len(tokens)]
+            if not window:
+                continue
+            window_text = " ".join(window)
+            score = fuzz.ratio(" ".join(tokens), window_text)
+            if score > best_score:
+                best_score = score
+                best = words[i:i + len(tokens)]
+        if not best or best_score < 75:
+            return None
+        xs = [v.get("x", 0) for w in best for v in (_word_vertices(w) or [])]
+        ys = [v.get("y", 0) for w in best for v in (_word_vertices(w) or [])]
+        if not xs or not ys:
+            return None
+        return min(xs), min(ys), max(xs), max(ys)
+
+    def _to_box_2d(x1: float, y1: float, x2: float, y2: float, img_w: int, img_h: int) -> List[int]:
+        def norm(value: float, total: int) -> int:
+            if total <= 0:
+                return 0
+            return int(max(0, min(1000, round((value / total) * 1000))))
+        return [
+            norm(y1, img_h),
+            norm(x1, img_w),
+            norm(y2, img_h),
+            norm(x2, img_w)
+        ]
+
+    def _find_question_number_box(words, q_num: int):
+        targets = {
+            f"q{q_num}",
+            f"{q_num}",
+            f"{q_num}.",
+            f"{q_num})"
+        }
+        for w in words:
+            raw = (str(_word_text(w) or "")).lower().strip()
+            cleaned = re.sub(r"[^a-z0-9]", "", raw)
+            if raw in targets or cleaned in targets:
+                xs = [v.get("x", 0) for v in (_word_vertices(w) or [])]
+                ys = [v.get("y", 0) for v in (_word_vertices(w) or [])]
+                if xs and ys:
+                    return min(xs), min(ys), max(xs), max(ys)
+        return None
+
+    def _build_ocr_words(words):
+        ocr_words = []
+        for w in words:
+            xs = [v.get("x", 0) for v in (_word_vertices(w) or [])]
+            ys = [v.get("y", 0) for v in (_word_vertices(w) or [])]
+            if not xs or not ys:
+                continue
+            x1, x2 = min(xs), max(xs)
+            y1, y2 = min(ys), max(ys)
+            ocr_words.append({
+                "text": _word_text(w),
+                "x": x1,
+                "y": y1,
+                "w": x2 - x1,
+                "h": y2 - y1,
+                "xc": (x1 + x2) / 2,
+                "yc": (y1 + y2) / 2
+            })
+        ocr_words.sort(key=lambda i: (i["yc"], i["x"]))
+        return ocr_words
+
+    def calculate_annotation_coordinates(anchor_text: str, ocr_words, image_width: int, image_height: int):
+        if not anchor_text or not ocr_words:
+            return None
+        from thefuzz import fuzz
+
+        anchor_tokens = _normalize_text(anchor_text)
+        if not anchor_tokens:
+            return None
+
+        n = len(anchor_tokens)
+        best = None
+        best_score = 0
+
+        for i in range(0, max(1, len(ocr_words) - n + 1)):
+            window = ocr_words[i:i + n]
+            if not window:
+                continue
+            window_text = " ".join(_normalize_text(" ".join(w["text"] for w in window)))
+            if not window_text:
+                continue
+            score = fuzz.ratio(" ".join(anchor_tokens), window_text)
+            if score > best_score:
+                best_score = score
+                best = window
+
+        if best_score < 70 or not best:
+            return None
+
+        x1 = min(w["x"] for w in best)
+        y1 = min(w["y"] for w in best)
+        x2 = max(w["x"] + w["w"] for w in best)
+        y2 = max(w["y"] + w["h"] for w in best)
+
+        # padding 5%
+        pad_x = (x2 - x1) * 0.05
+        pad_y = (y2 - y1) * 0.05
+        x1 = max(0, x1 - pad_x)
+        y1 = max(0, y1 - pad_y)
+        x2 = min(image_width, x2 + pad_x)
+        y2 = min(image_height, y2 + pad_y)
+
+        return {
+            "x_percent": x1 / image_width,
+            "y_percent": y1 / image_height,
+            "w_percent": (x2 - x1) / image_width,
+            "h_percent": (y2 - y1) / image_height
+        }
+
+    def _find_best_line_box(words, anchor_text: str, y_threshold: float):
+        if not anchor_text:
+            return None
+        lines = _group_words_into_lines(words, y_threshold)
+        if not lines:
+            return None
+        anchor_norm = " ".join(_normalize_text(anchor_text))
+        if not anchor_norm:
+            return None
+        import difflib
+        best = None
+        best_score = 0.0
+        for line in lines:
+            line_norm = " ".join(_normalize_text(line.get("text", "")))
+            if not line_norm:
+                continue
+            score = difflib.SequenceMatcher(None, anchor_norm, line_norm).ratio()
+            if score > best_score:
+                best_score = score
+                best = line
+        if best_score >= 0.6 and best:
+            return best["x1"], best["y1"], best["x2"], best["y2"]
+        return None
+
+    def _group_words_into_lines(words, y_threshold: float):
+        if not words:
+            return []
+        items = []
+        for w in words:
+            xs = [v.get("x", 0) for v in (_word_vertices(w) or [])]
+            ys = [v.get("y", 0) for v in (_word_vertices(w) or [])]
+            if not xs or not ys:
+                continue
+            x1, x2 = min(xs), max(xs)
+            y1, y2 = min(ys), max(ys)
+            items.append({
+                "text": _word_text(w),
+                "x1": x1,
+                "x2": x2,
+                "y1": y1,
+                "y2": y2,
+                "yc": (y1 + y2) / 2
+            })
+        items.sort(key=lambda i: (i["yc"], i["x1"]))
+        lines = []
+        for item in items:
+            if not lines:
+                lines.append([item])
+                continue
+            last = lines[-1]
+            if abs(item["yc"] - last[-1]["yc"]) <= y_threshold:
+                last.append(item)
+            else:
+                lines.append([item])
+        line_boxes = []
+        for line in lines:
+            xs = [i["x1"] for i in line] + [i["x2"] for i in line]
+            ys = [i["y1"] for i in line] + [i["y2"] for i in line]
+            text = " ".join(i["text"] for i in line)
+            line_boxes.append({
+                "text": text,
+                "x1": min(xs),
+                "y1": min(ys),
+                "x2": max(xs),
+                "y2": max(ys)
+            })
+        return line_boxes
+
+    annotated_images: List[str] = []
+    for page_idx, original_image in enumerate(original_images):
+        try:
+            image_data = base64.b64decode(original_image)
+            with Image.open(io.BytesIO(image_data)) as img:
+                img_width, img_height = img.size
+        except Exception as e:
+            logger.warning(f"Could not get image dimensions: {e}, using defaults")
+            img_width, img_height = 1000, 1400
+
+        try:
+            ocr_result = vision_service.detect_text_from_base64(original_image, ["en"])
+            words = ocr_result.get("words", [])
+        except Exception as ocr_err:
+            logger.error(f"Vision OCR failed for page {page_idx + 1}: {ocr_err}")
+            words = []
+
+        ocr_words = _build_ocr_words(words) if words else []
+
+        def _is_cover_page(words, img_h: int) -> bool:
+            if not words:
+                return False
+            cover_keywords = {
+                "instruction",
+                "instructions",
+                "subject",
+                "evaluation",
+                "parameters",
+                "answer",
+                "sheet",
+                "roll",
+                "name",
+                "total",
+                "marks",
+                "signature",
+                "test",
+                "revision",
+                "paper",
+                "question",
+                "index"
+            }
+            hits = 0
+            for w in words:
+                text = str(_word_text(w) or "").lower().strip()
+                if not text:
+                    continue
+                ys = [v.get("y", 0) for v in (_word_vertices(w) or [])]
+                if ys and min(ys) > img_h * 0.45:
+                    continue
+                if text in cover_keywords:
+                    hits += 1
+                if hits >= 4:
+                    return True
+            return False
+
+        positioned_annotations: List[Annotation] = []
+
+        if _is_cover_page(words, img_height):
+            annotated_images.append(original_image)
+            continue
+
+        # Anchor-based annotations from question/sub-question annotations
+        for q_score in question_scores:
+            q_num = q_score.question_number
+            for ann_data in q_score.annotations:
+                if ann_data.page_index not in (-1, page_idx):
+                    continue
+                box = None
+                if ann_data.anchor_text:
+                    box = _find_anchor_box(words, ann_data.anchor_text)
+                    if not box:
+                        box = _find_best_line_box(words, ann_data.anchor_text, max(10, int(img_height * 0.012)))
+                    if not box and ocr_words:
+                        coords = calculate_annotation_coordinates(ann_data.anchor_text, ocr_words, img_width, img_height)
+                        if coords:
+                            x1 = coords["x_percent"] * img_width
+                            y1 = coords["y_percent"] * img_height
+                            x2 = x1 + coords["w_percent"] * img_width
+                            y2 = y1 + coords["h_percent"] * img_height
+                            box = (x1, y1, x2, y2)
+                if not box:
+                    box = _find_question_number_box(words, q_num)
+                if box:
+                    x1, y1, x2, y2 = box
+                    width = max(2, x2 - x1)
+                    height = max(2, y2 - y1)
+                    ann_data.box_2d = _to_box_2d(x1, y1, x2, y2, img_width, img_height)
+                    ann_data.x = int(x1)
+                    ann_data.y = int(y1)
+                    if ann_data.type == AnnotationType.ERROR_UNDERLINE:
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.ERROR_UNDERLINE,
+                                x=x1,
+                                y=y2 + 3,
+                                text=ann_data.text,
+                                color=ann_data.color or "blue",
+                                size=width
+                            ))
+                    elif ann_data.type == AnnotationType.CHECKMARK:
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.CHECKMARK,
+                                x=x2 + 6,
+                                y=y1,
+                                text="",
+                                color=ann_data.color,
+                                size=22
+                            ))
+                    elif ann_data.type == AnnotationType.CROSS_MARK:
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.CROSS_MARK,
+                                x=x2 + 6,
+                                y=y1,
+                                text="",
+                                color=ann_data.color,
+                                size=22
+                            ))
+                    elif ann_data.type == AnnotationType.HIGHLIGHT_BOX:
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.HIGHLIGHT_BOX,
+                                x=x1 - 4,
+                                y=y1 - 4,
+                                text=ann_data.text,
+                                color=ann_data.color,
+                                size=22,
+                                width=width + 8,
+                                height=height + 8
+                            ))
+                    elif ann_data.type == AnnotationType.COMMENT:
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.COMMENT,
+                                x=x2 + 8,
+                                y=max(5, y1 - 14),
+                                text=ann_data.text,
+                                color=ann_data.color or "red",
+                                size=16
+                            ))
+                    else:
+                            positioned_annotations.append(Annotation(
+                                annotation_type=ann_data.type,
+                                x=x1,
+                                y=y1,
+                                text=ann_data.text,
+                                color=ann_data.color,
+                                size=22
+                            ))
+
+            for sub_score in q_score.sub_scores:
+                for ann_data in sub_score.annotations:
+                    if ann_data.page_index not in (-1, page_idx):
+                        continue
+                    box = None
+                    if ann_data.anchor_text:
+                        box = _find_anchor_box(words, ann_data.anchor_text)
+                        if not box:
+                            box = _find_best_line_box(words, ann_data.anchor_text, max(10, int(img_height * 0.012)))
+                        if not box and ocr_words:
+                            coords = calculate_annotation_coordinates(ann_data.anchor_text, ocr_words, img_width, img_height)
+                            if coords:
+                                x1 = coords["x_percent"] * img_width
+                                y1 = coords["y_percent"] * img_height
+                                x2 = x1 + coords["w_percent"] * img_width
+                                y2 = y1 + coords["h_percent"] * img_height
+                                box = (x1, y1, x2, y2)
+                    if not box:
+                        box = _find_question_number_box(words, q_num)
+                    if box:
+                        x1, y1, x2, y2 = box
+                        width = max(2, x2 - x1)
+                        height = max(2, y2 - y1)
+                        ann_data.box_2d = _to_box_2d(x1, y1, x2, y2, img_width, img_height)
+                        ann_data.x = int(x1)
+                        ann_data.y = int(y1)
+                        if ann_data.type == AnnotationType.ERROR_UNDERLINE:
+                                positioned_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.ERROR_UNDERLINE,
+                                    x=x1,
+                                    y=y2 + 3,
+                                    text=ann_data.text,
+                                    color=ann_data.color or "blue",
+                                    size=width
+                                ))
+                        elif ann_data.type == AnnotationType.CHECKMARK:
+                                positioned_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.CHECKMARK,
+                                    x=x2 + 6,
+                                    y=y1,
+                                    text="",
+                                    color=ann_data.color,
+                                    size=22
+                                ))
+                        elif ann_data.type == AnnotationType.CROSS_MARK:
+                                positioned_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.CROSS_MARK,
+                                    x=x2 + 6,
+                                    y=y1,
+                                    text="",
+                                    color=ann_data.color,
+                                    size=22
+                                ))
+                        elif ann_data.type == AnnotationType.HIGHLIGHT_BOX:
+                                positioned_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.HIGHLIGHT_BOX,
+                                    x=x1 - 4,
+                                    y=y1 - 4,
+                                    text=ann_data.text,
+                                    color=ann_data.color,
+                                    size=22,
+                                    width=width + 8,
+                                    height=height + 8
+                                ))
+                        elif ann_data.type == AnnotationType.COMMENT:
+                                positioned_annotations.append(Annotation(
+                                    annotation_type=AnnotationType.COMMENT,
+                                    x=x2 + 8,
+                                    y=max(5, y1 - 14),
+                                    text=ann_data.text,
+                                    color=ann_data.color or "red",
+                                    size=16
+                                ))
+                        else:
+                                positioned_annotations.append(Annotation(
+                                    annotation_type=ann_data.type,
+                                    x=x1,
+                                    y=y1,
+                                    text=ann_data.text,
+                                    color=ann_data.color,
+                                    size=22
+                                ))
+
+        # Add professional margin totals for this page
+        margin_left = 16
+        auto_y = 120
+        page_questions = [q for q in question_scores if (q.page_number and q.page_number - 1 == page_idx)]
+        if not page_questions:
+            page_questions = question_scores
+        y_spacing = max(80, int(img_height / max(1, len(page_questions) + 1)))
+
+        for q_score in page_questions:
+            y_pos = auto_y
+            auto_y += y_spacing
+            score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+            score_text = (
+                str(int(q_score.obtained_marks))
+                if q_score.obtained_marks == int(q_score.obtained_marks)
+                else f"{q_score.obtained_marks:.1f}"
+            )
+            positioned_annotations.append(Annotation(
+                annotation_type=AnnotationType.MARGIN_BRACKET,
+                x=margin_left + 4,
+                y=max(10, y_pos - 10),
+                text="",
+                color="red",
+                size=80
+            ))
+            positioned_annotations.append(Annotation(
+                annotation_type=AnnotationType.SCORE_BOX,
+                x=margin_left + 6,
+                y=y_pos + 34,
+                text=f"{score_text}/{int(q_score.max_marks)}",
+                color="red",
+                size=28
+            ))
+            note_text = "Good" if score_pct >= 75 else "Avg" if score_pct >= 50 else "Revise" if score_pct >= 25 else "Incomp"
+            positioned_annotations.append(Annotation(
+                annotation_type=AnnotationType.MARGIN_NOTE,
+                x=margin_left + 12,
+                y=y_pos - 28,
+                text=note_text,
+                color="red",
+                size=16
+            ))
+
+        # Dense red-pen: underline each line and attach margin comments using OCR
+        if dense_red_pen:
+            y_threshold = max(10, int(img_height * 0.012))
+            line_boxes = _group_words_into_lines(words, y_threshold) if words else []
+
+            # Build comment pool from feedback
+            comment_pool = []
+            improvement_phrases = []
+            for q_score in question_scores:
+                if q_score.page_number and q_score.page_number - 1 != page_idx:
+                    continue
+                feedback = q_score.ai_feedback or ""
+                improvements = []
+                if "Improvements:" in feedback:
+                    improvements = feedback.split("Improvements:", 1)[-1]
+                parts = [p.strip(" -") for p in re.split(r"[\n\.]+", feedback) if p.strip()]
+                comment_pool.extend(parts[:3])
+                if improvements:
+                    improvement_phrases.extend([p.strip(" -") for p in re.split(r"[\n]+", improvements) if p.strip()])
+
+            # Fallback: synthesize lines if OCR failed
+            if not line_boxes:
+                top = int(img_height * 0.08)
+                bottom = int(img_height * 0.92)
+                step = max(28, int(img_height * 0.035))
+                y = top
+                while y < bottom:
+                    line_boxes.append({
+                        "x1": int(img_width * 0.12),
+                        "y1": y - 6,
+                        "x2": int(img_width * 0.85),
+                        "y2": y
+                    })
+                    y += step
+
+            # Group lines into paragraph blocks (for red boxes)
+            para_blocks = []
+            if line_boxes:
+                current = [line_boxes[0]]
+                for prev, nxt in zip(line_boxes, line_boxes[1:]):
+                    gap = nxt["y1"] - prev["y2"]
+                    if gap > y_threshold * 2:
+                        para_blocks.append(current)
+                        current = [nxt]
+                    else:
+                        current.append(nxt)
+                if current:
+                    para_blocks.append(current)
+
+            for block in para_blocks:
+                xs = [b["x1"] for b in block] + [b["x2"] for b in block]
+                ys = [b["y1"] for b in block] + [b["y2"] for b in block]
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.HIGHLIGHT_BOX,
+                    x=min(xs) - 6,
+                    y=min(ys) - 6,
+                    text="",
+                    color="red",
+                    size=22,
+                    width=(max(xs) - min(xs)) + 12,
+                    height=(max(ys) - min(ys)) + 12
+                ))
+
+            comment_idx = 0
+            for line_idx, line in enumerate(line_boxes):
+                width = max(2, line["x2"] - line["x1"])
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.ERROR_UNDERLINE,
+                    x=line["x1"],
+                    y=line["y2"] + 2,
+                    text="",
+                    color="red",
+                    size=width
+                ))
+                if comment_pool and line_idx % 3 == 0:
+                    comment = comment_pool[comment_idx % len(comment_pool)]
+                    comment_idx += 1
+                    note_x = min(line["x2"] + 16, img_width - 140)
+                    note_y = max(5, line["y1"] - 12)
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.COMMENT,
+                        x=note_x,
+                        y=note_y,
+                        text=comment[:80],
+                        color="red",
+                        size=16
+                    ))
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.CALLOUT_LINE,
+                        x=note_x - 4,
+                        y=note_y + 6,
+                        text="",
+                        color="red",
+                        size=0,
+                        width=int((line["x1"] + line["x2"]) / 2),
+                        height=int((line["y1"] + line["y2"]) / 2)
+                    ))
+
+            # Targeted boxes and comments from improvement phrases
+            for phrase in improvement_phrases[:6]:
+                box = _find_best_line_box(words, phrase, y_threshold) if words else None
+                if not box:
+                    continue
+                x1, y1, x2, y2 = box
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.HIGHLIGHT_BOX,
+                    x=x1 - 6,
+                    y=y1 - 6,
+                    text="",
+                    color="red",
+                    size=22,
+                    width=(x2 - x1) + 12,
+                    height=(y2 - y1) + 12
+                ))
+                note_x = min(x2 + 16, img_width - 140)
+                note_y = max(5, y1 - 12)
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.COMMENT,
+                    x=note_x,
+                    y=note_y,
+                    text=phrase[:80],
+                    color="red",
+                    size=16
+                ))
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.CALLOUT_LINE,
+                    x=note_x - 4,
+                    y=note_y + 6,
+                    text="",
+                    color="red",
+                    size=0,
+                    width=int((x1 + x2) / 2),
+                    height=int((y1 + y2) / 2)
+                ))
+
+        annotated_image = apply_annotations_to_image(original_image, positioned_annotations)
+        annotated_images.append(annotated_image)
+
+    logger.info(f"OCR annotations applied to {len(annotated_images)} pages")
+    return annotated_images
 
 
 def _generate_margin_annotations(
@@ -5676,105 +7308,21 @@ def generate_annotated_images(
     """
     try:
         logger.info(f"Generating annotated images for {len(original_images)} pages")
-        
-        # Auto-generate annotations from scores if AI didn't provide them
-        # This ensures annotations are always created
-        annotations_by_page = {}
-        for page_idx in range(len(original_images)):
-            annotations_by_page[page_idx] = []
-        
-        # Auto-generate annotations based on question scores
-        current_y = 120  # Starting Y position
-        y_spacing = 100  # Space between question annotations
-        margin_left = 30
-        
+
+        # Map questions to pages (use detected page_number when available)
+        page_questions: Dict[int, List[QuestionScore]] = {i: [] for i in range(len(original_images))}
         for q_score in question_scores:
-            # Determine which page this question likely appears on
-            # Simple heuristic: distribute questions evenly across pages
-            page_idx = min(
-                int((q_score.question_number - 1) / max(1, len(question_scores) / len(original_images))),
-                len(original_images) - 1
-            )
-            
-            # Check if AI provided annotations
-            has_ai_annotations = len(q_score.annotations) > 0 or any(
-                len(sub.annotations) > 0 for sub in q_score.sub_scores
-            )
-            
-            if not has_ai_annotations:
-                # Auto-generate basic annotations
-                # Add question number circle
-                annotations_by_page[page_idx].append(AnnotationData(
-                    type=AnnotationType.POINT_NUMBER,
-                    x=margin_left,
-                    y=current_y,
-                    text=str(q_score.question_number),
-                    color="black",
-                    size=25,
-                    page_index=page_idx
-                ))
-                
-                # Add score based on performance
-                score_percentage = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
-                
-                # Add checkmark or flag based on score
-                if score_percentage >= 60:
-                    # Good score - add checkmark
-                    annotations_by_page[page_idx].append(AnnotationData(
-                        type=AnnotationType.CHECKMARK,
-                        x=margin_left + 60,
-                        y=current_y,
-                        text="",
-                        color="green",
-                        size=25,
-                        page_index=page_idx
-                    ))
-                elif score_percentage < 30:
-                    # Low score - add flag
-                    annotations_by_page[page_idx].append(AnnotationData(
-                        type=AnnotationType.FLAG_CIRCLE,
-                        x=margin_left + 60,
-                        y=current_y + 5,
-                        text="R",
-                        color="red",
-                        size=30,
-                        page_index=page_idx
-                    ))
-                
-                # Add score circle
-                annotations_by_page[page_idx].append(AnnotationData(
-                    type=AnnotationType.SCORE_CIRCLE,
-                    x=margin_left + 120,
-                    y=current_y + 5,
-                    text=str(int(q_score.obtained_marks)) if q_score.obtained_marks == int(q_score.obtained_marks) else f"{q_score.obtained_marks:.1f}",
-                    color="green" if score_percentage >= 60 else "red",
-                    size=32,
-                    page_index=page_idx
-                ))
-                
-                current_y += y_spacing
+            if q_score.page_number and q_score.page_number > 0:
+                page_idx = min(q_score.page_number - 1, len(original_images) - 1)
             else:
-                # Use AI-provided annotations
-                for ann_data in q_score.annotations:
-                    if ann_data.page_index < len(original_images):
-                        annotations_by_page[ann_data.page_index].append(ann_data)
-                
-                # Add sub-question annotations
-                for sub_score in q_score.sub_scores:
-                    for ann_data in sub_score.annotations:
-                        if ann_data.page_index < len(original_images):
-                            annotations_by_page[ann_data.page_index].append(ann_data)
-        
-        # Now apply annotations to each page
+                page_idx = min(
+                    int((q_score.question_number - 1) / max(1, len(question_scores) / len(original_images))),
+                    len(original_images) - 1
+                )
+            page_questions[page_idx].append(q_score)
+
         annotated_images = []
         for page_idx, original_image in enumerate(original_images):
-            page_annotations = annotations_by_page.get(page_idx, [])
-            
-            if not page_annotations:
-                # No annotations for this page, keep original
-                annotated_images.append(original_image)
-                continue
-            
             # Get image dimensions for coordinate conversion
             try:
                 image_data = base64.b64decode(original_image)
@@ -5783,49 +7331,181 @@ def generate_annotated_images(
             except Exception as e:
                 logger.warning(f"Could not get image dimensions: {e}, using defaults")
                 img_width, img_height = 1000, 1400  # Default A4-ish dimensions
-            
-            # Convert AnnotationData to Annotation objects with positioning
-            positioned_annotations = []
-            current_y_pos = 120
-            
-            for ann_data in page_annotations:
-                # Check if AI provided box_2d coordinates (normalized 0-1000)
-                if ann_data.box_2d and len(ann_data.box_2d) == 4:
-                    # Convert normalized coordinates to pixel coordinates
-                    # box_2d format: [ymin, xmin, ymax, xmax]
-                    ymin, xmin, ymax, xmax = ann_data.box_2d
-                    x_pos = int(xmin / 1000 * img_width)
-                    y_pos = int(ymin / 1000 * img_height)
-                    # Optionally use center of box instead of top-left
-                    # x_pos = int((xmin + xmax) / 2 / 1000 * img_width)
-                    # y_pos = int((ymin + ymax) / 2 / 1000 * img_height)
-                    logger.debug(f"Converted box_2d {ann_data.box_2d} to pixels ({x_pos}, {y_pos})")
-                elif ann_data.x > 0 or ann_data.y > 0:
-                    # Use provided pixel coordinates
-                    x_pos = ann_data.x if ann_data.x > 0 else 30
-                    y_pos = ann_data.y if ann_data.y > 0 else current_y_pos
+
+            positioned_annotations: List[Annotation] = []
+            auto_annotation_y = 140
+            auto_annotation_step = 60
+
+            # Convert AI-provided annotations for this page
+            for q_score in page_questions.get(page_idx, []):
+                for ann_data in q_score.annotations:
+                    if ann_data.page_index != page_idx:
+                        continue
+                    if ann_data.box_2d and len(ann_data.box_2d) == 4:
+                        ymin, xmin, ymax, xmax = ann_data.box_2d
+                        x_pos = int(xmin / 1000 * img_width)
+                        y_pos = int(ymin / 1000 * img_height)
+                    elif ann_data.x > 0 or ann_data.y > 0:
+                        x_pos = ann_data.x if ann_data.x > 0 else 30
+                        y_pos = ann_data.y if ann_data.y > 0 else 120
+                    else:
+                        x_pos = 40
+                        y_pos = auto_annotation_y
+                        auto_annotation_y += auto_annotation_step
+                    positioned_annotations.append(Annotation(
+                        annotation_type=ann_data.type,
+                        x=x_pos,
+                        y=y_pos,
+                        text=ann_data.text,
+                        color=ann_data.color,
+                        size=ann_data.size
+                    ))
+
+                for sub_score in q_score.sub_scores:
+                    for ann_data in sub_score.annotations:
+                        if ann_data.page_index != page_idx:
+                            continue
+                        if ann_data.box_2d and len(ann_data.box_2d) == 4:
+                            ymin, xmin, ymax, xmax = ann_data.box_2d
+                            x_pos = int(xmin / 1000 * img_width)
+                            y_pos = int(ymin / 1000 * img_height)
+                        elif ann_data.x > 0 or ann_data.y > 0:
+                            x_pos = ann_data.x if ann_data.x > 0 else 30
+                            y_pos = ann_data.y if ann_data.y > 0 else 120
+                        else:
+                            x_pos = 40
+                            y_pos = auto_annotation_y
+                            auto_annotation_y += auto_annotation_step
+                        positioned_annotations.append(Annotation(
+                            annotation_type=ann_data.type,
+                            x=x_pos,
+                            y=y_pos,
+                            text=ann_data.text,
+                            color=ann_data.color,
+                            size=ann_data.size
+                        ))
+
+            # Teacher-style margin annotations
+            margin_left = 16
+            auto_y = 120
+            q_list = page_questions.get(page_idx, [])
+            y_spacing = max(80, int(img_height / max(1, len(q_list) + 1)))
+
+            for q_score in q_list:
+                if q_score.y_position is not None:
+                    y_pos = int(q_score.y_position / 1000 * img_height)
                 else:
-                    # Fallback: auto-position in margin
-                    x_pos = 30 if ann_data.type in [AnnotationType.CHECKMARK, AnnotationType.POINT_NUMBER] else 90
-                    y_pos = current_y_pos
-                    current_y_pos += 80
-                
-                ann = Annotation(
-                    annotation_type=ann_data.type,
-                    x=x_pos,
-                    y=y_pos,
-                    text=ann_data.text,
-                    color=ann_data.color,
-                    size=ann_data.size
+                    y_pos = auto_y
+                    auto_y += y_spacing
+
+                score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
+                score_text = (
+                    str(int(q_score.obtained_marks))
+                    if q_score.obtained_marks == int(q_score.obtained_marks)
+                    else f"{q_score.obtained_marks:.1f}"
                 )
-                positioned_annotations.append(ann)
-            
-            # Apply annotations to this page
+
+                # Margin bracket like a checked answer sheet
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.MARGIN_BRACKET,
+                    x=margin_left + 4,
+                    y=max(10, y_pos - 10),
+                    text="",
+                    color="red",
+                    size=80
+                ))
+
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.POINT_NUMBER,
+                    x=margin_left,
+                    y=y_pos,
+                    text=str(q_score.question_number),
+                    color="red",
+                    size=20
+                ))
+
+                if q_score.status == "not_attempted" or score_pct <= 0:
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.CROSS_MARK,
+                        x=margin_left + 50,
+                        y=y_pos,
+                        text="",
+                        color="red",
+                        size=26
+                    ))
+                elif score_pct >= 60:
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.CHECKMARK,
+                        x=margin_left + 50,
+                        y=y_pos,
+                        text="",
+                        color="green",
+                        size=26
+                    ))
+                elif score_pct < 40:
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.CROSS_MARK,
+                        x=margin_left + 50,
+                        y=y_pos,
+                        text="",
+                        color="red",
+                        size=26
+                    ))
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.ERROR_UNDERLINE,
+                        x=margin_left + 90,
+                        y=y_pos + 28,
+                        text="",
+                        color="red",
+                        size=90
+                    ))
+                else:
+                    positioned_annotations.append(Annotation(
+                        annotation_type=AnnotationType.FLAG_CIRCLE,
+                        x=margin_left + 50,
+                        y=y_pos + 5,
+                        text="R",
+                        color="red",
+                        size=24
+                    ))
+
+                # Score box on the left margin (teacher-style total)
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.SCORE_BOX,
+                    x=margin_left + 6,
+                    y=y_pos + 34,
+                    text=f"{score_text}/{int(q_score.max_marks)}",
+                    color="red",
+                    size=28
+                ))
+
+                # Short margin note based on quality
+                if score_pct >= 75:
+                    note_text = "Good"
+                elif score_pct >= 50:
+                    note_text = "Avg"
+                elif score_pct >= 25:
+                    note_text = "Revise"
+                else:
+                    note_text = "Incomp"
+
+                positioned_annotations.append(Annotation(
+                    annotation_type=AnnotationType.MARGIN_NOTE,
+                    x=margin_left + 12,
+                    y=y_pos - 28,
+                    text=note_text,
+                    color="red",
+                    size=16
+                ))
+
+            if not positioned_annotations:
+                annotated_images.append(original_image)
+                continue
+
             annotated_image = apply_annotations_to_image(original_image, positioned_annotations)
             annotated_images.append(annotated_image)
-            
             logger.info(f"Page {page_idx + 1}: Applied {len(positioned_annotations)} annotations")
-        
+
         logger.info(f"Successfully generated {len(annotated_images)} annotated images")
         return annotated_images
         
@@ -5959,93 +7639,24 @@ async def upload_model_answer(
         }}
     )
     
-    # Extract model answer content as text for efficient grading
-    logger.info(f"Extracting model answer content as text for exam {exam_id}")
-    model_answer_text = await extract_model_answer_content(
-        model_answer_images=images,
-        questions=exam.get("questions", [])
+    # Mark processing flags and trigger async extraction
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {
+            "model_answer_processing": True,
+            "model_answer_text_status": "processing",
+            "question_extraction_status": "processing",
+            "question_extraction_count": 0,
+            "model_answer_text_chars": 0
+        }}
     )
-    
-    # Store the extracted text in the exam_files collection
-    if model_answer_text:
-        await db.exam_files.update_one(
-            {"exam_id": exam_id, "file_type": "model_answer"},
-            {"$set": {
-                "model_answer_text": model_answer_text,
-                "text_extracted_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        logger.info(f"Stored model answer text ({len(model_answer_text)} chars) for exam {exam_id}")
-    
-    # Check if question paper exists
-    qp_imgs = await get_exam_question_paper_images(exam_id)
-    
-    # Logic:
-    # 1. If Question Paper exists -> Skip extraction (already done, unless we force, but user said skip)
-    # 2. If NO Question Paper -> Force extraction from Model Answer
-    
-    force_extraction = False
-    if not qp_imgs:
-        force_extraction = True
-        
-    result = await auto_extract_questions(exam_id, force=force_extraction)
-    
-    # RE-EXTRACT model answer text if questions were just populated
-    if result.get("success") and result.get("count", 0) > 0:
-        logger.info(f"Questions populated ({result.get('count')}). Re-extracting model answer text with question context...")
-        
-        # Fetch updated exam with questions
-        exam_updated = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
-        
-        # Re-extract with proper question context
-        model_answer_text_updated = await extract_model_answer_content(
-            model_answer_images=images,
-            questions=exam_updated.get("questions", [])
-        )
-        
-        # Update with better extraction
-        if model_answer_text_updated and len(model_answer_text_updated) > len(model_answer_text):
-            await db.exam_files.update_one(
-                {"exam_id": exam_id, "file_type": "model_answer"},
-                {"$set": {
-                    "model_answer_text": model_answer_text_updated,
-                    "text_extracted_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            logger.info(f"Updated model answer text ({len(model_answer_text_updated)} chars) with question context")
-            # Use the updated text for response
-            model_answer_text = model_answer_text_updated
 
-    # Determine extraction success
-    text_chars = len(model_answer_text) if model_answer_text else 0
-    extraction_success = text_chars > 500  # Consider successful if >500 chars
-    
-    message = "Model answer uploaded successfully."
-    if result.get("success"):
-        if result.get("skipped"):
-            message = f"✨ Model answer uploaded! Questions kept from {result.get('source').replace('_', ' ')}."
-        else:
-            message = f"✨ Model answer uploaded & {result.get('count')} questions auto-extracted from {result.get('source').replace('_', ' ')}!"
-    
-    # Add extraction status to message
-    if extraction_success:
-        message += f" ✅ Model answer content extracted successfully ({text_chars} characters)."
-    elif text_chars > 0:
-        message += f" ⚠️ Model answer extraction returned minimal content ({text_chars} characters). Grading may use image-based mode."
-    else:
-        message += " ❌ Model answer content extraction failed. Grading will use image-based mode (slower, less accurate)."
+    asyncio.create_task(_process_model_answer_async(exam_id))
 
     return {
-        "message": message,
+        "message": "✨ Model answer uploaded. Extraction is running in the background.",
         "pages": len(images),
-        "auto_extracted": result.get("success", False),
-        "extracted_count": result.get("count", 0),
-        "source": result.get("source", ""),
-        "text_extraction": {
-            "success": extraction_success,
-            "characters": text_chars,
-            "status": "success" if extraction_success else ("partial" if text_chars > 0 else "failed")
-        }
+        "processing": True
     }
 
 @api_router.post("/exams/{exam_id}/upload-question-paper")
@@ -6145,22 +7756,22 @@ async def upload_question_paper(
         }}
     )
     
-    # AUTO-EXTRACT questions from question paper (Priority: Always extract when uploading QP)
-    logger.info(f"Auto-extracting questions from question paper for exam {exam_id}")
+    # Trigger async extraction
+    await db.exams.update_one(
+        {"exam_id": exam_id},
+        {"$set": {
+            "question_paper_processing": True,
+            "question_extraction_status": "processing",
+            "question_extraction_count": 0
+        }}
+    )
 
-    result = await auto_extract_questions(exam_id, force=True)
+    asyncio.create_task(_process_question_paper_async(exam_id))
 
-    message = "Question paper uploaded successfully."
-    if result.get("success"):
-        message = f"✨ Question paper uploaded & {result.get('count')} questions auto-extracted!"
-    else:
-        message = "Question paper uploaded, but auto-extraction failed."
-        
     return {
-        "message": message,
+        "message": "✨ Question paper uploaded. Extraction is running in the background.",
         "pages": len(images),
-        "auto_extracted": result.get("success", False),
-        "extracted_count": result.get("count", 0)
+        "processing": True
     }
 
 @api_router.post("/exams/{exam_id}/upload-papers")
@@ -6185,7 +7796,7 @@ async def upload_student_papers(
     for file in files:
         file_bytes = await file.read()
         files_data.append({
-            "filename": filename,
+            "filename": file.filename,
             "content": file_bytes
         })
     
@@ -6330,7 +7941,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                     student_id=student_id,
                     student_name=student_name,
                     batch_id=exam["batch_id"],
-                    teacher_id=user.user_id
+                    teacher_id=teacher_id
                 )
                 
                 if error:
@@ -6354,51 +7965,241 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                 
                 if questions_from_collection:
                     questions_to_grade = questions_from_collection
-                    logger.info(f"Using {len(questions_to_grade)} questions from questions collection")
+                    q_nums = [q.get("question_number") for q in questions_to_grade]
+                    logger.info(f"Using {len(questions_to_grade)} questions from questions collection: Q{q_nums}")
+                    print(f"[GRADING-SETUP] Fetched from db.questions: {len(questions_to_grade)} questions: Q{q_nums}")
                 else:
                     questions_to_grade = exam.get("questions", [])
-                    logger.info(f"Using {len(questions_to_grade)} questions from exam document (fallback)")
+                    q_nums = [q.get("question_number") for q in questions_to_grade]
+                    logger.info(f"Using {len(questions_to_grade)} questions from exam document (fallback): Q{q_nums}")
+                    print(f"[GRADING-SETUP] Fetched from exam.questions: {len(questions_to_grade)} questions: Q{q_nums}")
+                
+                # If no questions exist, extract from first student answer sheet and cache
+                if not questions_to_grade:
+                    logger.info(f"No questions found - extracting from student answer sheet: {student_name}")
+                    print(f"[AUTO-EXTRACT] No questions in DB - extracting from first student paper")
+                    
+                    try:
+                        # Extract questions from student answer sheet
+                        extracted_questions = await extract_question_structure_from_paper(
+                            paper_images=images,
+                            paper_type="answer_sheet"
+                        )
+                        
+                        if extracted_questions and len(extracted_questions) > 0:
+                            # Save to questions collection for future use
+                            for q in extracted_questions:
+                                q["exam_id"] = exam_id
+                                q["extracted_from"] = "student_answer_sheet"
+                                q["extracted_at"] = datetime.now(timezone.utc).isoformat()
+                            
+                            await db.questions.insert_many(extracted_questions)
+                            logger.info(f"Extracted and cached {len(extracted_questions)} questions from student answer sheet")
+                            print(f"[AUTO-EXTRACT] Saved {len(extracted_questions)} questions to DB for exam {exam_id}")
+                            
+                            # Also update exam document for backward compatibility
+                            await db.exams.update_one(
+                                {"exam_id": exam_id},
+                                {
+                                    "$set": {
+                                        "questions": extracted_questions,
+                                        "extraction_source": "student_answer_sheet"
+                                    }
+                                }
+                            )
+                            
+                            questions_to_grade = extracted_questions
+                        else:
+                            raise Exception("No questions could be extracted from answer sheet")
+                    
+                    except Exception as extract_err:
+                        logger.error(f"Failed to extract questions from answer sheet: {extract_err}")
+                        errors.append({
+                            "filename": filename,
+                            "student": student_name,
+                            "error": f"No questions found and auto-extraction from answer sheet failed: {str(extract_err)}"
+                        })
+                        await db.grading_jobs.update_one(
+                            {"job_id": job_id},
+                            {
+                                "$set": {
+                                    "processed_papers": idx + 1,
+                                    "failed": len(errors),
+                                    "errors": errors,
+                                    "updated_at": datetime.now(timezone.utc).isoformat()
+                                }
+                            }
+                        )
+                        continue
+
+                # Heuristic: If only 1 question found but paper has multiple pages,
+                # re-extract from answer sheet to capture all questions.
+                if len(questions_to_grade) <= 1 and len(images) >= 2:
+                    logger.warning(f"Suspiciously low question count ({len(questions_to_grade)}) - re-extracting from answer sheet")
+                    try:
+                        re_extracted = await extract_question_structure_from_paper(
+                            paper_images=images,
+                            paper_type="answer_sheet"
+                        )
+
+                        if re_extracted and len(re_extracted) > len(questions_to_grade):
+                            for q in re_extracted:
+                                q["exam_id"] = exam_id
+                                q["extracted_from"] = "student_answer_sheet"
+                                q["extracted_at"] = datetime.now(timezone.utc).isoformat()
+
+                            await db.questions.delete_many({"exam_id": exam_id})
+                            await db.questions.insert_many(re_extracted)
+                            await db.exams.update_one(
+                                {"exam_id": exam_id},
+                                {
+                                    "$set": {
+                                        "questions": re_extracted,
+                                        "extraction_source": "student_answer_sheet"
+                                    }
+                                }
+                            )
+
+                            questions_to_grade = re_extracted
+                            logger.info(f"Re-extracted {len(re_extracted)} questions from answer sheet")
+                    except Exception as re_err:
+                        logger.error(f"Re-extraction failed: {re_err}")
                 
                 if not questions_to_grade:
+                    logger.error(f"No questions available for grading exam {exam_id}")
                     errors.append({
+                        "filename": filename,
                         "student": student_name,
-                        "error": "No questions found for this exam. Please ensure questions are extracted or manually added."
+                        "error": "No questions available for grading"
                     })
+                    await db.grading_jobs.update_one(
+                        {"job_id": job_id},
+                        {
+                            "$set": {
+                                "processed_papers": idx + 1,
+                                "failed": len(errors),
+                                "errors": errors,
+                                "updated_at": datetime.now(timezone.utc).isoformat()
+                            }
+                        }
+                    )
                     continue
                 
+                # Compute total marks dynamically from extracted questions
+                def compute_total_marks(questions_list: List[dict]) -> float:
+                    total = 0.0
+                    for q in questions_list or []:
+                        if q.get("sub_questions"):
+                            total += sum(float(sq.get("max_marks") or 0) for sq in q.get("sub_questions", []))
+                        else:
+                            total += float(q.get("max_marks") or 0)
+                    return total
+
+                derived_total_marks = compute_total_marks(questions_to_grade)
+                if derived_total_marks > 0:
+                    await db.exams.update_one(
+                        {"exam_id": exam_id},
+                        {"$set": {"total_marks": derived_total_marks}}
+                    )
+
                 # Get pre-extracted model answer text for efficient grading
                 model_answer_text = await get_exam_model_answer_text(exam_id)
                 
+                print(f"[GRADING-SETUP] Sending to grade_with_ai:")
+                print(f"  - Student images: {len(images)}")
+                print(f"  - Model answer images: {len(model_answer_imgs)}")
+                q_list = [q.get("question_number") for q in questions_to_grade]
+                print(f"  - Questions to grade: {len(questions_to_grade)} -> Q{q_list}")
+                print(f"  - Model answer text: {len(model_answer_text)} chars")
+                
+                # Fetch subject name for UPSC detection
+                subject_name = None
+                if exam.get("subject_id"):
+                    subject_doc = await db.subjects.find_one({"subject_id": exam["subject_id"]}, {"_id": 0, "name": 1})
+                    subject_name = subject_doc.get("name") if subject_doc else None
+
                 scores = await grade_with_ai(
                     images=images,
                     model_answer_images=model_answer_imgs,
                     questions=questions_to_grade,
                     grading_mode=exam.get("grading_mode", "balanced"),
-                    total_marks=exam.get("total_marks", 100),
-                    model_answer_text=model_answer_text
+                    total_marks=derived_total_marks if derived_total_marks > 0 else exam.get("total_marks", 100),
+                    model_answer_text=model_answer_text,
+                    subject_name=subject_name,
+                    exam_name=exam.get("exam_name")
                 )
                 
                 # Generate annotated images with grading marks using Vision OCR
                 logger.info(f"Generating annotated images for {student_name} using Vision OCR")
                 try:
-                    annotated_images = await generate_annotated_images_with_vision_ocr(images, scores, use_vision_ocr=True)
+                    annotated_images = await generate_annotated_images_with_vision_ocr(
+                        images,
+                        scores,
+                        use_vision_ocr=True,
+                        dense_red_pen=True
+                    )
                 except Exception as ann_error:
                     logger.warning(f"Vision OCR annotation failed, falling back to basic: {ann_error}")
                     annotated_images = generate_annotated_images(images, scores)
                 
                 total_score = sum(s.obtained_marks for s in scores)
-                percentage = (total_score / exam["total_marks"]) * 100 if exam["total_marks"] > 0 else 0
+                effective_total = derived_total_marks if derived_total_marks > 0 else exam.get("total_marks", 100)
+                percentage = (total_score / effective_total) * 100 if effective_total > 0 else 0
                 
                 submission_id = f"sub_{uuid.uuid4().hex[:8]}"
+                
+                # Store PDF in GridFS to avoid BSON 16MB limit
+                pdf_gridfs_id = None
+
+                # Store images in GridFS to avoid BSON 16MB limit
+                images_gridfs_id = None
+                annotated_images_gridfs_id = None
+                
+                try:
+                    # Store PDF bytes
+                    pdf_gridfs_id = fs.put(
+                        pdf_bytes,
+                        filename=f"{submission_id}.pdf",
+                        submission_id=submission_id
+                    )
+                    logger.info(f"Stored PDF in GridFS: {pdf_gridfs_id}")
+
+                    # Store original images
+                    images_data = pickle.dumps(images)
+                    images_gridfs_id = fs.put(
+                        images_data,
+                        filename=f"{submission_id}_images.pkl",
+                        submission_id=submission_id
+                    )
+                    logger.info(f"Stored {len(images)} images in GridFS: {images_gridfs_id}")
+                    
+                    # Store annotated images
+                    annotated_data = pickle.dumps(annotated_images)
+                    annotated_images_gridfs_id = fs.put(
+                        annotated_data,
+                        filename=f"{submission_id}_annotated.pkl",
+                        submission_id=submission_id
+                    )
+                    logger.info(f"Stored {len(annotated_images)} annotated images in GridFS: {annotated_images_gridfs_id}")
+                except Exception as gridfs_err:
+                    logger.error(f"GridFS storage error: {gridfs_err}")
+                    # Fallback to direct storage for small submissions
+                    pass
+                
                 submission = {
                     "submission_id": submission_id,
                     "exam_id": exam_id,
                     "student_id": user_id,
                     "student_name": student_name,
-                    "file_data": base64.b64encode(pdf_bytes).decode(),
-                    "file_images": images,  # Original images
-                    "annotated_images": annotated_images,  # NEW: Annotated images with grading marks
+                    "file_data": "" if pdf_gridfs_id else base64.b64encode(pdf_bytes).decode(),
+                    "pdf_gridfs_id": str(pdf_gridfs_id) if pdf_gridfs_id else None,
+                    "images_gridfs_id": str(images_gridfs_id) if images_gridfs_id else None,
+                    "annotated_images_gridfs_id": str(annotated_images_gridfs_id) if annotated_images_gridfs_id else None,
+                    # Only store images directly if GridFS failed (small submissions)
+                    "file_images": images if not images_gridfs_id else [],
+                    "annotated_images": annotated_images if not annotated_images_gridfs_id else [],
                     "total_score": total_score,
+                    "total_marks": effective_total,
                     "percentage": round(percentage, 2),
                     "question_scores": [s.model_dump() for s in scores],
                     "status": "ai_graded",
@@ -6476,9 +8277,8 @@ async def grade_papers_background(
     user: User = Depends(get_current_user)
 ):
     """
-    Start background grading job - creates a task in MongoDB for worker to process
+    Start background grading job using in-memory file bytes (no GridFS)
     Returns immediately with job_id for progress polling
-    Stores large files in GridFS to avoid 16MB BSON limit
     """
     try:
         logger.info(f"=== GRADE PAPERS BG START === User: {user.user_id}, Exam: {exam_id}, Files: {len(files)}")
@@ -6495,35 +8295,22 @@ async def grade_papers_background(
         job_id = f"job_{uuid.uuid4().hex[:12]}"
         logger.info(f"Generated job_id: {job_id}")
         
-        # Read all files into memory CONCURRENTLY
+        # Read all files into memory
         logger.info(f"Reading {len(files)} files for job {job_id}...")
-        read_tasks = [file.read() for file in files]
-        file_contents = await asyncio.gather(*read_tasks)
-        logger.info(f"All files read successfully")
-        
-        # Store files in GridFS to avoid 16MB BSON document limit
-        # Only store file IDs in the task document
-        logger.info(f"Storing {len(files)} files in GridFS...")
-        file_refs = []
-        for file, content in zip(files, file_contents):
-            file_size_mb = len(content) / (1024 * 1024)
-            logger.info(f"  Storing {file.filename}: {file_size_mb:.2f} MB")
-            
-            # Store in GridFS
-            file_id = fs.put(
-                content,
-                filename=file.filename,
-                job_id=job_id,
-                content_type="application/pdf"
-            )
-            
-            file_refs.append({
+        files_data = []
+        for file in files:
+            file_bytes = await file.read()
+            if not file_bytes:
+                continue
+            files_data.append({
                 "filename": file.filename,
-                "gridfs_id": str(file_id),  # Store GridFS ID instead of file content
-                "size_bytes": len(content)
+                "content": file_bytes
             })
         
-        logger.info(f"All files stored in GridFS. Creating job record and task...")
+        if not files_data:
+            raise HTTPException(status_code=400, detail="No valid PDF files uploaded")
+        
+        logger.info(f"All files read successfully: {len(files_data)} files")
         
         # Create job record in database
         job_record = {
@@ -6531,7 +8318,7 @@ async def grade_papers_background(
             "exam_id": exam_id,
             "teacher_id": user.user_id,
             "status": "pending",
-            "total_papers": len(file_refs),
+            "total_papers": len(files_data),
             "processed_papers": 0,
             "successful": 0,
             "failed": 0,
@@ -6544,35 +8331,18 @@ async def grade_papers_background(
         await db.grading_jobs.insert_one(job_record)
         logger.info(f"Job record created in DB")
         
-        # Create task for worker to process
-        # Store only file references (GridFS IDs), not the actual file data
-        task_id = f"task_{uuid.uuid4().hex[:12]}"
-        task_record = {
-            "task_id": task_id,
-            "type": "grade_papers",
-            "status": "pending",
-            "data": {
-                "job_id": job_id,
-                "exam_id": exam_id,
-                "file_refs": file_refs,  # Only store GridFS IDs, not file content
-                "teacher_id": user.user_id
-            },
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        await db.tasks.insert_one(task_record)
-        logger.info(f"Task {task_id} created for worker. Job will be processed in background.")
-        
         await db.exams.update_one({"exam_id": exam_id}, {"$set": {"status": "processing"}})
-        
-        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} queued for {len(file_refs)} papers")
-        
+
+        # Start background processing directly (in-memory bytes)
+        asyncio.create_task(process_grading_job_in_background(job_id, exam_id, files_data, exam, user.user_id))
+
+        logger.info(f"=== GRADE PAPERS BG SUCCESS === Job {job_id} started for {len(files_data)} papers")
+
         return {
             "job_id": job_id,
-            "task_id": task_id,
             "status": "pending",
-            "total_papers": len(file_refs),
-            "message": f"Grading job queued for {len(file_refs)} papers. Worker will process in background."
+            "total_papers": len(files_data),
+            "message": f"Grading job started for {len(files_data)} papers. Use job_id to check progress."
         }
     except HTTPException:
         raise
@@ -6695,6 +8465,41 @@ async def get_submission(
         
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
+        
+        # Retrieve images/PDF from GridFS if available
+        if include_images:
+            # Retrieve PDF bytes
+            if submission.get("pdf_gridfs_id") and not submission.get("file_data"):
+                try:
+                    pdf_oid = ObjectId(submission["pdf_gridfs_id"])
+                    if fs.exists(pdf_oid):
+                        pdf_out = fs.get(pdf_oid)
+                        submission["file_data"] = base64.b64encode(pdf_out.read()).decode()
+                except Exception as e:
+                    logger.error(f"Error retrieving PDF from GridFS: {e}")
+            # Retrieve original images from GridFS
+            if submission.get("images_gridfs_id"):
+                try:
+                    images_oid = ObjectId(submission["images_gridfs_id"])
+                    if fs.exists(images_oid):
+                        grid_out = fs.get(images_oid)
+                        submission["file_images"] = pickle.loads(grid_out.read())
+                        logger.info(f"Retrieved {len(submission['file_images'])} images from GridFS")
+                except Exception as e:
+                    logger.error(f"Error retrieving images from GridFS: {e}")
+                    # Keep existing file_images if any
+            
+            # Retrieve annotated images from GridFS
+            if submission.get("annotated_images_gridfs_id"):
+                try:
+                    annotated_oid = ObjectId(submission["annotated_images_gridfs_id"])
+                    if fs.exists(annotated_oid):
+                        grid_out = fs.get(annotated_oid)
+                        submission["annotated_images"] = pickle.loads(grid_out.read())
+                        logger.info(f"Retrieved {len(submission['annotated_images'])} annotated images from GridFS")
+                except Exception as e:
+                    logger.error(f"Error retrieving annotated images from GridFS: {e}")
+                    # Keep existing annotated_images if any
 
         # Get exam to check visibility settings for students
         exam = await db.exams.find_one(
@@ -6750,11 +8555,9 @@ async def get_submission(
                     if file_id_str:
                         try:
                             # Use global fs object which is safe
-                            from bson import ObjectId
                             file_oid = ObjectId(file_id_str)
                             if fs.exists(file_oid):
                                 grid_out = fs.get(file_oid)
-                                import pickle
                                 images_list = pickle.loads(grid_out.read())
                                 submission["question_paper_images"] = images_list
                         except Exception as e:
@@ -6770,11 +8573,9 @@ async def get_submission(
                 
                 if exam_file and exam_file.get("model_answer_gridfs_id"):
                     try:
-                        from bson import ObjectId
                         file_oid = ObjectId(exam_file["model_answer_gridfs_id"])
                         if fs.exists(file_oid):
                             grid_out = fs.get(file_oid)
-                            import pickle
                             images_list = pickle.loads(grid_out.read())
                             submission["model_answer_images"] = images_list
                     except Exception as e:
@@ -6796,11 +8597,9 @@ async def get_submission(
                 if file_id_str:
                     try:
                         # Use global fs object which is safe
-                        from bson import ObjectId
                         file_oid = ObjectId(file_id_str)
                         if fs.exists(file_oid):
                             grid_out = fs.get(file_oid)
-                            import pickle
                             images_list = pickle.loads(grid_out.read())
                             submission["question_paper_images"] = images_list
                     except Exception as e:
@@ -7343,7 +9142,6 @@ async def get_misconceptions_analysis(
     ai_analysis = None
     if misconceptions:
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
             llm_key = get_llm_api_key()
             
             analysis_prompt = f"""Analyze these student misconceptions from exam "{exam.get('exam_name', 'Unknown')}":
@@ -7689,7 +9487,6 @@ async def get_student_deep_dive(
     ai_analysis = None
     if worst_questions:
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
             llm_key = get_llm_api_key()
             
             analysis_prompt = f"""Analyze this student's performance and provide specific improvement guidance:
@@ -7802,7 +9599,6 @@ async def generate_review_packet(
     
     # Generate practice questions using AI
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         llm_key = get_llm_api_key()
         
         subject = await db.subjects.find_one({"subject_id": exam.get("subject_id")}, {"_id": 0, "name": 1})
@@ -7892,7 +9688,6 @@ async def infer_question_topics(
     subject_name = subject.get("name", "General") if subject else "General"
     
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         llm_key = get_llm_api_key()
         
         # Build question data
@@ -8447,7 +10242,6 @@ async def get_question_drilldown(
     
     if failed_answers:
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
             
             # Prepare feedback summary for AI
             feedback_samples = [f"Student {a['student_name']}: {a['feedback'][:200]}" for a in failed_answers[:10]]
@@ -8861,7 +10655,6 @@ IMPORTANT:
 Now analyze and respond:"""
 
         # Call AI
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         api_key = get_llm_api_key()
         if not api_key:
@@ -9367,7 +11160,6 @@ async def ask_your_data(
     
     # Step 2: Use AI to parse the query and determine what data to fetch
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         prompt = f"""
 You are a data analyst for a teacher. Parse the natural language query and return a structured JSON response.
@@ -10737,8 +12529,93 @@ async def get_common_feedback_patterns():
 
 # ============== HEALTH CHECK ==============
 
-@api_router.get("/health")
-async def health_check():
+@api_router.post("/debug/force-reextract/{exam_id}")
+async def force_reextract_questions(exam_id: str, user: User = Depends(get_current_user)):
+    """Force complete re-extraction of ALL questions - deletes old and extracts fresh."""
+    try:
+        # Get exam
+        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0})
+        if not exam:
+            raise HTTPException(status_code=404, detail="Exam not found")
+        
+        # STEP 1: Delete all old questions for this exam
+        delete_result = await db.questions.delete_many({"exam_id": exam_id})
+        print(f"\n{'='*70}")
+        print(f"[FORCE-REEXTRACT] Deleted {delete_result.deleted_count} old questions for {exam_id}")
+        
+        # STEP 2: Clear the extraction metadata from exam
+        await db.exams.update_one(
+            {"exam_id": exam_id},
+            {"$set": {
+                "questions": [],
+                "questions_count": 0,
+                "extraction_source": None,
+                "question_extraction_status": "pending"
+            }}
+        )
+        print(f"[FORCE-REEXTRACT] Cleared extraction metadata from exam")
+        
+        # STEP 3: Force fresh extraction with force=True
+        print(f"[FORCE-REEXTRACT] Starting fresh extraction...")
+        result = await auto_extract_questions(exam_id, force=True)
+        
+        print(f"[FORCE-REEXTRACT] Extraction complete: {result}")
+        print(f"{'='*70}\n")
+        
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", ""),
+            "deleted_count": delete_result.deleted_count,
+            "extracted_count": result.get("count", 0),
+            "questions": result.get("count", 0)
+        }
+        
+    except Exception as e:
+        logger.error(f"Force reextraction error: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@api_router.get("/debug/exam-questions/{exam_id}")
+async def debug_exam_questions(exam_id: str, user: User = Depends(get_current_user)):
+    """Debug endpoint to see ALL questions in database for this exam."""
+    try:
+        # Get from database questions collection
+        db_questions = await db.questions.find(
+            {"exam_id": exam_id},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        # Get from exam document
+        exam = await db.exams.find_one({"exam_id": exam_id}, {"_id": 0, "questions": 1})
+        exam_questions = exam.get("questions", []) if exam else []
+        
+        # Detailed summary
+        db_q_numbers = [q.get("question_number") for q in db_questions]
+        exam_q_numbers = [q.get("question_number") for q in exam_questions]
+        
+        print(f"\n{'='*70}")
+        print(f"[DEBUG-QUESTIONS] Exam: {exam_id}")
+        print(f"[DEBUG-QUESTIONS] Database questions collection: {len(db_questions)} questions")
+        print(f"  Question numbers: Q{db_q_numbers}")
+        for i, q in enumerate(db_questions[:10]):
+            print(f"    Q{q.get('question_number')}: max_marks={q.get('max_marks')}, sub_q={len(q.get('sub_questions', []))}")
+        print(f"[DEBUG-QUESTIONS] Exam document questions array: {len(exam_questions)} questions")
+        print(f"  Question numbers: Q{exam_q_numbers}")
+        print(f"{'='*70}\n")
+        
+        return {
+            "exam_id": exam_id,
+            "database_count": len(db_questions),
+            "database_questions": db_q_numbers,
+            "database_details": db_questions,
+            "exam_count": len(exam_questions),
+            "exam_questions": exam_q_numbers,
+            "exam_details": exam_questions
+        }
+        
+    except Exception as e:
+        logger.error(f"Debug questions error: {e}")
+        return {"error": str(e)}
     return {"status": "healthy", "service": "GradeSense API"}
 
 # ============== BATCH STATS ==============

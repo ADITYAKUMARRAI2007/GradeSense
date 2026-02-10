@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import { API } from "../../App";
 import Layout from "../../components/Layout";
@@ -23,6 +23,7 @@ import {
   Save, 
   CheckCircle,
   CheckCircle2,
+  AlertCircle,
   FileText,
   RefreshCw,
   X,
@@ -40,6 +41,242 @@ import {
   Plus,
   PartyPopper
 } from "lucide-react";
+
+function AnnotationImage({
+  imageBase64,
+  pageIndex,
+  annotations,
+  onClick,
+  showAnnotations
+}) {
+  const imgRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  const drawAnnotations = useCallback(() => {
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    if (!showAnnotations || !annotations || annotations.length === 0) return;
+
+    const toPx = (value, total) => Math.max(0, Math.min(total, (value / 1000) * total));
+
+    const resolveBox = (ann) => {
+      if (ann?.x_percent !== undefined && ann?.y_percent !== undefined) {
+        const x1 = ann.x_percent * width;
+        const y1 = ann.y_percent * height;
+        const w = (ann.w_percent ?? 0) * width;
+        const h = (ann.h_percent ?? 0) * height;
+        return {
+          x1,
+          y1,
+          x2: x1 + Math.max(2, w),
+          y2: y1 + Math.max(2, h)
+        };
+      }
+      if (ann?.box_2d && ann.box_2d.length === 4) {
+        const [ymin, xmin, ymax, xmax] = ann.box_2d;
+        return {
+          x1: toPx(xmin, width),
+          y1: toPx(ymin, height),
+          x2: toPx(xmax, width),
+          y2: toPx(ymax, height)
+        };
+      }
+      const size = ann?.size || 30;
+      const x = ann?.x || 0;
+      const y = ann?.y || 0;
+      return {
+        x1: x,
+        y1: y,
+        x2: x + size,
+        y2: y + size
+      };
+    };
+
+    const jitter = (value, amount = 2) => value + (Math.random() * amount * 2 - amount);
+
+    const setStyle = (color, lineWidth = 2) => {
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.font = "18px 'Kalam', 'Caveat', 'Patrick Hand', 'Comic Sans MS', 'Bradley Hand', cursive";
+    };
+
+    const wrapText = (text, maxWidth) => {
+      const words = String(text || "").split(/\s+/).filter(Boolean);
+      const lines = [];
+      let line = "";
+      words.forEach((word) => {
+        const testLine = line ? `${line} ${word}` : word;
+        if (ctx.measureText(testLine).width <= maxWidth) {
+          line = testLine;
+        } else {
+          if (line) lines.push(line);
+          line = word;
+        }
+      });
+      if (line) lines.push(line);
+      return lines;
+    };
+
+    annotations.forEach((ann) => {
+      if (!ann?.box_2d && (ann?.x === 0 && ann?.y === 0)) {
+        return; // skip annotations without coordinates to avoid top-left artifacts
+      }
+      const type = (ann?.type || "").toLowerCase();
+      const color = ann?.color || (type.includes("cross") || type.includes("error") || type.includes("comment") ? "#ef4444" : "#22c55e");
+      const box = resolveBox(ann);
+      const text = ann?.text || "";
+
+      setStyle(color, 3);
+
+      if (type === "checkmark" || type === "tick") {
+        const x = box.x1;
+        const y = box.y1;
+        const size = Math.max(18, box.x2 - box.x1);
+        ctx.beginPath();
+        ctx.moveTo(jitter(x + size * 0.2), jitter(y + size * 0.55));
+        ctx.lineTo(jitter(x + size * 0.45), jitter(y + size * 0.8));
+        ctx.lineTo(jitter(x + size * 0.85), jitter(y + size * 0.2));
+        ctx.stroke();
+        return;
+      }
+
+      if (type === "cross_mark" || type === "cross" || type === "x") {
+        const x = box.x1;
+        const y = box.y1;
+        const size = Math.max(18, box.x2 - box.x1);
+        ctx.beginPath();
+        ctx.moveTo(jitter(x), jitter(y));
+        ctx.lineTo(jitter(x + size), jitter(y + size));
+        ctx.moveTo(jitter(x + size), jitter(y));
+        ctx.lineTo(jitter(x), jitter(y + size));
+        ctx.stroke();
+        return;
+      }
+
+      if (type === "error_underline" || type === "underline") {
+        const y = box.y2 + 6;
+        ctx.beginPath();
+        ctx.moveTo(jitter(box.x1), jitter(y));
+        ctx.lineTo(jitter(box.x2), jitter(y));
+        ctx.stroke();
+        return;
+      }
+
+      if (type === "highlight_box" || type === "box") {
+        const x1 = jitter(box.x1, 1.5);
+        const y1 = jitter(box.y1, 1.5);
+        const w = jitter(box.x2 - box.x1, 1.5);
+        const h = jitter(box.y2 - box.y1, 1.5);
+        ctx.strokeRect(x1, y1, w, h);
+        if (text) {
+          // Draw text inside the box
+          ctx.fillStyle = color;
+          ctx.font = "14px 'Kalam', 'Caveat', 'Patrick Hand', 'Comic Sans MS', 'Bradley Hand', cursive";
+          const lines = wrapText(text, w - 8);
+          lines.forEach((line, i) => {
+            ctx.fillText(line, x1 + 4, y1 + 18 + i * 16);
+          });
+        }
+        return;
+      }
+
+      if (type === "score_circle") {
+        const cx = (box.x1 + box.x2) / 2;
+        const cy = (box.y1 + box.y2) / 2;
+        const radius = Math.max(16, (box.x2 - box.x1) / 2);
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        if (text) {
+          ctx.fillText(text, cx - radius / 2, cy + 6);
+        }
+        return;
+      }
+
+      if (type === "score_box") {
+        ctx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+        if (text) {
+          ctx.fillText(text, box.x1 + 6, box.y1 + 24);
+        }
+        return;
+      }
+
+      if (type === "comment" || type === "margin_note") {
+        const noteWidth = 170;
+        const padding = 6;
+        let x = Math.min(width - noteWidth - 8, box.x2 + 10);
+        let y = Math.max(8, box.y1 - 18);
+        const lines = wrapText(text || "", noteWidth - padding * 2);
+        const lineHeight = 18;
+        const boxHeight = Math.max(22, lines.length * lineHeight + padding * 2);
+        if (y + boxHeight > height - 8) {
+          y = Math.max(8, height - boxHeight - 8);
+        }
+
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(x, y, noteWidth, boxHeight, 6);
+        } else {
+          ctx.rect(x, y, noteWidth, boxHeight);
+        }
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        setStyle(color, 2);
+        lines.forEach((line, i) => {
+          ctx.fillText(line, x + padding, y + padding + lineHeight * (i + 0.8));
+        });
+
+        ctx.beginPath();
+        ctx.moveTo(x, y + 8);
+        ctx.lineTo(box.x2 + 6, box.y1 + 6);
+        ctx.stroke();
+        return;
+      }
+    });
+  }, [annotations, showAnnotations]);
+
+  useEffect(() => {
+    drawAnnotations();
+  }, [drawAnnotations]);
+
+  return (
+    <div className="relative cursor-pointer" onClick={onClick}>
+      <img
+        ref={imgRef}
+        src={`data:image/jpeg;base64,${imageBase64}`}
+        alt={`Page ${pageIndex + 1}`}
+        className="w-full rounded-lg shadow-md hover:shadow-lg transition-shadow"
+        onLoad={drawAnnotations}
+      />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
+    </div>
+  );
+}
 
 export default function ReviewPapers({ user }) {
   const [submissions, setSubmissions] = useState([]);
@@ -110,6 +347,38 @@ export default function ReviewPapers({ user }) {
     console.log('🔄 zoomedImages changed:', zoomedImages ? `${zoomedImages.images?.length} pages` : 'null');
   }, [zoomedImages]);
 
+  const annotationsByPage = useMemo(() => {
+    const map = {};
+    if (!selectedSubmission?.question_scores) return map;
+    const addAnn = (ann) => {
+      if (!ann) return;
+      const hasBox = Array.isArray(ann.box_2d) && ann.box_2d.length === 4;
+      const hasPoint = (ann.x && ann.x > 0) || (ann.y && ann.y > 0);
+      if (!hasBox && !hasPoint) return;
+      if (hasBox) {
+        const [, xmin, , xmax] = ann.box_2d;
+        if (xmax <= 80 || xmin <= 40) return;
+      }
+      if (ann.x_percent !== undefined && ann.x_percent <= 0.08) return;
+      const page = ann.page_index ?? -1;
+      if (page < 0) return;
+      if (!map[page]) map[page] = [];
+      map[page].push(ann);
+    };
+    selectedSubmission.question_scores.forEach((qs) => {
+      (qs.annotations || []).forEach(addAnn);
+      (qs.sub_scores || []).forEach((sub) => {
+        (sub.annotations || []).forEach(addAnn);
+      });
+    });
+    return map;
+  }, [selectedSubmission]);
+
+  const hasOverlayAnnotations = useMemo(
+    () => Object.keys(annotationsByPage).length > 0,
+    [annotationsByPage]
+  );
+
   const fetchData = async () => {
     try {
       const [submissionsRes, examsRes, batchesRes] = await Promise.all([
@@ -135,15 +404,39 @@ export default function ReviewPapers({ user }) {
       // This prevents display bugs where questions appear multiple times
       if (response.data.question_scores && Array.isArray(response.data.question_scores)) {
         const uniqueScores = [];
-        const seenQuestions = new Set();
-        
+        const seenQuestions = new Map();
+
         for (const qs of response.data.question_scores) {
-          if (!seenQuestions.has(qs.question_number)) {
+          const existing = seenQuestions.get(qs.question_number);
+          if (!existing) {
+            seenQuestions.set(qs.question_number, qs);
             uniqueScores.push(qs);
-            seenQuestions.add(qs.question_number);
+          } else {
+            // Merge annotations and sub-scores to preserve overlay data
+            const mergedAnnotations = [
+              ...(existing.annotations || []),
+              ...(qs.annotations || [])
+            ];
+            existing.annotations = mergedAnnotations;
+
+            if (qs.sub_scores?.length) {
+              const subMap = new Map((existing.sub_scores || []).map((s) => [s.sub_id, s]));
+              qs.sub_scores.forEach((sub) => {
+                const existingSub = subMap.get(sub.sub_id);
+                if (!existingSub) {
+                  subMap.set(sub.sub_id, sub);
+                } else {
+                  existingSub.annotations = [
+                    ...(existingSub.annotations || []),
+                    ...(sub.annotations || [])
+                  ];
+                }
+              });
+              existing.sub_scores = Array.from(subMap.values());
+            }
           }
         }
-        
+
         response.data.question_scores = uniqueScores;
         
         // Recalculate total if deduplication occurred
@@ -172,8 +465,48 @@ export default function ReviewPapers({ user }) {
     }
   }, []);
 
+  // Check if all questions are reviewed
+  const areAllQuestionsReviewed = () => {
+    if (!selectedSubmission?.question_scores) return false;
+    const allReviewed = selectedSubmission.question_scores.every(qs => qs.is_reviewed === true);
+    return allReviewed;
+  };
+
+  // Get count of reviewed vs total questions
+  const getReviewedCount = () => {
+    if (!selectedSubmission?.question_scores) return { reviewed: 0, total: 0 };
+    const reviewed = selectedSubmission.question_scores.filter(qs => qs.is_reviewed === true).length;
+    const total = selectedSubmission.question_scores.length;
+    return { reviewed, total };
+  };
+
+  // Check if all questions are graded and listed before showing final result
+  const isGradingComplete = useMemo(() => {
+    if (!selectedSubmission?.question_scores || selectedSubmission.question_scores.length === 0) return false;
+
+    // If exam questions are known, ensure every question exists in scores
+    if (examQuestions && examQuestions.length > 0) {
+      const scoreNums = new Set(selectedSubmission.question_scores.map(qs => qs.question_number));
+      const allPresent = examQuestions.every(q => scoreNums.has(q.question_number));
+      if (!allPresent) return false;
+    }
+
+    // If any question is marked not_found, grading is incomplete
+    const anyNotFound = selectedSubmission.question_scores.some(qs => qs.status === "not_found");
+    if (anyNotFound) return false;
+
+    return true;
+  }, [selectedSubmission, examQuestions]);
+
   const handleSaveChanges = async () => {
     if (!selectedSubmission) return;
+    
+    // Check if all questions are reviewed
+    const { reviewed, total } = getReviewedCount();
+    if (reviewed < total) {
+      toast.error(`Please review all questions first! (${reviewed}/${total} reviewed)`);
+      return;
+    }
     
     setSaving(true);
     try {
@@ -565,11 +898,10 @@ export default function ReviewPapers({ user }) {
     }
   };
 
-  // Memoize DetailContent to prevent recreation on every render
-  // This fixes the textarea editing issue
-  const DetailContent = useMemo(() => {
+  // DetailContent renderer (no useMemo to avoid hook dependency warnings)
+  const renderDetailContent = () => {
     if (!selectedSubmission) return null;
-    
+
     return (
     <>
       {/* Header */}
@@ -578,7 +910,11 @@ export default function ReviewPapers({ user }) {
           <div className="min-w-0 flex-1">
             <h3 className="text-lg md:text-xl font-semibold truncate">{selectedSubmission.student_name}</h3>
             <p className="text-xs md:text-sm text-muted-foreground">
-              Score: {(selectedSubmission.obtained_marks || selectedSubmission.total_score || 0).toFixed(1)} / {selectedSubmission.total_marks || exams.find(e => e.exam_id === selectedSubmission.exam_id)?.total_marks || "?"} ({(selectedSubmission.percentage || 0).toFixed(1)}%)
+              {isGradingComplete ? (
+                <>Score: {(selectedSubmission.obtained_marks || selectedSubmission.total_score || 0).toFixed(1)} / {selectedSubmission.total_marks || exams.find(e => e.exam_id === selectedSubmission.exam_id)?.total_marks || "?"} ({(selectedSubmission.percentage || 0).toFixed(1)}%)</>
+              ) : (
+                <>Score: Pending (all questions must be graded)</>
+              )}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -611,24 +947,6 @@ export default function ReviewPapers({ user }) {
                 <FileText className="w-3 h-3 md:w-4 md:h-4 mr-1" />
                 <span className="hidden sm:inline">{showModelAnswer ? "Hide" : "Show"} Model</span>
                 <span className="sm:hidden">Model</span>
-              </Button>
-            )}
-            {/* Extract Questions Button in Review Dialog */}
-            {selectedSubmission && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExtractQuestions}
-                disabled={extractingQuestions}
-                className="text-purple-600 border-purple-200 hover:bg-purple-100"
-              >
-                {extractingQuestions ? (
-                  <RefreshCw className="w-3 h-3 md:w-4 md:h-4 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                )}
-                <span className="hidden sm:inline">Extract Questions</span>
-                <span className="sm:hidden">Extract</span>
               </Button>
             )}
           </div>
@@ -705,46 +1023,39 @@ export default function ReviewPapers({ user }) {
               {/* Answer Sheets */}
               <div className="space-y-4">
                 {/* Show annotated images if available and toggle is on */}
-                {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                  selectedSubmission.annotated_images : selectedSubmission.file_images
-                ).map((img, idx) => (
-                  <div 
-                    key={idx} 
-                    className="relative cursor-pointer"
-                    onClick={(e) => {
-                      console.log('🖱️ Image clicked! Index:', idx);
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                        selectedSubmission.annotated_images : selectedSubmission.file_images
-                      ).map((image, index) => ({
-                        src: `data:image/jpeg;base64,${image}`,
-                        title: `Page ${index + 1}`
-                      }));
-                      console.log('📸 Setting images:', allImages.length, 'pages');
-                      // Update key first to force Dialog remount, then set state
-                      setModalKey(prev => prev + 1);
-                      setZoomedImages({ 
-                        images: allImages, 
-                        title: "Student Answer", 
-                        initialIndex: idx 
-                      });
-                      setIsModalOpen(true);
-                      console.log('✅ Modal state set to OPEN');
-                    }}
-                  >
-                    <img 
-                      src={`data:image/jpeg;base64,${img}`}
-                      alt={`Page ${idx + 1}`}
-                      className="w-full rounded-lg shadow-md hover:shadow-lg transition-shadow"
-                    />
-                    {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
-                      <Badge className="absolute top-2 right-2 bg-green-500 text-white">
-                        With Annotations
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                {(() => {
+                  const baseImages = (selectedSubmission.file_images?.length
+                    ? selectedSubmission.file_images
+                    : (selectedSubmission.annotated_images || []));
+                  const useOverlay = showAnnotations && hasOverlayAnnotations;
+                  const displayImages = baseImages;
+
+                  return displayImages.map((img, idx) => (
+                    <div key={idx} className="relative">
+                      <AnnotationImage
+                        imageBase64={img}
+                        pageIndex={idx}
+                        annotations={annotationsByPage[idx] || []}
+                        showAnnotations={useOverlay}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const src = `data:image/jpeg;base64,${img}`;
+                          setImageZoom(100);
+                          setZoomedImage({
+                            src,
+                            title: `Page ${idx + 1}`
+                          });
+                        }}
+                      />
+                      {showAnnotations && (useOverlay || selectedSubmission.annotated_images?.length > 0) && (
+                        <Badge className="absolute top-2 right-2 bg-green-500 text-white">
+                          With Annotations
+                        </Badge>
+                      )}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           ) : (
@@ -896,6 +1207,18 @@ export default function ReviewPapers({ user }) {
                   />
                 </div>
 
+                {/* Rubric / Evaluator Preference */}
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Rubric / Evaluator Preference</Label>
+                  <Textarea 
+                    value={qs.rubric_preference || ""}
+                    onChange={(e) => updateQuestionScore(index, "rubric_preference", e.target.value)}
+                    placeholder="Add rubric notes or evaluator preferences..."
+                    className="mt-1 text-xs"
+                    rows={2}
+                  />
+                </div>
+
                 <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
                   <div className="flex items-center gap-2">
                     <Checkbox 
@@ -991,53 +1314,56 @@ export default function ReviewPapers({ user }) {
                         <h3 className="text-xs font-semibold text-blue-700 sticky top-0 bg-muted/30 py-1">Student&apos;s Answer</h3>
                       )}
                       <div className="space-y-4">
-                        {(showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                          selectedSubmission.annotated_images : selectedSubmission.file_images
-                        ).map((img, idx) => (
-                          <div 
-                            key={idx} 
-                            className="relative group cursor-pointer"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const allImages = (showAnnotations && selectedSubmission.annotated_images?.length > 0 ? 
-                                selectedSubmission.annotated_images : selectedSubmission.file_images
-                              ).map((image, index) => ({
-                                src: `data:image/jpeg;base64,${image}`,
-                                title: `Page ${index + 1}`
-                              }));
-                              // Update key first to force Dialog remount, then set state
-                              setModalKey(prev => prev + 1);
-                              setZoomedImages({ 
-                                images: allImages, 
-                                title: "Student Answer", 
-                                initialIndex: idx 
-                              });
-                              setIsModalOpen(true);
-                            }}
-                          >
-                            <div className="relative hover:shadow-xl transition-shadow">
-                              <img 
-                                src={`data:image/jpeg;base64,${img}`}
-                                alt={`Page ${idx + 1}`}
-                                className="w-full rounded-lg shadow-md"
-                                style={{ minHeight: '400px', objectFit: 'contain' }}
+                        {(() => {
+                          const baseImages = (selectedSubmission.file_images?.length
+                            ? selectedSubmission.file_images
+                            : (selectedSubmission.annotated_images || []));
+                          const useOverlay = showAnnotations && hasOverlayAnnotations && !(selectedSubmission.annotated_images?.length > 0);
+                          const displayImages = useOverlay
+                            ? baseImages
+                            : (showAnnotations && selectedSubmission.annotated_images?.length > 0
+                                ? selectedSubmission.annotated_images
+                                : baseImages);
+
+                          return displayImages.map((img, idx) => (
+                            <div key={idx} className="relative group">
+                              <AnnotationImage
+                                imageBase64={img}
+                                pageIndex={idx}
+                                annotations={annotationsByPage[idx] || []}
+                                showAnnotations={useOverlay}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const allImages = displayImages.map((image, index) => ({
+                                    src: `data:image/jpeg;base64,${image}`,
+                                    title: `Page ${index + 1}`
+                                  }));
+                                  // Update key first to force Dialog remount, then set state
+                                  setModalKey(prev => prev + 1);
+                                  setZoomedImages({ 
+                                    images: allImages, 
+                                    title: "Student Answer", 
+                                    initialIndex: idx 
+                                  });
+                                  setIsModalOpen(true);
+                                }}
                               />
-                              {showAnnotations && selectedSubmission.annotated_images?.length > 0 && (
+                              {showAnnotations && (useOverlay || selectedSubmission.annotated_images?.length > 0) && (
                                 <Badge className="absolute top-2 right-2 bg-green-500 text-white">
                                   With Annotations
                                 </Badge>
                               )}
                               {/* Zoom Overlay */}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg">
                                 <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
                                   <Maximize2 className="w-4 h-4" />
                                   <span className="text-sm font-medium">Click to enlarge</span>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
                     </div>
 
@@ -1143,6 +1469,39 @@ export default function ReviewPapers({ user }) {
           <Panel defaultSize={45} minSize={30} maxSize={70} collapsible={false}>
             <ScrollArea className="h-full">
               <div className="p-4 space-y-3">
+                {/* Review Status Banner */}
+                <div className={`p-3 rounded-lg border-2 sticky top-0 z-10 ${ areAllQuestionsReviewed()
+                    ? "bg-green-50 border-green-300"
+                    : "bg-amber-50 border-amber-300"
+                  }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {areAllQuestionsReviewed() ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-semibold text-green-700">All Questions Reviewed</p>
+                            <p className="text-xs text-green-600">Ready to approve and move to next paper</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-5 h-5 text-amber-600" />
+                          <div>
+                            <p className="text-sm font-semibold text-amber-700">Review Incomplete</p>
+                            <p className="text-xs text-amber-600">
+                              {getReviewedCount().total - getReviewedCount().reviewed} of {getReviewedCount().total} questions need review
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <Badge variant="secondary" className="text-sm font-bold">
+                      {getReviewedCount().reviewed}/{getReviewedCount().total}
+                    </Badge>
+                  </div>
+                </div>
+
                 {selectedSubmission.question_scores?.map((qs, index) => {
                   const hasSubQuestions = qs.sub_scores && qs.sub_scores.length > 0;
                   const examQuestion = examQuestions.find(q => q.question_number === qs.question_number);
@@ -1151,7 +1510,7 @@ export default function ReviewPapers({ user }) {
                   <div 
                     key={index}
                     className={`p-3 lg:p-4 rounded-lg border question-card ${
-                      qs.is_reviewed ? "reviewed" : ""
+                      qs.is_reviewed ? "reviewed border-green-300 bg-green-50" : "border-orange-200 bg-orange-50/30"
                     }`}
                   >
                     {/* Question Header with Total Score */}
@@ -1211,12 +1570,8 @@ export default function ReviewPapers({ user }) {
                         <div className="mb-3 p-2 bg-amber-50 rounded border-l-2 border-amber-400">
                           <p className="text-xs text-amber-800 font-medium">⚠️ Question {qs.question_number}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Question text not available. To see full questions:
+                            Question text not available. Upload model answer or question paper to auto-extract questions.
                           </p>
-                          <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc">
-                            <li>View model answer (left panel)</li>
-                            <li>Or go to Manage Exams → Select exam → Click &quot;Extract Questions&quot;</li>
-                          </ul>
                         </div>
                       ) : null;
                     })()}
@@ -1359,6 +1714,26 @@ export default function ReviewPapers({ user }) {
                       </div>
                     </div>
 
+                    {/* Rubric / Evaluator Preference */}
+                    <div className="mt-3">
+                      <Label className="text-xs lg:text-sm text-muted-foreground">Rubric / Evaluator Preference</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Textarea 
+                          value={qs.rubric_preference || ""}
+                          onChange={(e) => updateQuestionScore(index, "rubric_preference", e.target.value)}
+                          placeholder="Add rubric notes or evaluator preferences..."
+                          className="text-xs lg:text-sm flex-1"
+                          rows={2}
+                        />
+                        <VoiceInput
+                          onTranscript={(text) => {
+                            const currentValue = qs.rubric_preference || "";
+                            updateQuestionScore(index, "rubric_preference", currentValue + (currentValue ? " " : "") + text);
+                          }}
+                        />
+                      </div>
+                    </div>
+
                     {/* Footer Actions */}
                     <div className="flex items-center justify-between gap-2 flex-wrap mt-3">
                       <div className="flex items-center gap-2">
@@ -1434,17 +1809,39 @@ export default function ReviewPapers({ user }) {
           <Button 
             size="sm"
             onClick={() => {
+              const { reviewed, total } = getReviewedCount();
+              if (!isGradingComplete) {
+                toast.error("Cannot approve! All questions must be graded and listed first.");
+                return;
+              }
+              if (reviewed < total) {
+                toast.error(`Cannot approve! ${total - reviewed} question(s) not reviewed.`);
+                return;
+              }
               handleSaveChanges();
               if (currentIndex < filteredSubmissions.length - 1) {
                 navigatePaper(1);
               }
             }}
-            disabled={saving}
+            disabled={saving || !areAllQuestionsReviewed() || !isGradingComplete}
             data-testid="approve-finalize-btn"
-            className="text-xs lg:text-sm"
+            className={`text-xs lg:text-sm ${
+              areAllQuestionsReviewed() && isGradingComplete
+                ? "" 
+                : "opacity-50 cursor-not-allowed"
+            }`}
+            title={
+              !isGradingComplete
+                ? "All questions must be graded and listed before approval"
+                : areAllQuestionsReviewed()
+                  ? "Approve this submission"
+                  : `Please review all ${getReviewedCount().total} questions first`
+            }
           >
             <CheckCircle className="w-3 h-3 lg:w-4 lg:h-4" />
-            <span className="ml-1 lg:ml-2 hidden sm:inline">Approve</span>
+            <span className="ml-1 lg:ml-2 hidden sm:inline">
+              Approve {!areAllQuestionsReviewed() && `(${getReviewedCount().reviewed}/${getReviewedCount().total})`}
+            </span>
           </Button>
         </div>
       </div>
@@ -1727,27 +2124,8 @@ export default function ReviewPapers({ user }) {
         </DialogContent>
       </Dialog>
     </>
-  );
-  }, [
-    selectedSubmission, 
-    exams, 
-    modelAnswerImages, 
-    questionPaperImages,
-    showModelAnswer, 
-    showQuestionPaper,
-    showAnnotations,
-    examQuestions,
-    imageZoom,
-    zoomedImage,
-    feedbackDialogOpen,
-    feedbackQuestion,
-    feedbackCorrections,
-    submittingFeedback,
-    applyToAllPapers,
-    saving,
-    currentIndex,
-    filteredSubmissions
-  ]);
+    );
+  };
 
   return (
     <Layout user={user}>
@@ -1823,42 +2201,7 @@ export default function ReviewPapers({ user }) {
                     </SelectContent>
                   </Select>
 
-                  {/* AI Tools - Extract Questions Button */}
-                  {filters.exam_id && (
-                    <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-purple-700 flex items-center gap-1">
-                          <Brain className="w-3 h-3" />
-                          AI Tools
-                        </span>
-                        {(() => {
-                          const selectedExam = exams.find(e => e.exam_id === filters.exam_id);
-                          const hasDocuments = selectedExam?.model_answer_images?.length > 0 || 
-                                               selectedExam?.question_paper_images?.length > 0 ||
-                                               selectedExam?.has_model_answer ||
-                                               selectedExam?.has_question_paper;
-                          return hasDocuments ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleExtractQuestions}
-                              disabled={extractingQuestions}
-                              className="text-purple-600 border-purple-200 hover:bg-purple-100 h-7 text-xs"
-                            >
-                              {extractingQuestions ? (
-                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                              ) : (
-                                <Sparkles className="w-3 h-3 mr-1" />
-                              )}
-                              Extract Questions
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-purple-500">Upload model answer or question paper first</span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
+                  {/* Questions are auto-extracted when documents are uploaded */}
                 </div>
               </CardHeader>
               
@@ -1926,7 +2269,7 @@ export default function ReviewPapers({ user }) {
           {/* Review Dialog - Full Screen */}
           <Dialog open={dialogOpen && !!selectedSubmission} onOpenChange={setDialogOpen}>
             <DialogContent className="max-w-[98vw] w-full max-h-[95vh] h-[95vh] p-0 flex flex-col">
-              {selectedSubmission && DetailContent}
+              {renderDetailContent()}
             </DialogContent>
           </Dialog>
 

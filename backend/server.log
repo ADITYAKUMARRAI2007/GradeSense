@@ -1,0 +1,673 @@
+INFO:     Will watch for changes in these directories: ['/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [51092] using StatReload
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [51095]
+INFO:     Waiting for application startup.
+2026-02-05 13:33:19,207 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 13:33:19,207 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 13:33:19,207 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 13:33:19,207 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 13:33:19,207 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 13:33:19,207 - server - INFO - 🔄 Background worker started
+2026-02-05 13:33:19,207 - server - INFO - ============================================================
+2026-02-05 13:33:19,207 - server - INFO - 🔄 Background worker started
+2026-02-05 13:33:19,207 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 13:33:19,213 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 13:33:19,215 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 13:33:19,215 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 13:33:19,219 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:62154 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62186 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62201 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62218 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/profile/check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/dashboard/class-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62286 - "GET /api/dashboard/class-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62286 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/analytics/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/analytics/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/batches/batch_1805c0ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/batches/batch_1805c0ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/batches/batch_1805c0ae/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/batches/batch_1805c0ae/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/exams?batch_id=batch_1805c0ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/exams?batch_id=batch_1805c0ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/batches/batch_1805c0ae/students HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/batches/batch_1805c0ae/students HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62286 - "GET /api/dashboard/class-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62289 - "GET /api/dashboard/class-snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/analytics/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62289 - "GET /api/analytics/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62289 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /api/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET /api/exams/exam_ceb3ce82 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62286 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62289 - "GET /api/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/exams/exam_ceb3ce82 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62277 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62299 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62305 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62305 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62328 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62340 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62340 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62345 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62347 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62347 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62356 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62359 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62359 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62367 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62373 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62373 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62396 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62402 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62402 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62408 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62411 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62411 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62419 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62421 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62421 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62434 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62436 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62436 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62443 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62448 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62448 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62459 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62467 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62467 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62471 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62473 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62473 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62485 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62487 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62487 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62491 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62493 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62493 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62498 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62502 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62502 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62509 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62511 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62511 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62518 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62523 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62523 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62528 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62533 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62533 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62541 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62546 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62546 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62548 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62552 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62552 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62572 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62589 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62589 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62595 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62598 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62598 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62601 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62612 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62612 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62620 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62622 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62622 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62626 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62632 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62632 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62638 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62645 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62645 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62670 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62704 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62704 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62739 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62772 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62772 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62808 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62843 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62843 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62878 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62914 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62914 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62951 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62983 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62983 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63022 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63054 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63054 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63088 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63120 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63120 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63153 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63187 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63187 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63221 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63254 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63254 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63306 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63337 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63337 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63371 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63404 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63404 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63441 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63473 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63473 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63508 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63540 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63540 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63574 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63608 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63608 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63647 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63682 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63682 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63715 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63749 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63749 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63791 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63823 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63823 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63866 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63899 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63899 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63931 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63966 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63966 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64005 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64041 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64041 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64076 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64110 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64110 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64148 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64180 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64180 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64216 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64258 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64258 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64295 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64329 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64329 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64383 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64420 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64420 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64455 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64496 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64496 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64546 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64595 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64595 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:30:26,971 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:30:26,973 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:30:26,973 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51095]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [78886]
+INFO:     Waiting for application startup.
+2026-02-05 14:30:30,151 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:30:30,151 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:30:30,151 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:30:30,157 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:30:30,157 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:30:30,157 - server - INFO - 🔄 Background worker started
+2026-02-05 14:30:30,157 - server - INFO - ============================================================
+2026-02-05 14:30:30,157 - server - INFO - 🔄 Background worker started
+2026-02-05 14:30:30,157 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:30:30,163 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:30:30,164 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:30:30,164 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:30:30,168 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64652 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/cache/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:30:48,866 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:30:48,866 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:30:48,866 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [78886]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79063]
+INFO:     Waiting for application startup.
+2026-02-05 14:30:51,562 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:30:51,562 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:30:51,562 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:30:51,569 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:30:51,569 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:30:51,569 - server - INFO - 🔄 Background worker started
+2026-02-05 14:30:51,569 - server - INFO - ============================================================
+2026-02-05 14:30:51,569 - server - INFO - 🔄 Background worker started
+2026-02-05 14:30:51,569 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:30:51,573 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:30:51,574 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:30:51,574 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:30:51,578 - task_worker - INFO - Task worker started. Polling for tasks...
+WARNING:  StatReload detected changes in 'app/services/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:31:03,700 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:31:03,700 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:31:03,703 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79063]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79147]
+INFO:     Waiting for application startup.
+2026-02-05 14:31:11,330 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:31:11,330 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:31:11,331 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:31:11,339 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:31:11,339 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:31:11,339 - server - INFO - 🔄 Background worker started
+2026-02-05 14:31:11,339 - server - INFO - ============================================================
+2026-02-05 14:31:11,339 - server - INFO - 🔄 Background worker started
+2026-02-05 14:31:11,339 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:31:11,351 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:31:11,354 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:31:11,354 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:31:11,360 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64716 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64716 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/services/question_extraction.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:31:20,709 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:31:20,709 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:31:20,709 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79147]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79241]
+INFO:     Waiting for application startup.
+2026-02-05 14:31:24,369 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:31:24,370 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:31:24,370 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:31:24,377 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:31:24,377 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:31:24,377 - server - INFO - 🔄 Background worker started
+2026-02-05 14:31:24,377 - server - INFO - ============================================================
+2026-02-05 14:31:24,377 - server - INFO - 🔄 Background worker started
+2026-02-05 14:31:24,377 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:31:24,382 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:31:24,383 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:31:24,383 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:31:24,390 - task_worker - INFO - Task worker started. Polling for tasks...
+WARNING:  StatReload detected changes in 'app/services/answer_extraction.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:31:40,759 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:31:40,759 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:31:40,759 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79241]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79409]
+INFO:     Waiting for application startup.
+2026-02-05 14:31:43,498 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:31:43,498 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:31:43,498 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:31:43,506 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:31:43,506 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:31:43,506 - server - INFO - 🔄 Background worker started
+2026-02-05 14:31:43,506 - server - INFO - ============================================================
+2026-02-05 14:31:43,506 - server - INFO - 🔄 Background worker started
+2026-02-05 14:31:43,506 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:31:43,510 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:31:43,511 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:31:43,511 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:31:43,517 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64780 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/services/grading.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:32:15,029 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:32:15,029 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:32:15,030 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79409]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79686]
+INFO:     Waiting for application startup.
+2026-02-05 14:32:17,956 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:32:17,956 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:32:17,957 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:32:17,961 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:32:17,961 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:32:17,962 - server - INFO - 🔄 Background worker started
+2026-02-05 14:32:17,962 - server - INFO - ============================================================
+2026-02-05 14:32:17,962 - server - INFO - 🔄 Background worker started
+2026-02-05 14:32:17,962 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:32:17,977 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:32:17,979 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:32:17,980 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:32:17,986 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64830 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64830 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/services/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:32:42,505 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:32:42,505 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:32:42,506 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79686]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79889]
+INFO:     Waiting for application startup.
+2026-02-05 14:32:45,472 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:32:45,472 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:32:45,473 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:32:45,478 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:32:45,479 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:32:45,479 - server - INFO - 🔄 Background worker started
+2026-02-05 14:32:45,479 - server - INFO - ============================================================
+2026-02-05 14:32:45,479 - server - INFO - 🔄 Background worker started
+2026-02-05 14:32:45,479 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:32:45,482 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:32:45,484 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:32:45,484 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:32:45,487 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64898 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/models/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:32:51,549 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:32:51,549 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:32:51,549 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79889]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79965]
+INFO:     Waiting for application startup.
+2026-02-05 14:32:54,665 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:32:54,665 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:32:54,665 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:32:54,673 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:32:54,673 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:32:54,673 - server - INFO - 🔄 Background worker started
+2026-02-05 14:32:54,673 - server - INFO - ============================================================
+2026-02-05 14:32:54,673 - server - INFO - 🔄 Background worker started
+2026-02-05 14:32:54,673 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:32:54,678 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:32:54,709 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:32:54,709 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:32:54,770 - task_worker - INFO - Task worker started. Polling for tasks...
+WARNING:  StatReload detected changes in 'app/utils/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:32:58,351 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:32:58,351 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:32:58,351 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79965]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [79966]
+INFO:     Waiting for application startup.
+2026-02-05 14:33:01,155 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:33:01,155 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:33:01,155 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:33:01,156 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:33:01,156 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:33:01,156 - server - INFO - 🔄 Background worker started
+2026-02-05 14:33:01,156 - server - INFO - ============================================================
+2026-02-05 14:33:01,156 - server - INFO - 🔄 Background worker started
+2026-02-05 14:33:01,156 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:33:01,161 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:33:01,162 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:33:01,162 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:33:01,168 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64966 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/routes/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:33:19,053 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:33:19,054 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:33:19,054 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79966]
+WARNING:  StatReload detected changes in 'app/routes/exam_routes.py'. Reloading...
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [80134]
+INFO:     Waiting for application startup.
+2026-02-05 14:33:22,434 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:33:22,434 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:33:22,435 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:33:22,435 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:33:22,435 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:33:22,435 - server - INFO - 🔄 Background worker started
+2026-02-05 14:33:22,435 - server - INFO - ============================================================
+2026-02-05 14:33:22,435 - server - INFO - 🔄 Background worker started
+2026-02-05 14:33:22,435 - server - INFO - ============================================================
+INFO:     Application startup complete.
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [80136]
+INFO:     Waiting for application startup.
+2026-02-05 14:33:24,907 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:33:24,907 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:33:24,908 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:33:24,908 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:33:24,908 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:33:24,909 - server - INFO - 🔄 Background worker started
+2026-02-05 14:33:24,909 - server - INFO - ============================================================
+2026-02-05 14:33:24,909 - server - INFO - 🔄 Background worker started
+2026-02-05 14:33:24,909 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:33:24,930 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:33:24,936 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:33:24,936 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:33:24,941 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:64973 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65031 - "GET /api/notifications HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:34:17,303 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:34:17,304 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:34:17,304 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [80136]
+/Users/adityakumarrai/Downloads/GradeSense/GradeSense/backend/server.py:30: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [80587]
+INFO:     Waiting for application startup.
+2026-02-05 14:34:20,699 - server - INFO - 🚀 FastAPI app starting up...
+2026-02-05 14:34:20,700 - server - INFO - REGISTERED ROUTES: ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/version', '/api/auth/google/callback', '/api/auth/session', '/api/auth/register', '/api/auth/set-password', '/api/auth/login', '/api/admin/export-users', '/api/notifications', '/api/notifications/{notification_id}/read', '/api/notifications/mark-all-read', '/api/notifications/clear-all', '/api/notifications/{notification_id}', '/api/dashboard/class-snapshot', '/api/dashboard/actionable-stats', '/api/search', '/api/auth/me', '/api/auth/logout', '/api/profile/complete', '/api/profile/check', '/api/exams/student-mode', '/api/exams/{exam_id}/submissions-status', '/api/exams/{exam_id}/submit', '/api/exams/{exam_id}/remove-student/{student_id}', '/api/exams/{exam_id}/grade-student-submissions', '/api/batches', '/api/batches/{batch_id}', '/api/batches', '/api/batches/{batch_id}', '/api/batches/{batch_id}', '/api/subjects', '/api/subjects', '/api/students', '/api/students/my-exams', '/api/students/{student_user_id}', '/api/students', '/api/students/{student_user_id}', '/api/exams/{exam_id}/upload-more-papers', '/api/exams/{exam_id}/bulk-approve', '/api/submissions/{submission_id}/unapprove', '/api/exams/{exam_id}/submissions', '/api/submissions/{submission_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/close', '/api/exams/{exam_id}/reopen', '/api/exams/{exam_id}/regrade-all', '/api/batches/{batch_id}/close', '/api/batches/{batch_id}/reopen', '/api/batches/{batch_id}/students', '/api/batches/{batch_id}/students/{student_id}', '/api/students/{student_user_id}', '/api/exams', '/api/exams', '/api/exams/{exam_id}', '/api/exams/{exam_id}', '/api/exams/{exam_id}/extract-questions', '/api/exams/{exam_id}/re-extract-questions', '/api/exams/{exam_id}/upload-model-answer', '/api/exams/{exam_id}/upload-question-paper', '/api/exams/{exam_id}/upload-papers', '/api/exams/{exam_id}/grade-papers-bg', '/api/grading-jobs/{job_id}', '/api/grading-jobs/{job_id}/cancel', '/api/submissions', '/api/submissions/{submission_id}', '/api/submissions/{submission_id}', '/api/re-evaluations', '/api/re-evaluations', '/api/re-evaluations/{request_id}', '/api/analytics/dashboard', '/api/analytics/class-report', '/api/analytics/insights', '/api/analytics/misconceptions', '/api/analytics/topic-mastery', '/api/analytics/student-deep-dive/{student_id}', '/api/analytics/generate-review-packet', '/api/exams/{exam_id}/infer-topics', '/api/exams/{exam_id}/question-topics', '/api/analytics/student-dashboard', '/api/analytics/drill-down/topic/{topic_name}', '/api/analytics/drill-down/question', '/api/analytics/student-journey/{student_id}', '/api/analytics/ask-ai', '/api/analytics/bluff-index', '/api/analytics/syllabus-coverage', '/api/analytics/peer-groups', '/api/analytics/send-peer-group-email', '/api/analytics/ask', '/api/study-materials', '/api/feedback/submit', '/api/feedback/{feedback_id}/apply-to-batch', '/api/feedback/{feedback_id}/apply-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/feedback/apply-multiple-to-all-papers', '/api/exams/{exam_id}/publish-results', '/api/exams/{exam_id}/unpublish-results', '/api/feedback/my-feedback', '/api/feedback/teacher-patterns/{teacher_id}', '/api/feedback/common-patterns', '/api/health', '/api/batches/{batch_id}/stats', '/api/batches/{batch_id}/students', '/api/students/{student_id}/analytics', '/api/debug/cleanup', '/api/debug/status', '/api/auth/check-admin', '/api/admin/dashboard-stats', '/api/admin/users/{user_id}/details', '/api/admin/users/{user_id}/features', '/api/admin/users/{user_id}/quotas', '/api/admin/users/{user_id}/status', '/api/feedback', '/api/admin/feedback', '/api/admin/feedback/{feedback_id}/resolve', '/api/metrics/track-event', '/api/admin/users', '/api/admin/metrics/overview', '/health']
+2026-02-05 14:34:20,701 - server - INFO - 🔍 Checking system dependencies...
+2026-02-05 14:34:20,709 - server - INFO - ✅ poppler-utils is already installed
+2026-02-05 14:34:20,709 - server - INFO - 🔄 Starting integrated background task worker...
+2026-02-05 14:34:20,709 - server - INFO - 🔄 Background worker started
+2026-02-05 14:34:20,709 - server - INFO - ============================================================
+2026-02-05 14:34:20,710 - server - INFO - 🔄 Background worker started
+2026-02-05 14:34:20,710 - server - INFO - ============================================================
+INFO:     Application startup complete.
+2026-02-05 14:34:20,728 - server - INFO - Deleted 0 old metrics_logs records
+2026-02-05 14:34:20,731 - server - INFO - Deleted 0 old api_metrics records
+2026-02-05 14:34:20,731 - server - INFO - ✅ Data cleanup completed successfully
+2026-02-05 14:34:20,740 - task_worker - INFO - Task worker started. Polling for tasks...
+INFO:     127.0.0.1:65072 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65127 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65170 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65170 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65216 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65263 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65263 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65302 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65339 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65339 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /api/profile/check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65408 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65406 - "GET /api/exams/exam_ceb3ce82 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65410 - "GET /api/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65414 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /api/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65417 - "GET /api/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65408 - "GET /api/exams/exam_ceb3ce82 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65474 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65474 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65531 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49191 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49191 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49233 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49275 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49275 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49324 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49374 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49374 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49415 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49455 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49455 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49514 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49554 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49554 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49643 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49643 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-05 14:44:43,615 - server - INFO - 🛑 FastAPI app shutting down...
+2026-02-05 14:44:43,618 - server - INFO - ⏹️  Stopping background task worker...
+2026-02-05 14:44:43,618 - server - INFO - ✅ Background task worker stopped cleanly
+INFO:     Application shutdown complete.
+INFO:     Finished server process [80587]
+INFO:     Stopping reloader process [51092]

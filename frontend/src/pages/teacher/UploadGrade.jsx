@@ -25,7 +25,8 @@ import {
   Loader2,
   X,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Info
 } from "lucide-react";
 
 const GRADING_MODES = [
@@ -291,7 +292,7 @@ export default function UploadGrade({ user }) {
           return;
         }
         
-        console.log('Restoring state:', state);
+        // Restore persisted state silently
         
         // PRIORITY: Handle active grading job FIRST
         if (state.activeJobId) {
@@ -359,9 +360,6 @@ export default function UploadGrade({ user }) {
           try {
             const examResponse = await axios.get(`${API}/exams/${state.examId}`);
             const examData = examResponse.data;
-            
-            console.log('Exam data from backend:', examData);
-            
             // Set exam ID first
             setExamId(state.examId);
             
@@ -370,19 +368,8 @@ export default function UploadGrade({ user }) {
               setFormData(state.formData);
             }
             
-            // Check if model answer is being processed
-            if (examData.model_answer_processing) {
-              console.log('Model answer is still processing');
-              setStep(2);
-              setLoading(true);
-              setPaperUploaded(false);
-              toast.info('Model answer is being processed. Please wait...');
-              return;
-            }
-            
             // Mark files as uploaded based on backend data
             if (examData.model_answer_file_id) {
-              console.log('Model answer already uploaded');
               setPaperUploaded(true);
             }
             
@@ -846,17 +833,11 @@ export default function UploadGrade({ user }) {
       toast.error("Exam ID not found. Please go back to Step 1 and create the exam first.");
       return;
     }
-    
-    // If no model answer and no question paper, just move to next step
-    if (!modelAnswerFile && !questionPaperFile) {
-      setStep(3);
-      toast.info("Proceeding without model answer. AI will grade based on question rubrics.");
-      return;
-    }
-    
+
+    // Both uploads are now optional - questions will be extracted from student papers if needed
     setLoading(true);
     try {
-      // Upload question paper if provided
+      // Upload question paper if a new file is selected (optional)
       if (questionPaperFile) {
         const qpFormData = new FormData();
         qpFormData.append("file", questionPaperFile);
@@ -864,16 +845,18 @@ export default function UploadGrade({ user }) {
           headers: { "Content-Type": "multipart/form-data" },
           timeout: 900000  // 15 minutes for large document processing
         });
-        
+
         // Show auto-extraction result
         if (qpResponse.data.auto_extracted) {
           toast.success(`✨ Question paper uploaded & ${qpResponse.data.extracted_count} questions auto-extracted!`);
         } else {
           toast.success("Question paper uploaded");
         }
+
+        setPaperUploaded(true);
       }
-      
-      // Upload model answer if provided
+
+      // Upload model answer if provided (optional)
       if (modelAnswerFile) {
         const formData = new FormData();
         formData.append("file", modelAnswerFile);
@@ -881,15 +864,17 @@ export default function UploadGrade({ user }) {
           headers: { "Content-Type": "multipart/form-data" },
           timeout: 900000  // 15 minutes for large document processing
         });
-        
+
         // Show auto-extraction result
         if (maResponse.data.auto_extracted) {
-          toast.success(`✨ Model answer uploaded & ${maResponse.data.extracted_count} questions auto-extracted!`);
+          toast.success(`✨ Model answer uploaded & ${maResponse.data.extracted_count} answers auto-extracted!`);
         } else {
           toast.success("Model answer uploaded");
         }
+
+        setPaperUploaded(true);
       }
-      
+
       setStep(3);
     } catch (error) {
       console.error("Error:", error);
@@ -1262,7 +1247,7 @@ export default function UploadGrade({ user }) {
             <CardContent className="space-y-6">
               {/* Question Paper Upload */}
               <div>
-                <Label className="text-sm font-medium mb-2 block">Question Paper (Recommended)</Label>
+                <Label className="text-sm font-medium mb-2 block">Question Paper (Optional)</Label>
                 <div 
                   {...getQuestionRootProps()} 
                   className={`dropzone upload-zone p-6 text-center border-2 border-dashed rounded-xl ${isQuestionDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"}`}
@@ -1335,8 +1320,7 @@ export default function UploadGrade({ user }) {
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>💡 Tip:</strong> Upload question paper to automatically extract and display questions in the review page. 
-                  Model answer helps improve AI grading accuracy. Both are optional.
+                  <strong>💡 Tip:</strong> Both uploads are optional! If neither is uploaded, questions will be automatically extracted from student answer papers. Model answer improves AI grading accuracy.
                 </p>
               </div>
               <div className="flex justify-between pt-4">
@@ -1350,7 +1334,7 @@ export default function UploadGrade({ user }) {
                   data-testid="upload-model-btn"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  {(modelAnswerFile || questionPaperFile) ? "Upload & Continue" : "Skip & Continue"}
+                  Upload & Continue
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -1745,25 +1729,19 @@ export default function UploadGrade({ user }) {
               <CardDescription>Upload student answer sheets for grading</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Validation: Require paper upload and questions */}
+              {/* Info: Model answer/question paper is optional */}
               {!paperUploaded && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-red-900">⚠️ Cannot Proceed to Grading</p>
-                      <p className="text-sm text-red-800">
-                        You must upload either a <strong>Question Paper</strong> or <strong>Model Answer</strong> in Step 2 before proceeding to grade student papers.
+                      <p className="text-sm font-medium text-blue-900">ℹ️ Optional: Model Answer/Question Paper</p>
+                      <p className="text-sm text-blue-800">
+                        You can proceed without uploading a <strong>Question Paper</strong> or <strong>Model Answer</strong>. The AI can extract questions directly from student answer papers.
                       </p>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setStep(2)}
-                        className="mt-2 border-red-300 text-red-700 hover:bg-red-50"
-                      >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Go Back to Step 2
-                      </Button>
+                      <p className="text-xs text-blue-700 mt-1">
+                        💡 <strong>Tip:</strong> Upload a model answer for more accurate grading, or let AI extract questions from the first student paper.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1783,7 +1761,7 @@ export default function UploadGrade({ user }) {
                 </div>
               )}
 
-              {paperUploaded && (
+              {/* Always show student papers upload area - removed paperUploaded condition */}
               <>
               {/* File Format Instructions */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1886,7 +1864,7 @@ export default function UploadGrade({ user }) {
                 </Button>
                 <Button 
                   onClick={handleStartGrading} 
-                  disabled={studentFiles.length === 0 || processing || !paperUploaded}
+                  disabled={studentFiles.length === 0 || processing}
                   data-testid="start-grading-btn"
                 >
                   {processing ? (
@@ -1897,7 +1875,6 @@ export default function UploadGrade({ user }) {
                 </Button>
               </div>
               </>
-              )}
             </CardContent>
           </Card>
         )}

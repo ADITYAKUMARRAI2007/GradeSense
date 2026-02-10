@@ -38,11 +38,10 @@ import FeedbackBeacon from "./components/FeedbackBeacon";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 export const API = `${BACKEND_URL}/api`;
 
-// Debug logging for environment
+// Debug logging for environment (disabled in UI to keep console clean)
 if (!process.env.REACT_APP_BACKEND_URL) {
-  console.warn('⚠️ REACT_APP_BACKEND_URL is not set, using window.location.origin:', window.location.origin);
+  // Intentionally silent in UI
 }
-console.log('🔗 API URL configured as:', API);
 
 // Configure axios
 axios.defaults.withCredentials = true;
@@ -110,18 +109,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           const profileResponse = await axios.get(`${API}/profile/check`);
           setProfileCheck(profileResponse.data);
           
-          console.log('Profile check response:', profileResponse.data);
-          
           // ONLY redirect to profile setup if EXPLICITLY marked as incomplete (false)
           // AND not already on profile setup page
           if (profileResponse.data.profile_completed === false && location.pathname !== '/profile/setup') {
-            console.log('Profile incomplete (new user), redirecting to setup');
             navigate('/profile/setup', { replace: true });
             return;
           }
           
           // If profile is complete (true or null for existing users), continue normally
-          console.log('Profile complete, allowing navigation');
         } catch (profileError) {
           console.error('Profile check error:', profileError);
           // If profile check fails, assume profile is complete (existing user)
