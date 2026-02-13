@@ -604,6 +604,7 @@ class User(BaseModel):
     contact: Optional[str] = None  # Phone number
     teacher_type: Optional[str] = None  # school, college, competitive, others
     exam_category: Optional[str] = None  # For competitive: UPSC, CA, CLAT, JEE, NEET, others
+    exam_type: Optional[str] = None  # upsc or college
     profile_completed: bool = False  # Track if initial profile setup is done
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -613,6 +614,7 @@ class UserCreate(BaseModel):
     role: str = "student"
     student_id: Optional[str] = None
     batches: List[str] = []
+    exam_type: Optional[str] = None  # upsc or college
 
 class ProfileUpdate(BaseModel):
     name: str
@@ -620,6 +622,7 @@ class ProfileUpdate(BaseModel):
     email: str
     teacher_type: str  # school, college, competitive, others
     exam_category: Optional[str] = None  # Only for competitive exams
+    exam_type: Optional[str] = None  # upsc or college
 
 class Batch(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -709,11 +712,25 @@ class AnnotationData(BaseModel):
     x: int = 0  # X coordinate (pixel), auto-calculated from box_2d if not provided
     y: int = 0  # Y coordinate (pixel), auto-calculated from box_2d if not provided
     text: str = ""
+    label: Optional[str] = None
+    feedback: Optional[str] = None
     color: str = "green"
     size: int = 30
     page_index: int = 0  # Which page/image this annotation belongs to
     box_2d: Optional[List[int]] = None  # [ymin, xmin, ymax, xmax] normalized 0-1000
     anchor_text: Optional[str] = None  # Optional text anchor for OCR positioning
+    anchor_x: Optional[float] = None  # Anchor x (0-1)
+    anchor_y: Optional[float] = None  # Anchor y (0-1)
+    margin_x: Optional[float] = None  # Margin x (0-1)
+    margin_y: Optional[float] = None  # Margin y (0-1)
+    x_percent: Optional[float] = None  # Generic x (0-1)
+    y_percent: Optional[float] = None  # Generic y (0-1)
+    w_percent: Optional[float] = None  # Width (0-1)
+    h_percent: Optional[float] = None  # Height (0-1)
+    y_start: Optional[float] = None  # Bracket start y (0-1) alias for y_start_percent
+    y_end: Optional[float] = None  # Bracket end y (0-1) alias for y_end_percent
+    y_start_percent: Optional[float] = None  # Bracket start y (0-1)
+    y_end_percent: Optional[float] = None  # Bracket end y (0-1)
 
 class SubQuestionScore(BaseModel):
     sub_id: str
@@ -1270,16 +1287,21 @@ from pydantic import EmailStr, Field
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    password: str = Field(
+        ..., min_length=8,
+        description="Password must be at least 8 characters"
+    )
     name: str
     role: str = Field(..., pattern="^(teacher|student)$")
+    exam_type: str = Field(..., pattern="^(upsc|college)$")
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    exam_type: Optional[str] = None
 
 @api_router.post("/auth/register")
-async def register_user(request: RegisterRequest, response: Response):
+async def register_user(request: RegisterRequest, response: Response, req: Request):
     """Register a new user with email and password (JWT-based auth)"""
     # Check if user already exists
     existing_user = await db.users.find_one({"email": request.email}, {"_id": 0})
@@ -1288,7 +1310,10 @@ async def register_user(request: RegisterRequest, response: Response):
     
     # Create new user
     user_id = str(uuid.uuid4())
-    hashed_password = get_password_hash(request.password)
+    try:
+        hashed_password = get_password_hash(request.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
     new_user = {
         "user_id": user_id,
@@ -1298,6 +1323,9 @@ async def register_user(request: RegisterRequest, response: Response):
         "password_hash": hashed_password,
         "auth_type": "jwt",  # Mark as JWT auth vs OAuth
         "picture": None,
+        "exam_type": request.exam_type,
+        "teacher_type": "competitive" if request.exam_type == "upsc" else "college",
+        "exam_category": "UPSC" if request.exam_type == "upsc" else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "last_login": datetime.now(timezone.utc).isoformat(),
         "account_status": "active"
@@ -1321,7 +1349,7 @@ async def register_user(request: RegisterRequest, response: Response):
         httponly=True,
         max_age=7 * 24 * 60 * 60,  # 7 days
         samesite="lax",
-        secure=True,
+        secure=req.url.scheme == "https",
         path="/"
     )
     
@@ -1330,13 +1358,17 @@ async def register_user(request: RegisterRequest, response: Response):
         "email": request.email,
         "name": request.name,
         "role": request.role,
+        "exam_type": request.exam_type,
         "token": access_token
     }
 
 
 class SetPasswordRequest(BaseModel):
     email: EmailStr
-    new_password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
+    new_password: str = Field(
+        ..., min_length=6,
+        description="Password must be at least 6 characters"
+    )
 
 @api_router.post("/auth/set-password")
 async def set_password_for_google_account(request: SetPasswordRequest):
@@ -1351,7 +1383,10 @@ async def set_password_for_google_account(request: SetPasswordRequest):
         raise HTTPException(status_code=400, detail="This account already has a password. Use the login page or reset password if you forgot it.")
     
     # Set password hash and mark profile as completed for existing Google users
-    password_hash = get_password_hash(request.new_password)
+    try:
+        password_hash = get_password_hash(request.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     await db.users.update_one(
         {"email": request.email},
         {"$set": {
@@ -1366,7 +1401,7 @@ async def set_password_for_google_account(request: SetPasswordRequest):
     }
 
 @api_router.post("/auth/login")
-async def login_user(request: LoginRequest, response: Response):
+async def login_user(request: LoginRequest, response: Response, req: Request):
     """Login with email and password (JWT-based auth)"""
     # Find user
     user = await db.users.find_one({"email": request.email}, {"_id": 0})
@@ -1390,10 +1425,15 @@ async def login_user(request: LoginRequest, response: Response):
     elif account_status == "disabled":
         raise HTTPException(status_code=403, detail="Account disabled. Contact support.")
     
-    # Update last login
+    # Update last login and exam_type if provided
+    update_fields = {"last_login": datetime.now(timezone.utc).isoformat()}
+    if request.exam_type in ["upsc", "college"]:
+        update_fields["exam_type"] = request.exam_type
+        update_fields["teacher_type"] = "competitive" if request.exam_type == "upsc" else "college"
+        update_fields["exam_category"] = "UPSC" if request.exam_type == "upsc" else None
     await db.users.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+        {"$set": update_fields}
     )
     
     # Create JWT token
@@ -1411,7 +1451,7 @@ async def login_user(request: LoginRequest, response: Response):
         httponly=True,
         max_age=7 * 24 * 60 * 60,  # 7 days
         samesite="lax",
-        secure=True,
+        secure=req.url.scheme == "https",
         path="/"
     )
     
@@ -1423,6 +1463,7 @@ async def login_user(request: LoginRequest, response: Response):
         "name": user.get("name"),
         "picture": user.get("picture"),
         "role": user["role"],
+        "exam_type": user.get("exam_type"),
         "token": access_token,
         "profile_completed": user.get("profile_completed", True)  # Default to True for existing users
     }
@@ -2091,7 +2132,8 @@ async def get_me(user: User = Depends(get_current_user)):
         "name": user.name,
         "picture": user.picture,
         "role": user.role,
-        "batches": user.batches
+        "batches": user.batches,
+        "exam_type": getattr(user, "exam_type", None)
     }
 
 @api_router.post("/auth/logout")
@@ -2113,6 +2155,10 @@ async def complete_profile(
 ):
     """Complete user profile on first login"""
     try:
+        # Validate exam_type
+        if profile.exam_type and profile.exam_type not in ["upsc", "college"]:
+            raise HTTPException(status_code=400, detail="Invalid exam type")
+
         # Validate teacher_type
         valid_teacher_types = ["school", "college", "competitive", "others"]
         if profile.teacher_type not in valid_teacher_types:
@@ -2131,6 +2177,7 @@ async def complete_profile(
             "email": profile.email,
             "teacher_type": profile.teacher_type,
             "exam_category": profile.exam_category if profile.teacher_type == "competitive" else None,
+            "exam_type": profile.exam_type,
             "profile_completed": True,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
@@ -3450,6 +3497,7 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                 model_answer_text=model_answer_text,
                 subject_name=subject_name,
                 exam_name=exam.get("exam_name"),
+                exam_type=getattr(user, "exam_type", None),
                 skip_cache=True
             )
 
@@ -3459,7 +3507,7 @@ async def regrade_all_submissions(exam_id: str, user: User = Depends(get_current
                     answer_images,
                     scores,
                     use_vision_ocr=True,
-                    dense_red_pen=True
+                    dense_red_pen=False
                 )
             except Exception as ann_error:
                 logger.warning(f"Regrade annotation generation failed, using margin annotations: {ann_error}")
@@ -4257,7 +4305,7 @@ async def extract_model_answer_content(
                 questions_context += f"  - Part {sq_id} ({sq_marks} marks)\n"
         
         # Process in chunks for large model answers
-        CHUNK_SIZE = 8  # Process 8 pages at a time for stability
+        CHUNK_SIZE = 15  # Process 15 pages at a time for stability
         all_extracted_content = []
         
         for chunk_start in range(0, len(model_answer_images), CHUNK_SIZE):
@@ -4789,7 +4837,7 @@ Return a JSON array where EACH question has this exact structure:
 ).with_model("gemini", "gemini-2.5-flash").with_params(temperature=0)
         
         # Create image contents - CHUNK if too many pages
-        CHUNK_SIZE = 10  # Process 10 pages at a time to avoid timeouts
+        CHUNK_SIZE = 15  # Process 15 pages at a time to avoid timeouts
         all_images = paper_images
         
         if len(all_images) > CHUNK_SIZE:
@@ -5287,6 +5335,7 @@ async def grade_with_ai(
     exam_id: str = None,  # NEW: For pattern matching
     subject_name: str = None,  # NEW: For UPSC detection
     exam_name: str = None,  # NEW: For UPSC detection
+    exam_type: str = None,  # NEW: upsc or college
     skip_cache: bool = False  # NEW: Skip cache when regrading
 ) -> List[QuestionScore]:
     """Grade answer paper using Gemini with GradeSense Master Instruction Set + Teacher's Learned Patterns.
@@ -5624,9 +5673,11 @@ Evaluate every answer based on these three pillars:
 * GS-4 (Ethics): Check for "Values" (Integrity, Probity), Thinkers (Gandhi, Kant), and Concrete Examples of Officers.
 
 ## 4. FEEDBACK STYLE (Administrative Tone)
-* Do not be encouraging. Be constructive and curt.
-* Good Feedback: "Lacks substantiation. Cite Article 21 to strengthen the privacy argument."
-* Bad Feedback: "Good attempt, try to add more points."
+* Provide clear, concise feedback indexed to each answer part.
+* Use positive notes for good elements: "Good intro, good data usage, strong conclusion"
+* Use corrective notes for issues: "Missing Article 21, incorrect data"
+* Keep feedback short patches, not long paragraphs.
+* Position feedback near the relevant answer line with arrows.
 
 ## 5. OUTPUT FORMAT (STRICT JSON)
 Output ONLY this JSON structure. No preamble.
@@ -5658,29 +5709,65 @@ You must scan the answer for specific **"Value Indicators."** If found, you MUST
 You must generate coordinates and labels to simulate a human teacher marking the paper.
 * **`TICK` (Green):** Place next to every "Value Indicator" found (e.g., next to "Article 21").
 * **`CROSS` (Red):** Place next to factually incorrect data.
-* **`UNDERLINE` (Blue):** Underline ONLY one correct key phrase (do NOT underline wrong or weak text).
-* **`COMMENT` (Red):** Boxed improvement note near correct text. Use administrative language: "Add Article 21," "Cite NCRB data," "Give example." Avoid long notes.
+* **`UNDERLINE` (Red):** Draw red lines under each question's answer text to highlight it.
+* **`COMMENT` (Red):** Margin note with arrow pointing to the text. Use administrative language: "Add Article 21," "Cite NCRB data," "Give example." Avoid long notes.
+* **PLACEMENT:** Place marks exactly on the text or word mentioned in the anchor_text. For overall feedback, add a bracketed section at the end like [Good start, fair attempt, feedback clearly and to the point].
+* **COLLECTIVE FEEDBACK:** At the end of all questions, add a bracketed feedback summary with overall assessment.
 
 ## 4. OUTPUT FORMAT (STRICT JSON)
 Return a single JSON object as per GradeSense JSON format (required by the system).
 """
 
+    college_system_prompt = """# ROLE: College Exam Evaluator (University Standard)
+
+## MISSION
+You are an experienced university evaluator grading undergraduate and postgraduate exam scripts. Your goal is to grade fairly based on conceptual accuracy, completeness, and clarity, while rewarding structure and evidence.
+
+## 1. SCORING PRINCIPLES
+* Accuracy and relevance to the question are primary.
+* Partial credit must be awarded for correct concepts even if the answer is incomplete.
+* Penalize factual errors or misconceptions.
+* Reward clear structure: definition → explanation → example → conclusion.
+
+## 2. COMMON COLLEGE EVALUATION SIGNALS
+* Definitions are expected for theory questions.
+* Examples or applications improve scores.
+* Diagrams/flowcharts should get small positive credit if relevant.
+* For numerical problems, method marks matter.
+
+## 3. FEEDBACK STYLE
+* Short, actionable comments per answer part.
+* Highlight missing keywords, examples, or steps.
+* Avoid UPSC-specific constraints (no civil services jargon).
+
+## 4. OUTPUT FORMAT (STRICT JSON)
+Return only GradeSense JSON as defined below.
+"""
+
     # Detect UPSC context
     upsc_paper = infer_upsc_paper(exam_name, subject_name)
     is_upsc = False
-    if upsc_paper:
+    exam_type_norm = str(exam_type or "").lower()
+    if exam_type_norm == "upsc":
         is_upsc = True
-    if subject_name and "upsc" in subject_name.lower():
-        is_upsc = True
-    if exam_name and "upsc" in exam_name.lower():
-        is_upsc = True
+    elif exam_type_norm == "college":
+        is_upsc = False
+    else:
+        if upsc_paper:
+            is_upsc = True
+        if subject_name and "upsc" in subject_name.lower():
+            is_upsc = True
+        if exam_name and "upsc" in exam_name.lower():
+            is_upsc = True
 
     # ============== GRADESENSE MASTER INSTRUCTION SET ==============
     selected_upsc_prompt = upsc_system_prompt
     if is_upsc and upsc_paper != "GS-4":
         selected_upsc_prompt = gs4_system_prompt
 
-    master_system_prompt = f"""{selected_upsc_prompt if is_upsc else ""}
+    base_prompt = selected_upsc_prompt if is_upsc else college_system_prompt
+
+    master_system_prompt = f"""{base_prompt}
 
 UPSC PAPER DETECTED: {upsc_paper or "Unknown"}
 Apply the subject-specific checks for this paper type when applicable.
@@ -5827,14 +5914,21 @@ Return ONLY valid JSON in this exact format:
     - Do NOT mention score caps or internal scoring rules in feedback
     - Always include at least one concrete add-on (data, example, committee, article, case)
 6. confidence must be between 0.0 and 1.0
-7. SELECTIVITY: Identify ONLY the top 3 to 5 most critical points (positive or negative) on this page. Do not annotate every sentence.
-8. CATEGORIZATION: For each point, choose a style:
-    - INLINE_SYMBOL (label TICK/CROSS)
-    - MARGIN_NOTE (brief note 2-5 words; written in margin with line)
-    - STRUCTURAL_BOX (only for large diagram/paragraph needing rework)
-9. If you use style fields, include: anchor (3-5 words), style, label, color. Otherwise use annotation_type/anchor_text.
-10. Do NOT underline every line or mark line-by-line. Underline only a correct key phrase (not wrong/weak text).
-11. For COMMENT/MARGIN_NOTE, write how adding the missing point/example/data would improve the answer and raise marks (do NOT mention caps)
+7. **CRITICAL: EXACTLY 4 COMMENTS PER PAGE** - Generate exactly 4 specific comments per page.
+8. **IGNORE PRINTED QUESTIONS** - Do NOT mark the printed text at the top of the page (typically top 25%). Only annotate the student's handwritten answers.
+9. **BOX COMMENTS**: Use **BOX_COMMENT** for all feedback.
+    - Label length: **3 to 6 words** (never 1 word)
+    - Example: "Intro lacks current affairs context"
+10. **STRICT FEEDBACK QUALITY RULES**:
+    - **NO SINGLE WORDS** like "Improve", "Good", "Vague"
+    - **3-6 WORDS ONLY**: short but specific feedback
+11. OUTPUT FORMAT (JSON fields):
+    - **type**: "BOX_COMMENT"
+    - **label**: 3-6 word feedback
+    - **anchor_text**: exact phrase from the answer to connect the box
+12. Output format examples:
+    - {{"type":"BOX_COMMENT","label":"Intro lacks current affairs context","anchor_text":"capital expenditure"}}
+    - {{"type":"BOX_COMMENT","label":"Good connection to SDG goals","anchor_text":"SDG"}}
 
 ## QUALITY ASSURANCE CHECKLIST
 - ARITHMETIC CHECK: no question exceeds max marks
@@ -5865,19 +5959,132 @@ Grade with integrity, insight, and care. Your success = matching an expert teach
                 continue
             if "style" in ann and "annotation_type" not in ann:
                 style = str(ann.get("style", "")).upper()
-                label = str(ann.get("label") or "")
-                anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
-                if _skip_anchor(anchor_text, style):
+                label = str(ann.get("short_label") or ann.get("label") or "")
+                
+                # Handle GROUP_BRACKET specially (no anchor text needed)
+                if style == "GROUP_BRACKET":
+                    page_number = ann.get("page_number")
+                    page_index = max(0, int(page_number) - 1) if page_number else ann.get("page_index", -1)
+                    if page_index is None or page_index < 0:
+                        continue
+                    
+                    normalized.append(AnnotationData(
+                        type="GROUP_BRACKET",
+                        text=label,
+                        label=label,
+                        feedback=str(ann.get("feedback") or "").strip() or None,
+                        color=ann.get("color", "#D32F2F"),
+                        page_index=page_index,
+                        y_start=float(ann.get("y_start", 0.3)),
+                        y_end=float(ann.get("y_end", 0.45))
+                    ))
                     continue
-                if style == "INLINE_SYMBOL":
-                    symbol = label.strip().upper()
-                    mapped_type = AnnotationType.CHECKMARK if symbol == "TICK" else AnnotationType.CROSS_MARK
-                elif style == "MARGIN_NOTE":
-                    mapped_type = AnnotationType.COMMENT
-                elif style == "STRUCTURAL_BOX":
-                    mapped_type = AnnotationType.HIGHLIGHT_BOX
+                
+                # Handle MARGIN_LEASH (requires anchor text and positioning)
+                if style == "MARGIN_LEASH":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or ""
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    
+                    page_number = ann.get("page_number")
+                    page_index = max(0, int(page_number) - 1) if page_number else ann.get("page_index", -1)
+                    if page_index is None or page_index < 0:
+                        continue
+                    
+                    # These will be filled by OCR matching later
+                    normalized.append(AnnotationData(
+                        type="MARGIN_LEASH",
+                        text=label,
+                        label=label,
+                        feedback=str(ann.get("feedback") or "").strip() or None,
+                        color=ann.get("color", "#D32F2F"),
+                        page_index=page_index,
+                        anchor_text=anchor_text,
+                        anchor_x=0.5,
+                        anchor_y=0.5,
+                        margin_x=0.92,
+                        margin_y=0.5
+                    ))
+                    continue
+
+                # Handle MARGIN_NOTE (circle + connector)
+                if style == "MARGIN_NOTE":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or ""
+                    if _skip_anchor(anchor_text, style):
+                        continue
+
+                    page_number = ann.get("page_number")
+                    page_index = max(0, int(page_number) - 1) if page_number else ann.get("page_index", -1)
+                    if page_index is None or page_index < 0:
+                        continue
+
+                    normalized.append(AnnotationData(
+                        type="MARGIN_NOTE",
+                        text=label,
+                        label=label,
+                        feedback=str(ann.get("feedback") or "").strip() or None,
+                        color=ann.get("color", "#D32F2F"),
+                        page_index=page_index,
+                        anchor_text=anchor_text
+                    ))
+                    continue
+
+                if style == "EMPHASIS_UNDERLINE":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "EMPHASIS_UNDERLINE"
+                elif style == "DOUBLE_TICK":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "DOUBLE_TICK"
+                elif style == "FEEDBACK_UNDERLINE":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "FEEDBACK_UNDERLINE"
+                elif style == "FEEDBACK":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "FEEDBACK_UNDERLINE"
+                elif style == "TICK":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "TICK"
+                elif style == "CROSS":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "CROSS"
+                elif style == "BOX_COMMENT":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = "BOX_COMMENT"
+                
+                # Handle INLINE_TICK (simple checkmark)
+                if style == "INLINE_TICK":
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    mapped_type = AnnotationType.CHECKMARK
                 else:
-                    mapped_type = AnnotationType.COMMENT
+                    # Fallback for old styles
+                    anchor_text = ann.get("anchor") or ann.get("anchor_text") or label
+                    if _skip_anchor(anchor_text, style):
+                        continue
+                    if style == "INLINE_SYMBOL":
+                        symbol = label.strip().upper()
+                        mapped_type = AnnotationType.CHECKMARK if symbol == "TICK" else AnnotationType.CROSS_MARK
+                    elif style == "MARGIN_NOTE":
+                        mapped_type = AnnotationType.COMMENT
+                    elif style == "STRUCTURAL_BOX":
+                        mapped_type = AnnotationType.HIGHLIGHT_BOX
+                    else:
+                        mapped_type = AnnotationType.COMMENT
 
                 page_number = ann.get("page_number")
                 page_index = max(0, int(page_number) - 1) if page_number else ann.get("page_index", -1)
@@ -5889,6 +6096,8 @@ Grade with integrity, insight, and care. Your success = matching an expert teach
                     x=0,
                     y=0,
                     text=label,
+                    label=label,
+                    feedback=str(ann.get("feedback") or "").strip() or None,
                     color=ann.get("color", "red"),
                     size=26,
                     page_index=page_index,
@@ -5897,16 +6106,19 @@ Grade with integrity, insight, and care. Your success = matching an expert teach
             elif "annotation_type" in ann:
                 ann_type = str(ann.get("annotation_type", "")).upper()
                 type_map = {
-                    "TICK": AnnotationType.CHECKMARK,
+                    "TICK": "TICK",
                     "UNDERLINE": AnnotationType.ERROR_UNDERLINE,
-                    "CROSS": AnnotationType.CROSS_MARK,
+                    "CROSS": "CROSS",
                     "BOX": AnnotationType.HIGHLIGHT_BOX,
-                    "COMMENT": AnnotationType.COMMENT
+                    "COMMENT": AnnotationType.COMMENT,
+                    "FEEDBACK_UNDERLINE": "FEEDBACK_UNDERLINE",
+                    "FEEDBACK": "FEEDBACK_UNDERLINE"
+                    ,"BOX_COMMENT": "BOX_COMMENT"
                 }
                 mapped_type = type_map.get(ann_type, ann.get("type", AnnotationType.CHECKMARK))
                 sentiment = str(ann.get("sentiment", "")).lower()
                 if ann_type == "UNDERLINE":
-                    color = ann.get("color", "blue")
+                    color = ann.get("color", "red")
                 else:
                     color = "green" if sentiment == "positive" else "red" if sentiment == "negative" else ann.get("color", "red")
                 label = ann.get("short_label") or ann.get("reason") or ann.get("anchor_text") or ""
@@ -5945,13 +6157,13 @@ Grade with integrity, insight, and care. Your success = matching an expert teach
         normalized.sort(key=lambda a: priority.get(a.type, 99))
 
         # Limit annotation density to keep pages clean and readable
-        total_limit = 3
+        total_limit = 6
         type_limits = {
-            AnnotationType.ERROR_UNDERLINE: 1,
+            AnnotationType.ERROR_UNDERLINE: 2,
             AnnotationType.HIGHLIGHT_BOX: 1,
-            AnnotationType.COMMENT: 1,
-            AnnotationType.CROSS_MARK: 1,
-            AnnotationType.CHECKMARK: 1
+            AnnotationType.COMMENT: 2,
+            AnnotationType.CROSS_MARK: 2,
+            AnnotationType.CHECKMARK: 2
         }
         counts: Dict[str, int] = {}
         limited: List[AnnotationData] = []
@@ -6285,19 +6497,19 @@ Return valid JSON only."""
                 print(f"[CHUNK-{chunk_idx+1}] Sending to AI (attempt {attempt+1}/{max_retries})...")
                 logger.info(f"AI grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                 
-                # Add timeout to prevent indefinite hanging (120 seconds)
+                # Add timeout to prevent indefinite hanging (240 seconds)
                 try:
                     ai_resp = await asyncio.wait_for(
                         chunk_chat.send_message(user_msg),
-                        timeout=120.0  # 120 second timeout per attempt
+                        timeout=240.0  # 240 second timeout per attempt
                     )
                 except asyncio.TimeoutError:
-                    logger.error(f"Timeout after 120s grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
+                    logger.error(f"Timeout after 240s grading chunk {chunk_idx+1}/{total_chunks} attempt {attempt+1}")
                     if attempt < max_retries - 1:
                         continue  # Retry
                     else:
                         logger.error(f"Failed chunk {chunk_idx+1} after {max_retries} timeout attempts")
-                        raise TimeoutError(f"AI grading timed out after {max_retries} attempts (120s each)")
+                        raise TimeoutError(f"AI grading timed out after {max_retries} attempts (240s each)")
 
                 # Robust JSON parsing with multiple strategies
                 resp_text = ai_resp.strip()
@@ -6389,7 +6601,7 @@ Return valid JSON only."""
         return []
 
     # CHUNKED PROCESSING LOGIC - REDUCED chunk size for better timeout handling
-    CHUNK_SIZE = 8  # Process 8 pages at a time for stability
+    CHUNK_SIZE = 10  # Process 10 pages at a time for stability
     OVERLAP = 1  # Include 1-page overlap to preserve question context across chunks
     total_student_pages = len(images)
     
@@ -6668,7 +6880,7 @@ async def generate_annotated_images_with_vision_ocr(
             if score > best_score:
                 best_score = score
                 best = words[i:i + len(tokens)]
-        if not best or best_score < 75:
+        if not best or best_score < 60:
             return None
         xs = [v.get("x", 0) for w in best for v in (_word_vertices(w) or [])]
         ys = [v.get("y", 0) for w in best for v in (_word_vertices(w) or [])]
@@ -6751,7 +6963,7 @@ async def generate_annotated_images_with_vision_ocr(
                 best_score = score
                 best = window
 
-        if best_score < 70 or not best:
+        if best_score < 60 or not best:
             return None
 
         x1 = min(w["x"] for w in best)
@@ -6842,6 +7054,131 @@ async def generate_annotated_images_with_vision_ocr(
             })
         return line_boxes
 
+    def _extract_question_number(line_text: str, valid_numbers: set) -> Optional[int]:
+        text = str(line_text or "").strip().lower()
+        if not text:
+            return None
+        match = re.match(r"^\s*(q\s*)?(\d{1,2})[\).:]", text)
+        if match:
+            has_q_prefix = bool(match.group(1))
+            q_num = int(match.group(2))
+            if has_q_prefix and q_num in valid_numbers:
+                return q_num
+        match = re.search(r"\bq\s*(\d{1,2})\b", text)
+        if match:
+            q_num = int(match.group(1))
+            return q_num if q_num in valid_numbers else None
+        return None
+
+    def _normalize_text(s: str) -> str:
+        cleaned = re.sub(r"[^a-z0-9\s]+", " ", str(s or "").lower())
+        return re.sub(r"\s+", " ", cleaned).strip()
+
+    def _is_question_text_line(line_text: str, question_text: str) -> bool:
+        if not line_text or not question_text:
+            return False
+        line_norm = _normalize_text(line_text)
+        q_norm = _normalize_text(question_text)
+        if not line_norm or not q_norm:
+            return False
+        if line_norm in q_norm or q_norm in line_norm:
+            return True
+        try:
+            import difflib
+            return difflib.SequenceMatcher(None, line_norm, q_norm).ratio() >= 0.65
+        except Exception:
+            return False
+
+    def _assign_lines_to_questions(line_boxes, valid_numbers: set):
+        assigned = []
+        current_q = None
+        for line in line_boxes:
+            q_num = _extract_question_number(line.get("text", ""), valid_numbers)
+            is_header = False
+            if q_num is not None:
+                current_q = q_num
+                is_header = True
+            if current_q is not None:
+                q_text = question_text_map.get(current_q)
+                if q_text:
+                    if _is_question_text_line(line.get("text", ""), q_text):
+                        is_header = True
+            assigned.append({
+                "q_num": current_q,
+                "is_header": is_header,
+                **line
+            })
+        return assigned
+
+    def _build_word_boxes(words):
+        boxes = []
+        for w in words:
+            xs = [v.get("x", 0) for v in (_word_vertices(w) or [])]
+            ys = [v.get("y", 0) for v in (_word_vertices(w) or [])]
+            if xs and ys:
+                boxes.append((min(xs), min(ys), max(xs), max(ys)))
+        return boxes
+
+    def _rects_intersect(a, b) -> bool:
+        return not (a[2] <= b[0] or a[0] >= b[2] or a[3] <= b[1] or a[1] >= b[3])
+
+    def _is_rect_clear(word_boxes, rect) -> bool:
+        if not word_boxes:
+            return True
+        for wb in word_boxes:
+            if _rects_intersect(wb, rect):
+                return False
+        return True
+
+    def _find_margin_slot(target_y: int, box_h: int, margin_left: int, margin_right: int, img_h: int, word_boxes, occupied):
+        if target_y is None:
+            target_y = int(img_h * 0.15)
+        step = max(18, int(img_h * 0.02))
+        candidates = [target_y]
+        for offset in range(1, 10):
+            candidates.append(target_y - offset * step)
+            candidates.append(target_y + offset * step)
+        for y in candidates:
+            y1 = max(8, min(img_h - box_h - 8, y))
+            rect = (margin_left, y1, margin_right, y1 + box_h)
+            if not _is_rect_clear(word_boxes, rect):
+                continue
+            if any(_rects_intersect(rect, (margin_left, oy1, margin_right, oy2)) for oy1, oy2 in occupied):
+                continue
+            return y1
+        return None
+
+    def _format_feedback_note(text: str, positive: bool) -> str:
+        cleaned = str(text or "").strip(" -")
+        if len(cleaned) >= 12:
+            return cleaned
+        prefix = "Good: " if positive else "Add: "
+        return f"{prefix}{cleaned}" if cleaned else ""
+
+    def _pick_feedback_phrases(text: str) -> dict:
+        positives = []
+        negatives = []
+        improvements = []
+        raw = text or ""
+        if "Improvements:" in raw:
+            _, tail = raw.split("Improvements:", 1)
+            improvements = [p.strip(" -") for p in re.split(r"[\n]+", tail) if p.strip()]
+        for part in re.split(r"[\n\.]+", raw):
+            phrase = part.strip(" -")
+            if not phrase:
+                continue
+            lower = phrase.lower()
+            if any(k in lower for k in ["good", "strong", "well", "clear", "structured", "data", "example", "intro", "conclusion", "accurate"]):
+                positives.append(phrase)
+            if any(k in lower for k in ["missing", "add", "lack", "weak", "incorrect", "needs", "improve", "unclear"]):
+                negatives.append(phrase)
+        if not negatives and improvements:
+            negatives.extend(improvements)
+        return {
+            "positives": positives[:3],
+            "negatives": negatives[:3]
+        }
+
     annotated_images: List[str] = []
     for page_idx, original_image in enumerate(original_images):
         try:
@@ -6860,6 +7197,15 @@ async def generate_annotated_images_with_vision_ocr(
             words = []
 
         ocr_words = _build_ocr_words(words) if words else []
+        word_boxes = _build_word_boxes(words) if words else []
+        valid_question_numbers = {q.question_number for q in question_scores}
+        question_text_map = {q.question_number: (q.question_text or "") for q in question_scores}
+        y_threshold = max(10, int(img_height * 0.012))
+        line_boxes = _group_words_into_lines(words, y_threshold) if words else []
+        answer_start_y = int(img_height * 0.25)
+        if line_boxes:
+            line_boxes = [lb for lb in line_boxes if lb.get("y2", 0) >= answer_start_y]
+        assigned_lines = _assign_lines_to_questions(line_boxes, valid_question_numbers) if line_boxes else []
 
         def _is_cover_page(words, img_h: int) -> bool:
             if not words:
@@ -6881,7 +7227,11 @@ async def generate_annotated_images_with_vision_ocr(
                 "revision",
                 "paper",
                 "question",
-                "index"
+                "index",
+                "rubric",
+                "rating",
+                "overall",
+                "feedback"
             }
             hits = 0
             for w in words:
@@ -6898,10 +7248,154 @@ async def generate_annotated_images_with_vision_ocr(
             return False
 
         positioned_annotations: List[Annotation] = []
+        comment_stack: List[dict] = []
+        comment_cursor_y = int(img_height * 0.12)
+        comment_step = max(22, int(img_height * 0.02))
+        text_right_edge = None
+        if words:
+            xs = [v.get("x", 0) for w in words for v in (_word_vertices(w) or []) if v.get("x") is not None]
+            if xs:
+                text_right_edge = max(xs)
+        if text_right_edge is None:
+            text_right_edge = int(img_width * 0.6)
+        comment_x = min(int(img_width * 0.78), int(text_right_edge + 20), img_width - 240)
+        comment_x = max(comment_x, int(img_width * 0.6))
+        margin_left = comment_x
+        margin_right = img_width - 16
 
         if _is_cover_page(words, img_height):
             annotated_images.append(original_image)
             continue
+
+        # Enforce exactly 4 BOX_COMMENT per page (answers only)
+        page_ann_refs = []
+        for q_score in question_scores:
+            for ann_data in q_score.annotations:
+                if ann_data.page_index in (-1, page_idx):
+                    page_ann_refs.append((q_score, ann_data))
+
+        def _count_type(target_type: str) -> int:
+            return sum(1 for _, a in page_ann_refs if str(a.type).upper() == target_type)
+
+        box_count = _count_type("BOX_COMMENT")
+        used_texts = {
+            _normalize_text(a.anchor_text or a.text or "")
+            for _, a in page_ann_refs
+        }
+
+        def _add_box_from_lines(needed: int, label_text: str):
+            nonlocal used_texts
+            if needed <= 0 or not assigned_lines:
+                return 0
+            added = 0
+            for line in assigned_lines:
+                if added >= needed:
+                    break
+                if line.get("is_header"):
+                    continue
+                if line.get("y2", 0) < answer_start_y:
+                    continue
+                q_num = line.get("q_num")
+                if not q_num:
+                    continue
+                line_text = _normalize_text(line.get("text", ""))
+                if not line_text or line_text in used_texts:
+                    continue
+                x1, y1, x2, y2 = line.get("x1"), line.get("y1"), line.get("x2"), line.get("y2")
+                if x1 is None or y1 is None or x2 is None or y2 is None:
+                    continue
+                qs_obj = q_score_map.get(q_num)
+                if not qs_obj:
+                    continue
+                qs_obj.annotations.append(AnnotationData(
+                    type="BOX_COMMENT",
+                    page_index=page_idx,
+                    x_percent=float(x1) / img_width,
+                    y_percent=float(y1) / img_height,
+                    w_percent=float(max(2, x2 - x1)) / img_width,
+                    h_percent=float(max(2, y2 - y1)) / img_height,
+                    text=label_text,
+                    label=label_text,
+                    color="#D32F2F"
+                ))
+                used_texts.add(line_text)
+                added += 1
+            return added
+
+        # Fill to exactly 4
+        if box_count < 4:
+            box_count += _add_box_from_lines(4 - box_count, "Add data to answer")
+        if box_count > 4:
+            kept = 0
+            for q_score in question_scores:
+                new_list = []
+                for ann_data in q_score.annotations:
+                    if ann_data.page_index not in (-1, page_idx):
+                        new_list.append(ann_data)
+                        continue
+                    if str(ann_data.type).upper() == "BOX_COMMENT":
+                        if kept >= 4:
+                            continue
+                        kept += 1
+                    new_list.append(ann_data)
+                q_score.annotations = new_list
+
+        # Underline every OCR line of the answer (skip question headers)
+        question_line_centers: Dict[int, List[int]] = {}
+        q_score_map = {qs.question_number: qs for qs in question_scores}
+        header_spans = [(line.get("y1"), line.get("y2")) for line in assigned_lines if line.get("is_header")]
+        if not line_boxes:
+            top = int(img_height * 0.08)
+            bottom = int(img_height * 0.92)
+            step = max(28, int(img_height * 0.032))
+            y = top
+            while y < bottom:
+                line_boxes.append({
+                    "x1": int(img_width * 0.12),
+                    "y1": y - 6,
+                    "x2": int(img_width * 0.85),
+                    "y2": y
+                })
+                y += step
+        for line in line_boxes:
+            if any(line["y1"] <= hs[1] and line["y2"] >= hs[0] for hs in header_spans if hs[0] is not None and hs[1] is not None):
+                continue
+            width = max(2, line["x2"] - line["x1"])
+            positioned_annotations.append(Annotation(
+                annotation_type=AnnotationType.ERROR_UNDERLINE,
+                x=line["x1"],
+                y=line["y2"] + 2,
+                text="",
+                color="#b00020",
+                size=width
+            ))
+        for line in assigned_lines:
+            q_num = line.get("q_num")
+            if not q_num or line.get("is_header"):
+                continue
+            qs_obj = q_score_map.get(q_num)
+            if not qs_obj:
+                continue
+            x1 = max(0, line["x1"])
+            y2 = max(0, line["y2"] + 2)
+            w = max(2, line["x2"] - line["x1"])
+            qs_obj.annotations.append(AnnotationData(
+                type="SLOPPY_UNDERLINE",
+                page_index=page_idx,
+                x_percent=x1 / img_width,
+                y_percent=y2 / img_height,
+                w_percent=w / img_width,
+                color="#D32F2F"
+            ))
+        question_line_spans: Dict[int, List[tuple]] = {}
+        for line in assigned_lines:
+            if not line.get("q_num") or line.get("is_header"):
+                continue
+            question_line_centers.setdefault(line["q_num"], []).append(int((line["y1"] + line["y2"]) / 2))
+            question_line_spans.setdefault(line["q_num"], []).append((line["y1"], line["y2"]))
+
+        for q_num, spans in question_line_spans.items():
+            _ = spans
 
         # Anchor-based annotations from question/sub-question annotations
         for q_score in question_scores:
@@ -6922,71 +7416,79 @@ async def generate_annotated_images_with_vision_ocr(
                             x2 = x1 + coords["w_percent"] * img_width
                             y2 = y1 + coords["h_percent"] * img_height
                             box = (x1, y1, x2, y2)
-                if not box:
-                    box = _find_question_number_box(words, q_num)
+                # Do not fall back to question number when anchor text is missing
+                if not box and ann_data.type in {
+                    AnnotationType.CHECKMARK,
+                    AnnotationType.CROSS_MARK,
+                    AnnotationType.ERROR_UNDERLINE,
+                    AnnotationType.HIGHLIGHT_BOX,
+                    AnnotationType.COMMENT
+                }:
+                    continue
                 if box:
                     x1, y1, x2, y2 = box
+                    if y2 < answer_start_y:
+                        continue
                     width = max(2, x2 - x1)
                     height = max(2, y2 - y1)
                     ann_data.box_2d = _to_box_2d(x1, y1, x2, y2, img_width, img_height)
                     ann_data.x = int(x1)
                     ann_data.y = int(y1)
                     if ann_data.type == AnnotationType.ERROR_UNDERLINE:
-                            positioned_annotations.append(Annotation(
-                                annotation_type=AnnotationType.ERROR_UNDERLINE,
-                                x=x1,
-                                y=y2 + 3,
-                                text=ann_data.text,
-                                color=ann_data.color or "blue",
-                                size=width
-                            ))
+                        positioned_annotations.append(Annotation(
+                            annotation_type=AnnotationType.ERROR_UNDERLINE,
+                            x=x1,
+                            y=y2 + 3,
+                            text=ann_data.text,
+                            color=ann_data.color or "#b00020",
+                            size=width
+                        ))
                     elif ann_data.type == AnnotationType.CHECKMARK:
-                            positioned_annotations.append(Annotation(
-                                annotation_type=AnnotationType.CHECKMARK,
-                                x=x2 + 6,
-                                y=y1,
-                                text="",
-                                color=ann_data.color,
-                                size=22
-                            ))
+                        positioned_annotations.append(Annotation(
+                            annotation_type=AnnotationType.CHECKMARK,
+                            x=x2 + 6,
+                            y=y1,
+                            text="",
+                            color=ann_data.color,
+                            size=22
+                        ))
                     elif ann_data.type == AnnotationType.CROSS_MARK:
-                            positioned_annotations.append(Annotation(
-                                annotation_type=AnnotationType.CROSS_MARK,
-                                x=x2 + 6,
-                                y=y1,
-                                text="",
-                                color=ann_data.color,
-                                size=22
-                            ))
+                        positioned_annotations.append(Annotation(
+                            annotation_type=AnnotationType.CROSS_MARK,
+                            x=x2 + 6,
+                            y=y1,
+                            text="",
+                            color=ann_data.color,
+                            size=22
+                        ))
                     elif ann_data.type == AnnotationType.HIGHLIGHT_BOX:
-                            positioned_annotations.append(Annotation(
-                                annotation_type=AnnotationType.HIGHLIGHT_BOX,
-                                x=x1 - 4,
-                                y=y1 - 4,
-                                text=ann_data.text,
-                                color=ann_data.color,
-                                size=22,
-                                width=width + 8,
-                                height=height + 8
-                            ))
+                        positioned_annotations.append(Annotation(
+                            annotation_type=AnnotationType.HIGHLIGHT_BOX,
+                            x=x1 - 4,
+                            y=y1 - 4,
+                            text=ann_data.text,
+                            color=ann_data.color,
+                            size=22,
+                            width=width + 8,
+                            height=height + 8
+                        ))
                     elif ann_data.type == AnnotationType.COMMENT:
-                            positioned_annotations.append(Annotation(
-                                annotation_type=AnnotationType.COMMENT,
-                                x=x2 + 8,
-                                y=max(5, y1 - 14),
-                                text=ann_data.text,
-                                color=ann_data.color or "red",
-                                size=16
-                            ))
+                        if ann_data.text:
+                            comment_stack.append({
+                                "text": ann_data.text,
+                                "target_x": int((x1 + x2) / 2),
+                                "target_y": int((y1 + y2) / 2),
+                                "q_num": q_num
+                            })
                     else:
-                            positioned_annotations.append(Annotation(
-                                annotation_type=ann_data.type,
-                                x=x1,
-                                y=y1,
-                                text=ann_data.text,
-                                color=ann_data.color,
-                                size=22
-                            ))
+                        positioned_annotations.append(Annotation(
+                            annotation_type=ann_data.type,
+                            x=x1,
+                            y=y1,
+                            text=ann_data.text,
+                            color=ann_data.color,
+                            size=22
+                        ))
 
             for sub_score in q_score.sub_scores:
                 for ann_data in sub_score.annotations:
@@ -7005,114 +7507,186 @@ async def generate_annotated_images_with_vision_ocr(
                                 x2 = x1 + coords["w_percent"] * img_width
                                 y2 = y1 + coords["h_percent"] * img_height
                                 box = (x1, y1, x2, y2)
-                    if not box:
-                        box = _find_question_number_box(words, q_num)
+                    # Do not fall back to question number when anchor text is missing
+                    if not box and ann_data.type in {
+                        AnnotationType.CHECKMARK,
+                        AnnotationType.CROSS_MARK,
+                        AnnotationType.ERROR_UNDERLINE,
+                        AnnotationType.HIGHLIGHT_BOX,
+                        AnnotationType.COMMENT
+                    }:
+                        continue
                     if box:
                         x1, y1, x2, y2 = box
+                        if y2 < answer_start_y:
+                            continue
                         width = max(2, x2 - x1)
                         height = max(2, y2 - y1)
                         ann_data.box_2d = _to_box_2d(x1, y1, x2, y2, img_width, img_height)
                         ann_data.x = int(x1)
                         ann_data.y = int(y1)
                         if ann_data.type == AnnotationType.ERROR_UNDERLINE:
-                                positioned_annotations.append(Annotation(
-                                    annotation_type=AnnotationType.ERROR_UNDERLINE,
-                                    x=x1,
-                                    y=y2 + 3,
-                                    text=ann_data.text,
-                                    color=ann_data.color or "blue",
-                                    size=width
-                                ))
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.ERROR_UNDERLINE,
+                                x=x1,
+                                y=y2 + 3,
+                                text=ann_data.text,
+                                color=ann_data.color or "#b00020",
+                                size=width
+                            ))
                         elif ann_data.type == AnnotationType.CHECKMARK:
-                                positioned_annotations.append(Annotation(
-                                    annotation_type=AnnotationType.CHECKMARK,
-                                    x=x2 + 6,
-                                    y=y1,
-                                    text="",
-                                    color=ann_data.color,
-                                    size=22
-                                ))
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.CHECKMARK,
+                                x=x2 + 6,
+                                y=y1,
+                                text="",
+                                color=ann_data.color,
+                                size=22
+                            ))
                         elif ann_data.type == AnnotationType.CROSS_MARK:
-                                positioned_annotations.append(Annotation(
-                                    annotation_type=AnnotationType.CROSS_MARK,
-                                    x=x2 + 6,
-                                    y=y1,
-                                    text="",
-                                    color=ann_data.color,
-                                    size=22
-                                ))
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.CROSS_MARK,
+                                x=x2 + 6,
+                                y=y1,
+                                text="",
+                                color=ann_data.color,
+                                size=22
+                            ))
                         elif ann_data.type == AnnotationType.HIGHLIGHT_BOX:
-                                positioned_annotations.append(Annotation(
-                                    annotation_type=AnnotationType.HIGHLIGHT_BOX,
-                                    x=x1 - 4,
-                                    y=y1 - 4,
-                                    text=ann_data.text,
-                                    color=ann_data.color,
-                                    size=22,
-                                    width=width + 8,
-                                    height=height + 8
-                                ))
+                            positioned_annotations.append(Annotation(
+                                annotation_type=AnnotationType.HIGHLIGHT_BOX,
+                                x=x1 - 4,
+                                y=y1 - 4,
+                                text=ann_data.text,
+                                color=ann_data.color,
+                                size=22,
+                                width=width + 8,
+                                height=height + 8
+                            ))
                         elif ann_data.type == AnnotationType.COMMENT:
-                                positioned_annotations.append(Annotation(
-                                    annotation_type=AnnotationType.COMMENT,
-                                    x=x2 + 8,
-                                    y=max(5, y1 - 14),
-                                    text=ann_data.text,
-                                    color=ann_data.color or "red",
-                                    size=16
-                                ))
+                            if ann_data.text:
+                                comment_stack.append({
+                                    "text": ann_data.text,
+                                    "target_x": int((x1 + x2) / 2),
+                                    "target_y": int((y1 + y2) / 2),
+                                    "q_num": q_num
+                                })
                         else:
-                                positioned_annotations.append(Annotation(
-                                    annotation_type=ann_data.type,
-                                    x=x1,
-                                    y=y1,
-                                    text=ann_data.text,
-                                    color=ann_data.color,
-                                    size=22
-                                ))
+                            positioned_annotations.append(Annotation(
+                                annotation_type=ann_data.type,
+                                x=x1,
+                                y=y1,
+                                text=ann_data.text,
+                                color=ann_data.color,
+                                size=22
+                            ))
 
-        # Add professional margin totals for this page
-        margin_left = 16
-        auto_y = 120
-        page_questions = [q for q in question_scores if (q.page_number and q.page_number - 1 == page_idx)]
-        if not page_questions:
-            page_questions = question_scores
-        y_spacing = max(80, int(img_height / max(1, len(page_questions) + 1)))
+        if assigned_lines:
+            for q_score in question_scores:
+                if q_score.page_number and q_score.page_number - 1 != page_idx:
+                    continue
+                feedback = (q_score.ai_feedback or "").strip()
+                if not feedback:
+                    continue
+                phrases = _pick_feedback_phrases(feedback)
+                default_target_y = int(img_height * 0.25)
+                if q_score.question_number in question_line_centers:
+                    default_target_y = int(sum(question_line_centers[q_score.question_number]) / max(1, len(question_line_centers[q_score.question_number])))
+                if default_target_y < answer_start_y:
+                    continue
 
-        for q_score in page_questions:
-            y_pos = auto_y
-            auto_y += y_spacing
-            score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
-            score_text = (
-                str(int(q_score.obtained_marks))
-                if q_score.obtained_marks == int(q_score.obtained_marks)
-                else f"{q_score.obtained_marks:.1f}"
-            )
-            positioned_annotations.append(Annotation(
-                annotation_type=AnnotationType.MARGIN_BRACKET,
-                x=margin_left + 4,
-                y=max(10, y_pos - 10),
-                text="",
-                color="red",
-                size=80
-            ))
-            positioned_annotations.append(Annotation(
-                annotation_type=AnnotationType.SCORE_BOX,
-                x=margin_left + 6,
-                y=y_pos + 34,
-                text=f"{score_text}/{int(q_score.max_marks)}",
-                color="red",
-                size=28
-            ))
-            note_text = "Good" if score_pct >= 75 else "Avg" if score_pct >= 50 else "Revise" if score_pct >= 25 else "Incomp"
-            positioned_annotations.append(Annotation(
-                annotation_type=AnnotationType.MARGIN_NOTE,
-                x=margin_left + 12,
-                y=y_pos - 28,
-                text=note_text,
-                color="red",
-                size=16
-            ))
+                for phrase in phrases["positives"]:
+                    line_box = _find_best_line_box(words, phrase, max(10, int(img_height * 0.012))) if words else None
+                    if line_box:
+                        lx1, ly1, lx2, ly2 = line_box
+                        positioned_annotations.append(Annotation(
+                            annotation_type=AnnotationType.CHECKMARK,
+                            x=int(lx2 + 6),
+                            y=int(ly1),
+                            text="",
+                            color="green",
+                            size=20
+                        ))
+                        target_x = int(lx2)
+                        target_y = int((ly1 + ly2) / 2)
+                    else:
+                        target_x = int(text_right_edge) - 20
+                        target_y = default_target_y
+                    comment_stack.append({
+                        "text": _format_feedback_note(phrase, True),
+                        "target_x": target_x,
+                        "target_y": target_y,
+                        "q_num": q_score.question_number
+                    })
+
+                for phrase in phrases["negatives"]:
+                    line_box = _find_best_line_box(words, phrase, max(10, int(img_height * 0.012))) if words else None
+                    if line_box:
+                        lx1, ly1, lx2, ly2 = line_box
+                        positioned_annotations.append(Annotation(
+                            annotation_type=AnnotationType.CROSS_MARK,
+                            x=int(lx2 + 6),
+                            y=int(ly1),
+                            text="",
+                            color="#b00020",
+                            size=18
+                        ))
+                        target_x = int(lx2)
+                        target_y = int((ly1 + ly2) / 2)
+                    else:
+                        target_x = int(text_right_edge) - 20
+                        target_y = default_target_y
+                    comment_stack.append({
+                        "text": _format_feedback_note(phrase, False),
+                        "target_x": target_x,
+                        "target_y": target_y,
+                        "q_num": q_score.question_number
+                    })
+
+        if comment_stack:
+            seen_comments = set()
+            filtered_comments = []
+            for comment in comment_stack:
+                clean = str(comment.get("text", "")).strip()
+                if not clean or clean in seen_comments:
+                    continue
+                seen_comments.add(clean)
+                filtered_comments.append(comment)
+                if len(filtered_comments) >= 10:
+                    break
+
+            filtered_comments.sort(key=lambda c: c.get("target_y") or 0)
+            occupied = []
+            for comment in filtered_comments:
+                text = str(comment.get("text", ""))[:160]
+                approx_lines = max(1, int(len(text) / 28) + 1)
+                box_h = approx_lines * 18 + 10
+                slot_y = _find_margin_slot(comment.get("target_y"), box_h, margin_left, margin_right, img_height, word_boxes, occupied)
+                if slot_y is None:
+                    continue
+                note_type = AnnotationType.BRACKETED_FEEDBACK
+                positioned_annotations.append(Annotation(
+                    annotation_type=note_type,
+                    x=margin_left,
+                    y=slot_y,
+                    text=text,
+                    color="red",
+                    size=16
+                ))
+                q_num = comment.get("q_num")
+                qs_obj = q_score_map.get(q_num) if q_num else None
+                if qs_obj and comment.get("target_x") is not None and comment.get("target_y") is not None:
+                    qs_obj.annotations.append(AnnotationData(
+                        type="MARGIN_LEASH",
+                        page_index=page_idx,
+                        text=text,
+                        color="#D32F2F",
+                        anchor_x=float(comment["target_x"]) / img_width,
+                        anchor_y=float(comment["target_y"]) / img_height,
+                        margin_x=0.92,
+                        margin_y=float(slot_y) / img_height
+                    ))
+                occupied.append((slot_y, slot_y + box_h))
 
         # Dense red-pen: underline each line and attach margin comments using OCR
         if dense_red_pen:
@@ -7335,6 +7909,9 @@ def generate_annotated_images(
             positioned_annotations: List[Annotation] = []
             auto_annotation_y = 140
             auto_annotation_step = 60
+            comment_cursor_y = int(img_height * 0.12)
+            comment_x = int(img_width * 0.72)
+            comment_step = max(22, int(img_height * 0.02))
 
             # Convert AI-provided annotations for this page
             for q_score in page_questions.get(page_idx, []):
@@ -7349,9 +7926,14 @@ def generate_annotated_images(
                         x_pos = ann_data.x if ann_data.x > 0 else 30
                         y_pos = ann_data.y if ann_data.y > 0 else 120
                     else:
-                        x_pos = 40
-                        y_pos = auto_annotation_y
-                        auto_annotation_y += auto_annotation_step
+                        if ann_data.type in {AnnotationType.COMMENT, AnnotationType.MARGIN_NOTE}:
+                            x_pos = comment_x
+                            y_pos = comment_cursor_y
+                            comment_cursor_y += comment_step
+                        else:
+                            x_pos = 40
+                            y_pos = auto_annotation_y
+                            auto_annotation_y += auto_annotation_step
                     positioned_annotations.append(Annotation(
                         annotation_type=ann_data.type,
                         x=x_pos,
@@ -7373,9 +7955,14 @@ def generate_annotated_images(
                             x_pos = ann_data.x if ann_data.x > 0 else 30
                             y_pos = ann_data.y if ann_data.y > 0 else 120
                         else:
-                            x_pos = 40
-                            y_pos = auto_annotation_y
-                            auto_annotation_y += auto_annotation_step
+                            if ann_data.type in {AnnotationType.COMMENT, AnnotationType.MARGIN_NOTE}:
+                                x_pos = comment_x
+                                y_pos = comment_cursor_y
+                                comment_cursor_y += comment_step
+                            else:
+                                x_pos = 40
+                                y_pos = auto_annotation_y
+                                auto_annotation_y += auto_annotation_step
                         positioned_annotations.append(Annotation(
                             annotation_type=ann_data.type,
                             x=x_pos,
@@ -7384,119 +7971,6 @@ def generate_annotated_images(
                             color=ann_data.color,
                             size=ann_data.size
                         ))
-
-            # Teacher-style margin annotations
-            margin_left = 16
-            auto_y = 120
-            q_list = page_questions.get(page_idx, [])
-            y_spacing = max(80, int(img_height / max(1, len(q_list) + 1)))
-
-            for q_score in q_list:
-                if q_score.y_position is not None:
-                    y_pos = int(q_score.y_position / 1000 * img_height)
-                else:
-                    y_pos = auto_y
-                    auto_y += y_spacing
-
-                score_pct = (q_score.obtained_marks / q_score.max_marks * 100) if q_score.max_marks > 0 else 0
-                score_text = (
-                    str(int(q_score.obtained_marks))
-                    if q_score.obtained_marks == int(q_score.obtained_marks)
-                    else f"{q_score.obtained_marks:.1f}"
-                )
-
-                # Margin bracket like a checked answer sheet
-                positioned_annotations.append(Annotation(
-                    annotation_type=AnnotationType.MARGIN_BRACKET,
-                    x=margin_left + 4,
-                    y=max(10, y_pos - 10),
-                    text="",
-                    color="red",
-                    size=80
-                ))
-
-                positioned_annotations.append(Annotation(
-                    annotation_type=AnnotationType.POINT_NUMBER,
-                    x=margin_left,
-                    y=y_pos,
-                    text=str(q_score.question_number),
-                    color="red",
-                    size=20
-                ))
-
-                if q_score.status == "not_attempted" or score_pct <= 0:
-                    positioned_annotations.append(Annotation(
-                        annotation_type=AnnotationType.CROSS_MARK,
-                        x=margin_left + 50,
-                        y=y_pos,
-                        text="",
-                        color="red",
-                        size=26
-                    ))
-                elif score_pct >= 60:
-                    positioned_annotations.append(Annotation(
-                        annotation_type=AnnotationType.CHECKMARK,
-                        x=margin_left + 50,
-                        y=y_pos,
-                        text="",
-                        color="green",
-                        size=26
-                    ))
-                elif score_pct < 40:
-                    positioned_annotations.append(Annotation(
-                        annotation_type=AnnotationType.CROSS_MARK,
-                        x=margin_left + 50,
-                        y=y_pos,
-                        text="",
-                        color="red",
-                        size=26
-                    ))
-                    positioned_annotations.append(Annotation(
-                        annotation_type=AnnotationType.ERROR_UNDERLINE,
-                        x=margin_left + 90,
-                        y=y_pos + 28,
-                        text="",
-                        color="red",
-                        size=90
-                    ))
-                else:
-                    positioned_annotations.append(Annotation(
-                        annotation_type=AnnotationType.FLAG_CIRCLE,
-                        x=margin_left + 50,
-                        y=y_pos + 5,
-                        text="R",
-                        color="red",
-                        size=24
-                    ))
-
-                # Score box on the left margin (teacher-style total)
-                positioned_annotations.append(Annotation(
-                    annotation_type=AnnotationType.SCORE_BOX,
-                    x=margin_left + 6,
-                    y=y_pos + 34,
-                    text=f"{score_text}/{int(q_score.max_marks)}",
-                    color="red",
-                    size=28
-                ))
-
-                # Short margin note based on quality
-                if score_pct >= 75:
-                    note_text = "Good"
-                elif score_pct >= 50:
-                    note_text = "Avg"
-                elif score_pct >= 25:
-                    note_text = "Revise"
-                else:
-                    note_text = "Incomp"
-
-                positioned_annotations.append(Annotation(
-                    annotation_type=AnnotationType.MARGIN_NOTE,
-                    x=margin_left + 12,
-                    y=y_pos - 28,
-                    text=note_text,
-                    color="red",
-                    size=16
-                ))
 
             if not positioned_annotations:
                 annotated_images.append(original_image)
@@ -8136,7 +8610,7 @@ async def process_grading_job_in_background(job_id: str, exam_id: str, files_dat
                         images,
                         scores,
                         use_vision_ocr=True,
-                        dense_red_pen=True
+                        dense_red_pen=False
                     )
                 except Exception as ann_error:
                     logger.warning(f"Vision OCR annotation failed, falling back to basic: {ann_error}")
@@ -13651,10 +14125,16 @@ async def root_health_check():
     """Health check for Kubernetes liveness/readiness probes"""
     return {"status": "healthy", "service": "GradeSense API"}
 
+cors_origins_env = os.environ.get("CORS_ORIGINS")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",")] if cors_origins_env else [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

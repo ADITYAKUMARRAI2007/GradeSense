@@ -6,7 +6,8 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
-const API = process.env.REACT_APP_BACKEND_URL + "/api";
+const API_BASE = (process.env.REACT_APP_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
+const API = `${API_BASE}/api`;
 
 export default function EmailAuthPage() {
   const navigate = useNavigate();
@@ -18,17 +19,40 @@ export default function EmailAuthPage() {
     email: "",
     password: "",
     name: "",
-    role: "teacher"
+    role: "teacher",
+    exam_type: "upsc"
   });
+
+  const toErrorMessage = (error) => {
+    const detail = error?.response?.data?.detail;
+    if (typeof detail === "string") {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      return detail.map((item) => item?.msg || item?.type || "Validation error").join("; ");
+    }
+    if (detail && typeof detail === "object") {
+      return detail.msg || detail.type || JSON.stringify(detail);
+    }
+    return error?.message || "Authentication failed";
+  };
+
+  const isPasswordTooLong = (password) => password && password.length > 0
+    && new TextEncoder().encode(password).length > 72;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (isPasswordTooLong(formData.password)) {
+        toast.error("Password must be 72 bytes or fewer. Please use a shorter password.");
+        return;
+      }
+
       const endpoint = isLogin ? "/auth/login" : "/auth/register";
       const payload = isLogin 
-        ? { email: formData.email, password: formData.password }
+        ? { email: formData.email, password: formData.password, exam_type: formData.exam_type }
         : formData;
 
       const response = await axios.post(`${API}${endpoint}`, payload, {
@@ -56,7 +80,7 @@ export default function EmailAuthPage() {
 
     } catch (error) {
       console.error("Auth error:", error);
-      const errorMessage = error.response?.data?.detail || error.message || "Authentication failed";
+      const errorMessage = toErrorMessage(error);
       
       // If error mentions Google sign-in, show helpful message
       if (errorMessage.includes("Google sign-in")) {
@@ -79,6 +103,11 @@ export default function EmailAuthPage() {
     setLoading(true);
 
     try {
+      if (isPasswordTooLong(formData.password)) {
+        toast.error("Password must be 72 bytes or fewer. Please use a shorter password.");
+        return;
+      }
+
       await axios.post(`${API}/auth/set-password`, {
         email: formData.email,
         new_password: formData.password
@@ -89,7 +118,7 @@ export default function EmailAuthPage() {
       
     } catch (error) {
       console.error("Set password error:", error);
-      const errorMessage = error.response?.data?.detail || error.message || "Failed to set password";
+      const errorMessage = toErrorMessage(error);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -221,6 +250,40 @@ export default function EmailAuthPage() {
                   >
                     <div className="font-semibold">Student</div>
                     <div className="text-xs text-gray-500">Submit papers</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(isLogin !== "setPassword") && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Exam Type (Required)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, exam_type: "upsc" })}
+                    className={`p-3 rounded-lg border-2 transition-all text-left ${
+                      formData.exam_type === "upsc"
+                        ? "border-orange-500 bg-orange-50 text-orange-700"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="font-semibold">UPSC</div>
+                    <div className="text-xs text-gray-500">Competitive evaluation</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, exam_type: "college" })}
+                    className={`p-3 rounded-lg border-2 transition-all text-left ${
+                      formData.exam_type === "college"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="font-semibold">College/School</div>
+                    <div className="text-xs text-gray-500">Academic evaluation</div>
                   </button>
                 </div>
               </div>

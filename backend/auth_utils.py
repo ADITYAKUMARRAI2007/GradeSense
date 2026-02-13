@@ -25,6 +25,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password must be 72 bytes or fewer.")
     return pwd_context.hash(password)
 
 

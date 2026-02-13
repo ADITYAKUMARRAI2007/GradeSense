@@ -15,7 +15,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../../components/u
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/dialog";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
 import VoiceInput from "../../components/VoiceInput";
+import HandwrittenOverlay from "../../components/HandwrittenOverlay";
 import { 
   Search, 
   ChevronLeft, 
@@ -32,6 +34,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Download,
   MessageSquarePlus,
   Send,
   Lightbulb,
@@ -47,232 +50,36 @@ function AnnotationImage({
   pageIndex,
   annotations,
   onClick,
-  showAnnotations
+  showAnnotations,
+  interactive = true
 }) {
   const imgRef = useRef(null);
-  const canvasRef = useRef(null);
-
-  const drawAnnotations = useCallback(() => {
-    const img = imgRef.current;
-    const canvas = canvasRef.current;
-    if (!img || !canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const width = img.naturalWidth || img.width;
-    const height = img.naturalHeight || img.height;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    ctx.clearRect(0, 0, width, height);
-
-    if (!showAnnotations || !annotations || annotations.length === 0) return;
-
-    const toPx = (value, total) => Math.max(0, Math.min(total, (value / 1000) * total));
-
-    const resolveBox = (ann) => {
-      if (ann?.x_percent !== undefined && ann?.y_percent !== undefined) {
-        const x1 = ann.x_percent * width;
-        const y1 = ann.y_percent * height;
-        const w = (ann.w_percent ?? 0) * width;
-        const h = (ann.h_percent ?? 0) * height;
-        return {
-          x1,
-          y1,
-          x2: x1 + Math.max(2, w),
-          y2: y1 + Math.max(2, h)
-        };
-      }
-      if (ann?.box_2d && ann.box_2d.length === 4) {
-        const [ymin, xmin, ymax, xmax] = ann.box_2d;
-        return {
-          x1: toPx(xmin, width),
-          y1: toPx(ymin, height),
-          x2: toPx(xmax, width),
-          y2: toPx(ymax, height)
-        };
-      }
-      const size = ann?.size || 30;
-      const x = ann?.x || 0;
-      const y = ann?.y || 0;
-      return {
-        x1: x,
-        y1: y,
-        x2: x + size,
-        y2: y + size
-      };
-    };
-
-    const jitter = (value, amount = 2) => value + (Math.random() * amount * 2 - amount);
-
-    const setStyle = (color, lineWidth = 2) => {
-      ctx.strokeStyle = color;
-      ctx.fillStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.font = "18px 'Kalam', 'Caveat', 'Patrick Hand', 'Comic Sans MS', 'Bradley Hand', cursive";
-    };
-
-    const wrapText = (text, maxWidth) => {
-      const words = String(text || "").split(/\s+/).filter(Boolean);
-      const lines = [];
-      let line = "";
-      words.forEach((word) => {
-        const testLine = line ? `${line} ${word}` : word;
-        if (ctx.measureText(testLine).width <= maxWidth) {
-          line = testLine;
-        } else {
-          if (line) lines.push(line);
-          line = word;
-        }
-      });
-      if (line) lines.push(line);
-      return lines;
-    };
-
-    annotations.forEach((ann) => {
-      if (!ann?.box_2d && (ann?.x === 0 && ann?.y === 0)) {
-        return; // skip annotations without coordinates to avoid top-left artifacts
-      }
-      const type = (ann?.type || "").toLowerCase();
-      const color = ann?.color || (type.includes("cross") || type.includes("error") || type.includes("comment") ? "#ef4444" : "#22c55e");
-      const box = resolveBox(ann);
-      const text = ann?.text || "";
-
-      setStyle(color, 3);
-
-      if (type === "checkmark" || type === "tick") {
-        const x = box.x1;
-        const y = box.y1;
-        const size = Math.max(18, box.x2 - box.x1);
-        ctx.beginPath();
-        ctx.moveTo(jitter(x + size * 0.2), jitter(y + size * 0.55));
-        ctx.lineTo(jitter(x + size * 0.45), jitter(y + size * 0.8));
-        ctx.lineTo(jitter(x + size * 0.85), jitter(y + size * 0.2));
-        ctx.stroke();
-        return;
-      }
-
-      if (type === "cross_mark" || type === "cross" || type === "x") {
-        const x = box.x1;
-        const y = box.y1;
-        const size = Math.max(18, box.x2 - box.x1);
-        ctx.beginPath();
-        ctx.moveTo(jitter(x), jitter(y));
-        ctx.lineTo(jitter(x + size), jitter(y + size));
-        ctx.moveTo(jitter(x + size), jitter(y));
-        ctx.lineTo(jitter(x), jitter(y + size));
-        ctx.stroke();
-        return;
-      }
-
-      if (type === "error_underline" || type === "underline") {
-        const y = box.y2 + 6;
-        ctx.beginPath();
-        ctx.moveTo(jitter(box.x1), jitter(y));
-        ctx.lineTo(jitter(box.x2), jitter(y));
-        ctx.stroke();
-        return;
-      }
-
-      if (type === "highlight_box" || type === "box") {
-        const x1 = jitter(box.x1, 1.5);
-        const y1 = jitter(box.y1, 1.5);
-        const w = jitter(box.x2 - box.x1, 1.5);
-        const h = jitter(box.y2 - box.y1, 1.5);
-        ctx.strokeRect(x1, y1, w, h);
-        if (text) {
-          // Draw text inside the box
-          ctx.fillStyle = color;
-          ctx.font = "14px 'Kalam', 'Caveat', 'Patrick Hand', 'Comic Sans MS', 'Bradley Hand', cursive";
-          const lines = wrapText(text, w - 8);
-          lines.forEach((line, i) => {
-            ctx.fillText(line, x1 + 4, y1 + 18 + i * 16);
-          });
-        }
-        return;
-      }
-
-      if (type === "score_circle") {
-        const cx = (box.x1 + box.x2) / 2;
-        const cy = (box.y1 + box.y2) / 2;
-        const radius = Math.max(16, (box.x2 - box.x1) / 2);
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        if (text) {
-          ctx.fillText(text, cx - radius / 2, cy + 6);
-        }
-        return;
-      }
-
-      if (type === "score_box") {
-        ctx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
-        if (text) {
-          ctx.fillText(text, box.x1 + 6, box.y1 + 24);
-        }
-        return;
-      }
-
-      if (type === "comment" || type === "margin_note") {
-        const noteWidth = 170;
-        const padding = 6;
-        let x = Math.min(width - noteWidth - 8, box.x2 + 10);
-        let y = Math.max(8, box.y1 - 18);
-        const lines = wrapText(text || "", noteWidth - padding * 2);
-        const lineHeight = 18;
-        const boxHeight = Math.max(22, lines.length * lineHeight + padding * 2);
-        if (y + boxHeight > height - 8) {
-          y = Math.max(8, height - boxHeight - 8);
-        }
-
-        ctx.save();
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        if (typeof ctx.roundRect === "function") {
-          ctx.roundRect(x, y, noteWidth, boxHeight, 6);
-        } else {
-          ctx.rect(x, y, noteWidth, boxHeight);
-        }
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-
-        setStyle(color, 2);
-        lines.forEach((line, i) => {
-          ctx.fillText(line, x + padding, y + padding + lineHeight * (i + 0.8));
-        });
-
-        ctx.beginPath();
-        ctx.moveTo(x, y + 8);
-        ctx.lineTo(box.x2 + 6, box.y1 + 6);
-        ctx.stroke();
-        return;
-      }
-    });
-  }, [annotations, showAnnotations]);
-
-  useEffect(() => {
-    drawAnnotations();
-  }, [drawAnnotations]);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
   return (
-    <div className="relative cursor-pointer" onClick={onClick}>
+    <div
+      className={interactive ? "relative cursor-pointer" : "relative"}
+      onClick={interactive ? onClick : undefined}
+    >
       <img
         ref={imgRef}
         src={`data:image/jpeg;base64,${imageBase64}`}
         alt={`Page ${pageIndex + 1}`}
         className="w-full rounded-lg shadow-md hover:shadow-lg transition-shadow"
-        onLoad={drawAnnotations}
+        onLoad={() => {
+          const img = imgRef.current;
+          if (!img) return;
+          setImageSize({
+            width: img.naturalWidth || img.width,
+            height: img.naturalHeight || img.height
+          });
+        }}
       />
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
+      <HandwrittenOverlay
+        annotations={annotations}
+        width={imageSize.width}
+        height={imageSize.height}
+        show={showAnnotations}
       />
     </div>
   );
@@ -310,7 +117,7 @@ export default function ReviewPapers({ user }) {
     show_answer_sheet: true,
     show_question_paper: true
   });
-  const [imageZoom, setImageZoom] = useState(100);
+  const [imageZoom, setImageZoom] = useState(120);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackQuestion, setFeedbackQuestion] = useState(null);
   const [feedbackCorrections, setFeedbackCorrections] = useState([
@@ -325,6 +132,60 @@ export default function ReviewPapers({ user }) {
   const [applyToBatch, setApplyToBatch] = useState(false);
   const [applyToAllPapers, setApplyToAllPapers] = useState(false);
   const [extractingQuestions, setExtractingQuestions] = useState(false);
+
+  const getDownloadImages = useCallback(() => {
+    if (!selectedSubmission) return [];
+    const baseImages = selectedSubmission.file_images?.length
+      ? selectedSubmission.file_images
+      : (selectedSubmission.annotated_images || []);
+    if (showAnnotations && selectedSubmission.annotated_images?.length) {
+      return selectedSubmission.annotated_images;
+    }
+    return baseImages;
+  }, [selectedSubmission, showAnnotations]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    const images = getDownloadImages();
+    if (!images.length) {
+      toast.error("No answer sheet images available to download.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 24;
+    const maxW = pageWidth - margin * 2;
+    const maxH = pageHeight - margin * 2;
+
+    const loadImage = (src) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+
+    try {
+      for (let i = 0; i < images.length; i += 1) {
+        if (i > 0) doc.addPage();
+        const dataUrl = `data:image/jpeg;base64,${images[i]}`;
+        const img = await loadImage(dataUrl);
+        const scale = Math.min(maxW / img.width, maxH / img.height);
+        const drawW = img.width * scale;
+        const drawH = img.height * scale;
+        const x = (pageWidth - drawW) / 2;
+        const y = (pageHeight - drawH) / 2;
+        doc.addImage(dataUrl, "JPEG", x, y, drawW, drawH);
+      }
+
+      const safeName = (selectedSubmission?.student_name || "submission").replace(/[^a-z0-9_-]+/gi, "_");
+      const fileName = `${safeName}-${selectedSubmission?.submission_id || "answers"}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      console.error("PDF download failed:", error);
+      toast.error("Failed to generate PDF. Please try again.");
+    }
+  }, [getDownloadImages, selectedSubmission]);
 
   useEffect(() => {
     fetchData();
@@ -354,12 +215,10 @@ export default function ReviewPapers({ user }) {
       if (!ann) return;
       const hasBox = Array.isArray(ann.box_2d) && ann.box_2d.length === 4;
       const hasPoint = (ann.x && ann.x > 0) || (ann.y && ann.y > 0);
-      if (!hasBox && !hasPoint) return;
-      if (hasBox) {
-        const [, xmin, , xmax] = ann.box_2d;
-        if (xmax <= 80 || xmin <= 40) return;
-      }
-      if (ann.x_percent !== undefined && ann.x_percent <= 0.08) return;
+      const hasPercent = ann.x_percent !== undefined || ann.y_percent !== undefined;
+      const hasAnchors = ann.anchor_x !== undefined || ann.margin_x !== undefined;
+      const hasBracket = ann.y_start_percent !== undefined || ann.y_end_percent !== undefined || ann.y_start !== undefined || ann.y_end !== undefined;
+      if (!hasBox && !hasPoint && !hasPercent && !hasAnchors && !hasBracket) return;
       const page = ann.page_index ?? -1;
       if (page < 0) return;
       if (!map[page]) map[page] = [];
@@ -1040,11 +899,13 @@ export default function ReviewPapers({ user }) {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const src = `data:image/jpeg;base64,${img}`;
-                          setImageZoom(100);
+                          setImageZoom(120);
                           setZoomedImage({
-                            src,
-                            title: `Page ${idx + 1}`
+                            imageBase64: img,
+                            title: `Page ${idx + 1}`,
+                            pageIndex: idx,
+                            annotations: annotationsByPage[idx] || [],
+                            useOverlay
                           });
                         }}
                       />
@@ -1336,15 +1197,18 @@ export default function ReviewPapers({ user }) {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   const allImages = displayImages.map((image, index) => ({
-                                    src: `data:image/jpeg;base64,${image}`,
+                                    imageBase64: image,
                                     title: `Page ${index + 1}`
                                   }));
                                   // Update key first to force Dialog remount, then set state
                                   setModalKey(prev => prev + 1);
+                                  setImageZoom(120);
                                   setZoomedImages({ 
                                     images: allImages, 
                                     title: "Student Answer", 
-                                    initialIndex: idx 
+                                    initialIndex: idx,
+                                    annotationsByPage,
+                                    useOverlay
                                   });
                                   setIsModalOpen(true);
                                 }}
@@ -1355,7 +1219,7 @@ export default function ReviewPapers({ user }) {
                                 </Badge>
                               )}
                               {/* Zoom Overlay */}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg">
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg pointer-events-none">
                                 <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
                                   <Maximize2 className="w-4 h-4" />
                                   <span className="text-sm font-medium">Click to enlarge</span>
@@ -1378,14 +1242,17 @@ export default function ReviewPapers({ user }) {
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
                                 onClick={() => {
                                   const allImages = modelAnswerImages.map((image, index) => ({
-                                    src: `data:image/jpeg;base64,${image}`,
+                                    imageBase64: image,
                                     title: `Page ${index + 1}`
                                   }));
                                   setModalKey(prev => prev + 1);
+                                  setImageZoom(120);
                                   setZoomedImages({ 
                                     images: allImages, 
                                     title: "Model Answer", 
-                                    initialIndex: idx 
+                                    initialIndex: idx,
+                                    annotationsByPage: {},
+                                    useOverlay: false
                                   });
                                   setIsModalOpen(true);
                                 }}
@@ -1397,7 +1264,7 @@ export default function ReviewPapers({ user }) {
                                   style={{ minHeight: '400px', objectFit: 'contain' }}
                                 />
                                 {/* Zoom Overlay */}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
                                   <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
                                     <Maximize2 className="w-4 h-4" />
                                     <span className="text-sm font-medium">Click to enlarge</span>
@@ -1421,14 +1288,17 @@ export default function ReviewPapers({ user }) {
                                 className="relative cursor-zoom-in hover:shadow-xl transition-shadow"
                                 onClick={() => {
                                   const allImages = questionPaperImages.map((image, index) => ({
-                                    src: `data:image/jpeg;base64,${image}`,
+                                    imageBase64: image,
                                     title: `Page ${index + 1}`
                                   }));
                                   setModalKey(prev => prev + 1);
+                                  setImageZoom(120);
                                   setZoomedImages({ 
                                     images: allImages, 
                                     title: "Question Paper", 
-                                    initialIndex: idx 
+                                    initialIndex: idx,
+                                    annotationsByPage: {},
+                                    useOverlay: false
                                   });
                                   setIsModalOpen(true);
                                 }}
@@ -1440,7 +1310,7 @@ export default function ReviewPapers({ user }) {
                                   style={{ minHeight: '400px', objectFit: 'contain' }}
                                 />
                                 {/* Zoom Overlay */}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
                                   <div className="bg-white/90 px-3 py-2 rounded-lg flex items-center gap-2">
                                     <Maximize2 className="w-4 h-4" />
                                     <span className="text-sm font-medium">Click to enlarge</span>
@@ -1795,6 +1665,17 @@ export default function ReviewPapers({ user }) {
         </div>
 
         <div className="flex items-center gap-1 lg:gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={!selectedSubmission}
+            className="text-xs lg:text-sm"
+            title="Download answer sheet as PDF"
+          >
+            <Download className="w-3 h-3 lg:w-4 lg:h-4" />
+            <span className="ml-1 lg:ml-2">Download PDF</span>
+          </Button>
           <Button 
             variant="outline"
             size="sm"
@@ -1880,15 +1761,18 @@ export default function ReviewPapers({ user }) {
           </DialogHeader>
           <div className="overflow-auto p-4" style={{ maxHeight: 'calc(95vh - 80px)' }}>
             {zoomedImage && (
-              <img 
-                src={zoomedImage.src}
-                alt={zoomedImage.title}
+              <div
                 className="mx-auto"
-                style={{ 
-                  width: `${imageZoom}%`,
-                  transition: 'width 0.2s'
-                }}
-              />
+                style={{ width: `${imageZoom}%`, maxWidth: "none", transition: "width 0.2s" }}
+              >
+                <AnnotationImage
+                  imageBase64={zoomedImage.imageBase64}
+                  pageIndex={zoomedImage.pageIndex}
+                  annotations={zoomedImage.annotations || []}
+                  showAnnotations={!!zoomedImage.useOverlay}
+                  interactive={false}
+                />
+              </div>
             )}
           </div>
         </DialogContent>
@@ -2424,17 +2308,18 @@ export default function ReviewPapers({ user }) {
                         <div className="sticky top-2 left-2 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium z-10 inline-block shadow-md">
                           📄 {image.title}
                         </div>
-                        <img 
-                          src={image.src}
-                          alt={image.title}
-                          className="mx-auto rounded-lg mt-2"
-                          style={{ 
-                            width: `${imageZoom}%`,
-                            maxWidth: '100%',
-                            height: 'auto'
-                          }}
-                          loading="lazy"
-                        />
+                        <div
+                          className="mx-auto mt-2"
+                          style={{ width: `${imageZoom}%`, maxWidth: "none" }}
+                        >
+                          <AnnotationImage
+                            imageBase64={image.imageBase64}
+                            pageIndex={idx}
+                            annotations={zoomedImages.annotationsByPage?.[idx] || []}
+                            showAnnotations={!!zoomedImages.useOverlay}
+                            interactive={false}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

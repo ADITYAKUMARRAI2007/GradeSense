@@ -26,6 +26,7 @@ class AnnotationType:
     HIGHLIGHT_BOX = "highlight_box"  # Box around a text region
     COMMENT = "comment"  # Margin comment near anchor
     CALLOUT_LINE = "callout_line"  # Line/arrow from margin note to text
+    BRACKETED_FEEDBACK = "bracketed_feedback"  # Bracketed feedback section
 
 class Annotation:
     """Represents a single annotation on an image"""
@@ -79,6 +80,14 @@ class Annotation:
 
 def get_color_rgb(color_name: str) -> Tuple[int, int, int]:
     """Convert color name to RGB tuple"""
+    if isinstance(color_name, str) and color_name.startswith("#") and len(color_name) == 7:
+        try:
+            r = int(color_name[1:3], 16)
+            g = int(color_name[3:5], 16)
+            b = int(color_name[5:7], 16)
+            return (r, g, b)
+        except Exception:
+            pass
     colors = {
         "green": (34, 197, 94),  # Tailwind green-500
         "red": (239, 68, 68),  # Tailwind red-500
@@ -241,7 +250,7 @@ def draw_error_underline(
 ):
     """Draw a red wavy underline for errors"""
     underline_color = get_color_rgb("red")
-    line_width = 2
+    line_width = 3
     
     # Draw a wavy line (zigzag pattern)
     wave_height = 4
@@ -367,6 +376,27 @@ def draw_callout_line(
     draw.polygon([(x2, y2), left, right], fill=line_color)
 
 
+def draw_bracketed_feedback(
+    draw: ImageDraw,
+    x: int,
+    y: int,
+    text: str,
+    color: str = "red",
+    font: Optional[ImageFont.FreeTypeFont] = None
+):
+    """Draw bracketed feedback with brackets around the text"""
+    note_color = get_color_rgb(color)
+    # Draw brackets
+    bracket_height = 60
+    draw.text((x, y), "[", fill=note_color, font=font)
+    draw.text((x + 20, y), text, fill=note_color, font=font)
+    text_width = draw.textlength(text, font=font) if hasattr(draw, 'textlength') else 100  # approximate
+    draw.text((x + 20 + text_width + 5, y), "]", fill=note_color, font=font)
+    # Draw lines for brackets
+    draw.line([(x + 5, y - 5), (x + 5, y + bracket_height)], fill=note_color, width=2)
+    draw.line([(x + 20 + text_width + 10, y - 5), (x + 20 + text_width + 10, y + bracket_height)], fill=note_color, width=2)
+
+
 def apply_annotations_to_image(
     image_base64: str,
     annotations: List[Annotation]
@@ -446,10 +476,10 @@ def apply_annotations_to_image(
                 draw_score_box(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
 
             elif ann.annotation_type == AnnotationType.MARGIN_NOTE:
-                draw_margin_note(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
+                continue
 
             elif ann.annotation_type == AnnotationType.MARGIN_BRACKET:
-                draw_margin_bracket(draw, ann.x, ann.y, ann.size, ann.color or "red")
+                continue
 
             elif ann.annotation_type == AnnotationType.COMMENT:
                 draw_margin_note(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
@@ -461,6 +491,9 @@ def apply_annotations_to_image(
             elif ann.annotation_type == AnnotationType.CALLOUT_LINE:
                 if ann.width is not None and ann.height is not None:
                     draw_callout_line(draw, ann.x, ann.y, ann.width, ann.height, ann.color or "red")
+        
+            elif ann.annotation_type == AnnotationType.BRACKETED_FEEDBACK:
+                draw_bracketed_feedback(draw, ann.x, ann.y, ann.text, ann.color or "red", font)
         
         # Convert back to base64 with optimized quality for faster processing
         buffered = io.BytesIO()

@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { GraduationCap, Loader2, Mail } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
 const API = `${BACKEND_URL}/api`;
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+  const [examType, setExamType] = useState("upsc");
 
   // Check for existing session on page load
   useEffect(() => {
@@ -38,12 +40,13 @@ export default function LoginPage() {
   const handleGoogleLogin = (role) => {
     // Store role preference for after auth
     localStorage.setItem("preferredRole", role);
+    localStorage.setItem("preferredExamType", examType);
     
     // Get Google Client ID from environment variable
     const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
     const REDIRECT_URI = encodeURIComponent(`${window.location.origin}/callback`);
     const SCOPE = encodeURIComponent("openid profile email");
-    const STATE = encodeURIComponent(JSON.stringify({ role, timestamp: Date.now() }));
+    const STATE = encodeURIComponent(JSON.stringify({ role, exam_type: examType, timestamp: Date.now() }));
     
     // Redirect to Google OAuth
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPE}&state=${STATE}&access_type=offline&prompt=consent`;
@@ -82,10 +85,39 @@ export default function LoginPage() {
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl">Welcome Back</CardTitle>
             <CardDescription>
-              Choose your role to continue with Google Sign In
+              Choose exam type and role to continue with Google Sign In
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Exam Type (Required)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setExamType("upsc")}
+                  className={`p-3 rounded-lg border-2 transition-all text-left ${
+                    examType === "upsc"
+                      ? "border-orange-500 bg-orange-50 text-orange-700"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="font-semibold">UPSC</div>
+                  <div className="text-xs text-gray-500">Competitive evaluation</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExamType("college")}
+                  className={`p-3 rounded-lg border-2 transition-all text-left ${
+                    examType === "college"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="font-semibold">College/School</div>
+                  <div className="text-xs text-gray-500">Academic evaluation</div>
+                </button>
+              </div>
+            </div>
             {/* Teacher Login */}
             <Button
               onClick={() => handleGoogleLogin("teacher")}
